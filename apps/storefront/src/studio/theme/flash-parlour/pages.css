@@ -44,6 +44,7 @@
 .fp-label-strong {
 	color: var(--ink);
 	font-family: var(--display-face);
+	font-weight: 700;
 	font-size: 1.5rem;
 	line-height: 1.2;
 }
@@ -171,6 +172,10 @@
 }
 .fp-band .actions {
 	justify-content: center;
+}
+/* The shared invitation's words and its button, centred together. */
+.fp-band .stack {
+	justify-items: center;
 }
 .fp-intro-body {
 	display: grid;
@@ -309,9 +314,12 @@
 }
 
 .fp-flash-grid {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 1.75rem 1rem;
+	--fp-cols: 2;
+	--fp-gap: 1rem;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 1.75rem var(--fp-gap);
 	margin: 0;
 	padding: 0.5rem 0 0;
 	list-style: none;
@@ -323,18 +331,18 @@
 }
 @media (min-width: 40rem) {
 	.fp-flash-grid {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		--fp-cols: 3;
 	}
 }
 @media (min-width: 60rem) {
 	.fp-flash-grid {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		--fp-cols: 4;
 		row-gap: 2.25rem;
 	}
 }
 @media (min-width: 80rem) {
 	.fp-flash-grid-wall {
-		grid-template-columns: repeat(6, minmax(0, 1fr));
+		--fp-cols: 6;
 	}
 }
 
@@ -345,7 +353,9 @@
  * the price on a mustard tag (or "Ask for a price"), whose it is, and the red
  * "Request this design".
  */
+/* Equal widths, a row's worth of columns (the grid's --fp-cols); a short wall sits in the middle, not at the start. */
 .fp-card {
+	flex: 0 0 calc((100% - (var(--fp-cols) - 1) * var(--fp-gap)) / var(--fp-cols));
 	position: relative;
 	display: flex;
 	flex-direction: column;
@@ -406,6 +416,7 @@
 }
 .fp-card-name {
 	font-family: var(--display-face);
+	font-weight: 700;
 	font-size: 1.125rem;
 	line-height: 1.25;
 	overflow-wrap: anywhere;
@@ -443,6 +454,7 @@
 }
 .fp-card-price-ask {
 	border-style: dashed;
+	border-radius: var(--radius);
 	background: transparent;
 	font-weight: 700;
 }
@@ -577,6 +589,60 @@
 	.fp-hero-grid {
 		grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
 		gap: 3rem;
+	}
+}
+
+/*
+ * The shop's sign over the wall: one short band (kind and place, the name,
+ * the hours line, the way to book), so the flash is right under it. Stacked
+ * on a phone; the actions beside the name from 48rem.
+ */
+.fp-sign {
+	padding-block: clamp(0.875rem, 0.6rem + 1vw, 1.5rem);
+}
+.fp-sign-inner {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.625rem 2rem;
+}
+.fp-sign-text {
+	display: grid;
+	gap: 0.125rem;
+	min-inline-size: 0;
+	max-inline-size: 100%;
+}
+.fp-sign-name {
+	min-inline-size: 0;
+	font-size: clamp(1.75rem, 1.3rem + 2vw, 3rem);
+	line-height: 1.1;
+	text-shadow: 2px 2px 0 var(--fp-mustard);
+	overflow-wrap: anywhere;
+}
+.fp-sign .profile-hours {
+	color: var(--ink);
+	font-weight: 600;
+}
+.fp-sign-actions {
+	justify-content: flex-start;
+	margin: 0;
+}
+:root.theme-flash-parlour .fp-sign-actions .action,
+.fp-sign-actions .fp-button {
+	min-block-size: 2.75rem;
+	padding: 0.375rem 1rem;
+	font-size: 0.9375rem;
+}
+/* A phone keeps both on one row, so the wall starts a row sooner. */
+@media (max-width: 26rem) {
+	.fp-sign-actions {
+		gap: 0.5rem;
+	}
+	:root.theme-flash-parlour .fp-sign-actions .action,
+	.fp-sign-actions .fp-button {
+		padding-inline: 0.625rem;
+		font-size: 0.875rem;
 	}
 }
 
@@ -805,6 +871,7 @@
 	position: relative;
 	color: var(--ink);
 	font-family: var(--display-face);
+	font-weight: 700;
 	font-size: 3.5rem;
 	line-height: 1;
 }
@@ -984,6 +1051,7 @@
 }
 .fp-neighbour-name {
 	font-family: var(--display-face);
+	font-weight: 700;
 	font-size: 1.625rem;
 	line-height: 1.2;
 	overflow-wrap: anywhere;
@@ -1102,16 +1170,39 @@
 .fp-artwork-figure .artwork-video-hint {
 	text-decoration: none;
 }
-/* Angles: each photo or video whole on the cream in an ink outline; the one shown ringed in red. */
+/*
+ * Angles: each photo or video whole on the cream in an ink outline. The one
+ * shown has a heavier ink border and a mustard bar along its foot; the
+ * outline is focus's alone, so the shown and the focused thumbnails always
+ * look different.
+ */
 .fp-artwork-figure .artwork-angle {
+	position: relative;
 	border: 2px solid var(--ink);
 	border-radius: var(--radius);
 	background: var(--paper);
 }
 .fp-artwork-figure .artwork-angle[aria-current="true"] {
-	border-color: var(--ink);
+	border-width: 3px;
+	outline: none;
+}
+.fp-artwork-figure .artwork-angle[aria-current="true"]::after {
+	content: "";
+	position: absolute;
+	inset-inline: 0;
+	inset-block-end: 0;
+	block-size: 0.375rem;
+	border-block-start: 2px solid var(--ink);
+	background: var(--fp-mustard);
+}
+.fp-artwork-figure .artwork-angle:focus-visible {
 	outline: 3px solid var(--stencil);
-	outline-offset: 2px;
+	outline-offset: 3px;
+}
+@media (forced-colors: active) {
+	.fp-artwork-figure .artwork-angle[aria-current="true"] {
+		border-width: 5px;
+	}
 }
 .fp-colophon-ask {
 	display: grid;
@@ -1148,6 +1239,7 @@
 }
 .fp-artwork-artist-name {
 	font-family: var(--display-face);
+	font-weight: 700;
 	font-size: 1.625rem;
 	line-height: 1.2;
 	overflow-wrap: anywhere;

@@ -15,7 +15,7 @@ const copy = flashParlourCopy.wall;
  * cell, never cropped: the picture's own width and height are its `<img>`'s),
  * then its name (the sheet's link to the design's page, the picture being
  * decoration inside it, `alt=""`), its size and its price (or "Ask for a
- * price"), whose design it is (`showArtist`), and "Request this design" into
+ * price" while it can be asked for), whose design it is (`showArtist`), and "Request this design" into
  * the flash request flow while it can be asked for. A design that can't be
  * asked for now says why in the artist's own words, else ours; one someone
  * has claimed is greyed, stamped "Claimed" and asks for nothing (its page
@@ -109,16 +109,21 @@ function FlashCard({
 				</RouterAnchor>
 			) : null}
 			<p className="fp-card-facts">
+				<span className="sr-only">{`${studioCopy.flash.size}: `}</span>
 				<span className="fp-card-size user-text" dir="auto">
 					{design.size}
 				</span>
+				{design.priceText || requestable ? (
+					<span className="sr-only">{` ${studioCopy.flash.price}: `}</span>
+				) : null}
 				{design.priceText ? (
 					<span className="fp-card-price">{design.priceText}</span>
-				) : design.claimed ? null : (
+				) : requestable ? (
+					// "Ask for a price" only while the design can be asked for.
 					<span className="fp-card-price fp-card-price-ask">
 						{copy.askPrice}
 					</span>
-				)}
+				) : null}
 			</p>
 			{showArtist && design.artist ? (
 				<p className="fp-card-by">
@@ -135,12 +140,12 @@ function FlashCard({
 			) : null}
 			{requestable ? (
 				<RouterAnchor className="fp-card-request" href={design.requestHref}>
-					<span>
-						{copy.request}
-						<span className="sr-only">
-							<Fill template={copy.requestOf} values={{ name: design.name }} />
-						</span>
+					{/* One accessible name, "Request this design: Moth" (a hidden span beside
+					    the words would add a space before the colon); the words are shown. */}
+					<span className="sr-only">
+						<Fill template={copy.requestOf} values={{ name: design.name }} />
 					</span>
+					<span aria-hidden="true">{copy.request}</span>
 				</RouterAnchor>
 			) : null}
 		</li>

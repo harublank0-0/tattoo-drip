@@ -15,6 +15,8 @@ const copy = flashParlourCopy.book;
  * unchanged: its steps, rules, data and Turnstile are every theme's
  * (InquirySection); only the opening and the cream are Flash Parlour's. While
  * nobody takes new work the opening invites nothing and the section says so.
+ * The opening speaks of the flash wall only while the studio shows Flash and
+ * has a design on it (`hasFlash`).
  */
 export function FlashParlourBookPage({
 	data,
@@ -41,7 +43,13 @@ export function FlashParlourBookPage({
 				label={copy.label}
 				title={open ? copy.open : copy.closed}
 				titleId="inquiry-title"
-				line={open ? copy.openLine : undefined}
+				line={
+					open
+						? data.hasFlash
+							? copy.openLineFlash
+							: copy.openLine
+						: undefined
+				}
 			/>
 			<div className="fp-container fp-book-body">
 				<InquirySection

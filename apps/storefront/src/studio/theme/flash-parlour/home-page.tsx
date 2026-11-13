@@ -27,19 +27,19 @@ import { leadSizes } from "./sizes.ts";
 const copy = flashParlourCopy.home;
 
 /**
- * The wall's first row on a phone, loaded at once (React preloads each); the
- * rest are lazy, which still loads those already on a wide first screen.
+ * The wall's first six, loaded at once (a phone shows six; React preloads
+ * each); the rest are lazy, which still loads those on a wide first screen.
  */
-const EAGER_WALL = 2;
+const EAGER_WALL = 6;
 
 /**
  * Flash Parlour's studio page (`/`): the same data as every theme's
  * (loadStudioPage; this theme's home reads twelve available designs instead
- * of six, homeFlashCount). It opens on the studio's available flash pinned up
- * as a wall: each design on its sheet with its name, size and price, and
- * "Request this design" into the flash request flow; then the shop's sign:
+ * of six, homeFlashCount). It opens with the shop's sign, one short band:
  * its kind and place, its name (the page's h1), the hours line and the way
- * to book. A studio with no flash to show (none, Flash hidden in Page look,
+ * to book; right under it, the studio's available flash pinned up as a wall,
+ * each design on its sheet with its name, size and price, and "Request this
+ * design" into the flash request flow. A studio with no flash to show (none, Flash hidden in Page look,
  * or a failed read) leads with its work instead (its cover, else its largest
  * piece, else type alone on a star), never with a made-up design. Then its
  * introduction and its sections in its Page look order, each as Flash
@@ -67,78 +67,67 @@ export function FlashParlourStudioPage({
 			mainClassName="fp-main fp-home"
 		>
 			{walled ? (
-				<section id="flash" className="fp-wall" aria-labelledby="flash-title">
-					<div className="fp-container">
-						<div className="fp-wall-head">
-							<RibbonTitle id="flash-title">
-								{flashParlourCopy.wall.title}
-							</RibbonTitle>
-							<p className="fp-wall-line">{flashParlourCopy.wall.line}</p>
-						</div>
-						<FlashSheet
-							designs={home.wall}
-							artists={data.artists}
-							wall
-							eager={EAGER_WALL}
-						/>
-						<p className="fp-wall-all">
-							<RouterAnchor className="fp-button" href={flashHref({})}>
-								{flashParlourCopy.wall.all}
-							</RouterAnchor>
-						</p>
-					</div>
-				</section>
-			) : null}
-			<header className={walled ? "fp-hero fp-hero-after-wall" : "fp-hero"}>
-				<div
-					className={
-						home.lead
-							? "fp-container fp-hero-grid"
-							: "fp-container fp-hero-sign"
-					}
-				>
-					{home.lead ? <LeadFigure lead={home.lead} /> : null}
-					<div className="fp-hero-text">
-						{theme.logo ? (
-							<BrandLogo
-								image={theme.logo}
-								className="profile-logo"
-								sizes={logoSizes(theme.logo, "hero")}
-							/>
-						) : null}
-						{walled || home.lead ? null : (
-							<div className="fp-hero-ornament" aria-hidden="true">
-								<Star tone="red" />
-								<Star tone="mustard" className="fp-star-large" />
-								<Star tone="green" />
+				<>
+					<ShopSign data={data} />
+					<section id="flash" className="fp-wall" aria-labelledby="flash-title">
+						<div className="fp-container">
+							<div className="fp-wall-head">
+								<RibbonTitle id="flash-title">
+									{flashParlourCopy.wall.title}
+								</RibbonTitle>
+								<p className="fp-wall-line">{flashParlourCopy.wall.line}</p>
 							</div>
-						)}
-						<p className="fp-kicker user-text" dir="auto">
-							{studio.location
-								? `${studio.typeLabel} · ${studio.location}`
-								: studio.typeLabel}
-						</p>
-						<h1 className="fp-hero-name" dir="auto">
-							{studio.name}
-						</h1>
-						{data.openNow ? <OpenNow view={data.openNow} /> : null}
-						<div className="fp-hero-actions">
-							{data.requestLink ? (
-								<BookingCta link={data.requestLink} className="fp-cta" />
-							) : (
-								<p className="fp-status fp-status-closed">
-									{studioCopy.notTaking}
-								</p>
-							)}
-							{data.recentWork.photos.length > 0 ? (
-								<RouterAnchor className="fp-button" href={workHref({})}>
-									{copy.viewGallery}
+							<FlashSheet
+								designs={home.wall}
+								artists={data.artists}
+								wall
+								eager={EAGER_WALL}
+							/>
+							<p className="fp-wall-all">
+								<RouterAnchor className="fp-button" href={flashHref({})}>
+									{flashParlourCopy.wall.all}
 								</RouterAnchor>
+							</p>
+						</div>
+					</section>
+				</>
+			) : (
+				<header className="fp-hero">
+					<div
+						className={
+							home.lead
+								? "fp-container fp-hero-grid"
+								: "fp-container fp-hero-sign"
+						}
+					>
+						{home.lead ? <LeadFigure lead={home.lead} /> : null}
+						<div className="fp-hero-text">
+							{theme.logo ? (
+								<BrandLogo
+									image={theme.logo}
+									className="profile-logo"
+									sizes={logoSizes(theme.logo, "hero")}
+								/>
 							) : null}
+							{home.lead ? null : (
+								<div className="fp-hero-ornament" aria-hidden="true">
+									<Star tone="red" />
+									<Star tone="mustard" className="fp-star-large" />
+									<Star tone="green" />
+								</div>
+							)}
+							<p className="fp-kicker user-text" dir="auto">
+								{kickerOf(data)}
+							</p>
+							<h1 className="fp-hero-name" dir="auto">
+								{studio.name}
+							</h1>
+							{data.openNow ? <OpenNow view={data.openNow} /> : null}
+							<HeroActions data={data} className="fp-hero-actions" />
 						</div>
 					</div>
-				</div>
-			</header>
+				</header>
+			)}
 			{studio.intro ? (
 				<section
 					className="fp-section fp-intro"
@@ -158,6 +147,62 @@ export function FlashParlourStudioPage({
 				<HomeSection key={section} section={section} data={data} home={home} />
 			))}
 		</Shell>
+	);
+}
+
+/** The studio's kind and place, on one line. */
+function kickerOf(data: StudioPageData): string {
+	const { studio } = data;
+	return studio.location
+		? `${studio.typeLabel} · ${studio.location}`
+		: studio.typeLabel;
+}
+
+/** The way to book (or the closed line) and, while there is work, the way to the gallery. */
+function HeroActions({
+	data,
+	className,
+}: {
+	data: StudioPageData;
+	className: string;
+}) {
+	return (
+		<div className={className}>
+			{data.requestLink ? (
+				<BookingCta link={data.requestLink} className="fp-cta" />
+			) : (
+				<p className="fp-status fp-status-closed">{studioCopy.notTaking}</p>
+			)}
+			{data.recentWork.photos.length > 0 ? (
+				<RouterAnchor className="fp-button" href={workHref({})}>
+					{copy.viewGallery}
+				</RouterAnchor>
+			) : null}
+		</div>
+	);
+}
+
+/**
+ * The shop's sign over the wall: the studio's kind and place, its name (the
+ * page's h1, compact in the display face), the hours line and the way to
+ * book, in one short band, so the flash is right under it at every width.
+ */
+function ShopSign({ data }: { data: StudioPageData }) {
+	return (
+		<header className="fp-sign">
+			<div className="fp-container fp-sign-inner">
+				<div className="fp-sign-text">
+					<p className="fp-kicker user-text" dir="auto">
+						{kickerOf(data)}
+					</p>
+					<h1 className="fp-sign-name" dir="auto">
+						{data.studio.name}
+					</h1>
+					{data.openNow ? <OpenNow view={data.openNow} /> : null}
+				</div>
+				<HeroActions data={data} className="fp-hero-actions fp-sign-actions" />
+			</div>
+		</header>
 	);
 }
 

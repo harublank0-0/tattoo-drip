@@ -45,20 +45,31 @@ function capped(box: string, cap: readonly string[]): string {
 }
 
 /**
+ * A sheet's insets around its picture (pages.css): the card's padding (0.625rem
+ * a side) and 3px outline, the picture cell's padding (0.375rem a side) and
+ * 2px border, both sides: 2.625rem in all.
+ */
+export const SHEET_INSET_REM = 2 * (0.625 + 0.1875 + 0.375 + 0.125);
+
+/**
  * A flash design on a sheet (`.fp-flash-grid`): a square cell, the picture
- * contained whole in it, so the cell's width is the most it needs. The home
- * page's wall (`wall`) takes six columns from 80rem.
+ * contained whole in it, so the cell's inner width is the most it needs: the
+ * column less the sheet's insets. The home page's wall (`wall`) takes six
+ * columns from 80rem.
  */
 export function flashSheetSizes(wall: boolean): string {
-	const four = round((COLUMN_REM - 3 * FLASH_GAP_REM) / 4);
+	const inner = (columns: number, gaps: number) =>
+		`calc((100vw - ${round(GUTTER_REM + gaps)}rem) * ${round(1 / columns)} - ${SHEET_INSET_REM}rem)`;
 	return [
 		...(wall
-			? [`(min-width: 80rem) ${round((COLUMN_REM - 5 * FLASH_GAP_REM) / 6)}rem`]
+			? [
+					`(min-width: 80rem) ${round((COLUMN_REM - 5 * FLASH_GAP_REM) / 6 - SHEET_INSET_REM)}rem`,
+				]
 			: []),
-		`(min-width: ${WIDE_FROM}rem) ${four}rem`,
-		`(min-width: 60rem) ${columnCalc(4, 3 * FLASH_GAP_REM)}`,
-		`(min-width: 40rem) ${columnCalc(3, 2 * FLASH_GAP_REM)}`,
-		columnCalc(2, FLASH_GAP_REM),
+		`(min-width: ${WIDE_FROM}rem) ${round((COLUMN_REM - 3 * FLASH_GAP_REM) / 4 - SHEET_INSET_REM)}rem`,
+		`(min-width: 60rem) ${inner(4, 3 * FLASH_GAP_REM)}`,
+		`(min-width: 40rem) ${inner(3, 2 * FLASH_GAP_REM)}`,
+		inner(2, FLASH_GAP_REM),
 	].join(", ");
 }
 

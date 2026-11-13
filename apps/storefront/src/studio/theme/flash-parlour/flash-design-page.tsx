@@ -2,7 +2,8 @@ import { Fill } from "../../../intake/components/fill.tsx";
 import { RouterAnchor } from "../../components/router-anchor.tsx";
 import type { Shell } from "../../components/shell.tsx";
 import { studioCopy } from "../../copy.ts";
-import { flashHref, isAllowedHref, requestHref } from "../../links.ts";
+import { flashDesignAction } from "../../flash.ts";
+import { flashHref, isAllowedHref } from "../../links.ts";
 import type { FlashDesignPageData } from "../../loaders.ts";
 import { flashParlourCopy } from "./copy.ts";
 import { Star } from "./ornaments.tsx";
@@ -18,14 +19,14 @@ const BY = studioCopy.flash.by.replace("{name}", "");
  * One flash design's page (`/flash/$id`) in Flash Parlour: the design pinned
  * up large on its sheet, whole (`object-fit: contain`, the picture's own
  * width and height), eager and high priority; beside it from 60rem its
- * ticket: its name (the page's h1), whose it is, its size, its price or "Ask
- * for a price", and its state ("Available", the artist's own words why it
+ * ticket: its name (the page's h1), whose it is, its size, its price (or "Ask
+ * for a price" while it can be asked for), and its state ("Available", the artist's own words why it
  * can't be asked for now, or "Claimed", when the studio shows claimed
  * designs, with the sheet greyed and stamped); then "Request this design"
  * while it can be, "Ask for something similar" (the artist) or "Send your
  * idea" (the studio) for a claimed one while someone takes work, and the
- * way to the rest of the artist's flash. The same data every theme gets
- * (loadFlashDesignPage).
+ * way to the rest of the artist's flash (flashDesignAction, shared with every
+ * theme). The same data every theme gets (loadFlashDesignPage).
  */
 export function FlashParlourFlashDesignPage({
 	data,
@@ -37,15 +38,7 @@ export function FlashParlourFlashDesignPage({
 	const { studio, theme, design, closedNote, similar } = data;
 	const artist =
 		design.artist && isAllowedHref(design.artist.href) ? design.artist : null;
-	const action = design.claimed
-		? similar === "artist"
-			? { href: design.requestHref, label: studioCopy.flash.similar }
-			: similar === "studio"
-				? { href: requestHref({}), label: studioCopy.sendIdea }
-				: null
-		: closedNote === null
-			? { href: design.requestHref, label: studioCopy.flash.request }
-			: null;
+	const action = flashDesignAction(design, closedNote, similar);
 	const state = design.claimed
 		? "claimed"
 		: closedNote === null
@@ -126,7 +119,8 @@ export function FlashParlourFlashDesignPage({
 									{design.size}
 								</dd>
 							</div>
-							{design.priceText || !design.claimed ? (
+							{design.priceText || state === "available" ? (
+								// "Ask for a price" only while it can be asked for.
 								<div>
 									<dt>{studioCopy.flash.price}</dt>
 									<dd>{design.priceText ?? flashParlourCopy.wall.askPrice}</dd>

@@ -23,6 +23,7 @@ import {
 	flashDesignPageData,
 	flashPageData,
 	infoPageData,
+	loadRequestPage,
 	loadStudioPage,
 	requestPageData,
 	studioPageData,
@@ -36,23 +37,31 @@ import {
 } from "../../src/studio/theme/branding.ts";
 import { contrastRatio } from "../../src/studio/theme/color.ts";
 import {
+	FONT_KEYS,
 	parseThemeConfig,
 	THEME_KEYS,
 	THEME_SECTIONS,
 	type ThemeConfig,
+	type ThemeKey,
 } from "../../src/studio/theme/config.ts";
 import { initialOf } from "../../src/studio/theme/flash-parlour/artist-index.tsx";
 import { flashParlourHome } from "../../src/studio/theme/flash-parlour/home-view.ts";
 import {
 	flashSheetSizes,
 	pieceSizes,
+	SHEET_INSET_REM,
 } from "../../src/studio/theme/flash-parlour/sizes.ts";
 import {
 	FLASH_PARLOUR_CLASS,
 	FLASH_PARLOUR_SCHEME,
 	FLASH_PARLOUR_THEME_COLOR,
 } from "../../src/studio/theme/flash-parlour/theme.ts";
-import { matchedThemeKey, THEME_HTML } from "../../src/studio/theme/html.ts";
+import {
+	headingFontFile,
+	matchedHeadingFont,
+	matchedThemeKey,
+	THEME_HTML,
+} from "../../src/studio/theme/html.ts";
 import {
 	readPreviewTheme,
 	THEME_NAMES,
@@ -267,6 +276,93 @@ describe("Flash Parlour's palette (theme.ts and styles.css agree)", () => {
 		}
 	});
 
+	test("display text asks for bold, with no faux bold: Shrikhand stays its one face, a fallback gets its real bold", () => {
+		assert.match(css, /:root\.theme-flash-parlour \{ font-synthesis: none; \}/);
+		assert.match(
+			css,
+			/:root\.theme-flash-parlour h1, :root\.theme-flash-parlour h2, :root\.theme-flash-parlour h3 \{ font-weight: 700; \}/,
+		);
+		// Only the @font-face blocks say 400; every rule in the display face asks for 700.
+		const body = (sheet: string) =>
+			bare(sheet).replace(/@font-face \{[^}]*\}/g, "");
+		for (const sheet of [css, pagesCss]) {
+			assert.doesNotMatch(body(sheet), /font-weight: 400/);
+			for (const match of body(sheet).matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+				if (/font-family: var\(--display-face\)/.test(match[2])) {
+					assert.match(match[2], /font-weight: 700;/, match[1].trim());
+				}
+			}
+		}
+	});
+
+	test("the chat button's focus ring reads where the button floats, over the cream and over the black footer, whatever the accent", () => {
+		const rule = ruleOf(
+			css,
+			":root.theme-flash-parlour .chat-float :focus-visible",
+		);
+		const shadow =
+			/box-shadow: 0 0 0 3px var\((--[a-z-]+)\), 0 0 0 6px var\((--[a-z-]+)\);/.exec(
+				rule,
+			);
+		assert.ok(shadow, rule);
+		const [inner, outer] = [token(shadow[1]), token(shadow[2])];
+		// The places it floats over: every surface of the page, and the footer's black.
+		const places = {
+			cream: token("--paper"),
+			raised: token("--paper-raised"),
+			sheet: token("--fp-sheet"),
+			footer: token("--ink"),
+		};
+		for (const [place, colour] of Object.entries(places)) {
+			const best = Math.max(
+				contrastRatio(inner, colour),
+				contrastRatio(outer, colour),
+			);
+			assert.ok(best >= 3, `the ring on the ${place}: ${best.toFixed(2)}`);
+		}
+		// The two bands read against each other, and neither is the accent a studio can change.
+		assert.ok(contrastRatio(inner, outer) >= 3);
+		assert.doesNotMatch(rule, /--stencil/);
+		const branded = brandingCss({
+			...parseThemeConfig({ theme: "flash-parlour" }, null),
+			accent: "#0f5e58",
+		});
+		assert.ok(branded);
+		assert.doesNotMatch(branded, /--paper|--ink/);
+		// A forced-colour device draws the outline it keeps.
+		assert.match(rule, /outline: 3px solid transparent;/);
+	});
+
+	test("the tattoo's angles: the one shown marked by a heavier border and a mustard bar, the outline left to focus", () => {
+		const current = ruleOf(
+			pagesCss,
+			'.fp-artwork-figure .artwork-angle[aria-current="true"]',
+		);
+		assert.match(current, /outline: none;/);
+		assert.match(current, /border-width: 3px;/);
+		assert.match(
+			ruleOf(
+				pagesCss,
+				'.fp-artwork-figure .artwork-angle[aria-current="true"]::after',
+			),
+			/background: var\(--fp-mustard\);/,
+		);
+		const focus = ruleOf(
+			pagesCss,
+			".fp-artwork-figure .artwork-angle:focus-visible",
+		);
+		assert.match(focus, /outline: 3px solid var\(--stencil\);/);
+		// Same specificity, later in the sheet: focus still draws its ring on the shown one.
+		assert.ok(
+			bare(pagesCss).indexOf(
+				".fp-artwork-figure .artwork-angle:focus-visible {",
+			) >
+				bare(pagesCss).indexOf(
+					'.fp-artwork-figure .artwork-angle[aria-current="true"] {',
+				),
+		);
+	});
+
 	test("one light scheme whatever the device prefers, its own font only, and imported", () => {
 		assert.equal(css.match(/color-scheme:\s*light/g)?.length, 1);
 		assert.doesNotMatch(css, /prefers-color-scheme/);
@@ -323,13 +419,49 @@ describe("Flash Parlour's palette (theme.ts and styles.css agree)", () => {
 			root,
 			/import shrikhandLatin from "\.\.\/assets\/fonts\/shrikhand\/shrikhand-latin-400-normal\.woff2\?url";/,
 		);
-		assert.match(root, /if \(font !== "eczar"\) return eczarLatin;/);
-		assert.match(
-			root,
-			/if \(theme === "flash-parlour"\) return shrikhandLatin;/,
-		);
+		assert.match(root, /shrikhand: shrikhandLatin,/);
+		assert.match(root, /preloadedFont\(matchedHeadingFont\(matches\)\)/);
 		// One preload, whichever face it is (assets.test.ts).
 		assert.equal(root.match(/rel:\s*"preload"/g)?.length, 1);
+	});
+
+	test("the one preloaded heading font, for every theme and font: the theme's own face only with the default font", () => {
+		const own: Record<ThemeKey, string> = {
+			"stencil-and-ink": "eczar",
+			"ink-noir": "eczar",
+			irezumi: "eczar",
+			atelier: "bodoni-moda",
+			"flash-parlour": "shrikhand",
+		};
+		for (const theme of THEME_KEYS) {
+			for (const font of FONT_KEYS) {
+				assert.equal(
+					headingFontFile(theme, font),
+					font === "eczar" ? own[theme] : "eczar",
+					`${theme} × ${font}`,
+				);
+			}
+		}
+		// From the router's matches: the root's studio decides, and /deposit is unthemed.
+		const root = (font: string) => ({
+			routeId: "__root__",
+			loaderData: parlour({
+				branding: { ...DEFAULT_STOREFRONT?.branding, font },
+			}),
+		});
+		assert.equal(
+			matchedHeadingFont([root("eczar"), { routeId: "/" }]),
+			"shrikhand",
+		);
+		assert.equal(
+			matchedHeadingFont([root("serif"), { routeId: "/" }]),
+			"eczar",
+		);
+		assert.equal(
+			matchedHeadingFont([root("eczar"), { routeId: "/deposit" }]),
+			"eczar",
+		);
+		assert.equal(matchedHeadingFont([]), "eczar");
 	});
 
 	test("every rule is scoped: it starts at the theme's class or an fp- class", () => {
@@ -555,14 +687,33 @@ describe("Flash Parlour's home page: flash leads", () => {
 		assert.doesNotMatch(html, /class="(site-bar|ink-header|atl-header)"/);
 	});
 
-	test("the page opens on the wall: the available designs as sheets, then the shop's name, hours and booking", () => {
-		const html = homeHtml(parlour(), [SITA, ARJUN], work, flashPage(14));
+	test("the page opens with the shop's slim sign (its name the first heading, the h1), then the wall of available designs", () => {
+		const html = homeHtml(
+			parlour({}, GOOD_TO_KNOW_STUDIO),
+			[SITA, ARJUN],
+			work,
+			flashPage(14),
+		);
 		const main = mainOf(html);
 		assert.match(
 			main,
-			/^<section id="flash" class="fp-wall" aria-labelledby="flash-title">/,
+			/^<header class="fp-sign"><div class="fp-container fp-sign-inner"><div class="fp-sign-text"><p class="fp-kicker user-text" dir="auto">[^<]+<\/p><h1 class="fp-sign-name" dir="auto">Black Needle<\/h1>/,
 		);
-		assert.ok(main.indexOf('id="flash"') < main.indexOf("<h1"));
+		// The first heading is the h1; the wall's ribbon follows as an h2, then the hours and booking come with the h1.
+		const headings = Array.from(main.matchAll(/<h([1-3])[\s>]/g), (m) => m[1]);
+		assert.deepEqual(headings.slice(0, 2), ["1", "2"]);
+		const h1 = main.indexOf("<h1");
+		const hours = main.indexOf('class="profile-hours"');
+		const booking = main.indexOf('href="/book"');
+		const wall = main.indexOf('<section id="flash" class="fp-wall"');
+		assert.ok(
+			h1 < hours && hours < booking && booking < wall,
+			"name, hours, booking, then the wall",
+		);
+		assert.ok(
+			wall > 0 && !main.slice(0, wall).includes("<img"),
+			"nothing but the sign before the flash",
+		);
 		assert.match(
 			html,
 			/<h2 id="flash-title" class="fp-ribbon-title"><span class="fp-ribbon"><svg class="fp-ribbon-tail fp-ribbon-tail-start"[^>]*aria-hidden="true"/,
@@ -575,17 +726,13 @@ describe("Flash Parlour's home page: flash leads", () => {
 			/<ul class="fp-flash-grid fp-flash-grid-wall" role="list">/,
 		);
 		assert.match(html, /href="\/flash">See all the flash</);
-		// Then the sign: the name is the h1, the booking action under it.
-		assert.match(
-			html,
-			/<h1 class="fp-hero-name" dir="auto">Black Needle<\/h1>/,
-		);
 		assert.match(
 			html,
 			/<a class="action action-primary fp-cta" href="\/book">Request a session<\/a>/,
 		);
-		// No photo leads while the flash does, and Flash isn't drawn twice.
-		assert.doesNotMatch(html, /fp-hero-plate/);
+		// No photo or second hero while the flash leads, and Flash isn't drawn twice.
+		assert.doesNotMatch(html, /fp-hero-plate|class="fp-hero"/);
+		assert.equal(html.match(/<h1/g)?.length, 1);
 		assert.equal(html.match(/id="flash"/g)?.length, 1);
 	});
 
@@ -605,13 +752,13 @@ describe("Flash Parlour's home page: flash leads", () => {
 		);
 		assert.match(
 			first,
-			/<span class="fp-card-size user-text" dir="auto">About 3 in<\/span><span class="fp-card-price">NPR 3,000<\/span>/,
+			/<p class="fp-card-facts"><span class="sr-only">Size: <\/span><span class="fp-card-size user-text" dir="auto">About 3 in<\/span><span class="sr-only"> Price: <\/span><span class="fp-card-price">NPR 3,000<\/span><\/p>/,
 		);
 		assert.match(first, /<p class="fp-card-by">by <bdi>Sita Rai<\/bdi><\/p>/);
 		assert.match(
 			first,
 			new RegExp(
-				`<a class="fp-card-request" href="/book\\?flash=${flashId(1)}"><span>Request this design<span class="sr-only">: <bdi>Moth</bdi></span></span></a>`,
+				`<a class="fp-card-request" href="/book\\?flash=${flashId(1)}"><span class="sr-only">Request this design: <bdi>Moth</bdi></span><span aria-hidden="true">Request this design</span></a>`,
 			),
 		);
 		// A design without a price says to ask; never a made-up one.
@@ -625,10 +772,55 @@ describe("Flash Parlour's home page: flash leads", () => {
 			first,
 			new RegExp(`sizes="${escapeRegExp(flashSheetSizes(true))}"`),
 		);
-		assert.match(
-			flashSheetSizes(true),
-			/^\(min-width: 80rem\) 11\.84rem, \(min-width: 78\.5rem\) 18\.25rem/,
+		// The first six load at once (a phone shows six), the rest lazily.
+		const many = homeHtml(parlour(), [SITA, ARJUN], null, flashPage(12));
+		const loading = Array.from(
+			many.matchAll(/<img class="fp-card-picture"[^>]* loading="(\w+)"/g),
+			(m) => m[1],
 		);
+		assert.deepEqual(loading, [
+			...Array(6).fill("eager"),
+			...Array(6).fill("lazy"),
+		]);
+	});
+
+	test("a sheet's sizes are the picture's own width: never smaller than drawn, never a column's worth more", () => {
+		// The page's model (pages.css): the column, the wall's columns and gap,
+		// and the sheet's insets around the picture.
+		const REM = 16;
+		const drawn = (viewport: number, wall: boolean) => {
+			const column = Math.min(76 * REM, viewport - 2.5 * REM);
+			const columns =
+				wall && viewport >= 80 * REM
+					? 6
+					: viewport >= 60 * REM
+						? 4
+						: viewport >= 40 * REM
+							? 3
+							: 2;
+			return (column - (columns - 1) * REM) / columns - SHEET_INSET_REM * REM;
+		};
+		for (const wall of [true, false]) {
+			for (const viewport of [
+				320, 375, 414, 640, 768, 1024, 1280, 1440, 1920,
+			]) {
+				const asked = evaluateSizes(flashSheetSizes(wall), viewport, REM);
+				const real = drawn(viewport, wall);
+				assert.ok(
+					asked >= real - 0.5,
+					`${viewport}: asks ${asked}, drawn ${real}`,
+				);
+				assert.ok(
+					asked <= real * 1.05 + 1,
+					`${viewport}: asks ${asked}, drawn ${real}`,
+				);
+			}
+		}
+		assert.equal(SHEET_INSET_REM, 2.625);
+		// A 2x screen of 1280 px or more takes the 320 px copy for the wall.
+		for (const viewport of [1280, 1440, 1920]) {
+			assert.ok(evaluateSizes(flashSheetSizes(true), viewport, REM) * 2 <= 320);
+		}
 	});
 
 	test("on a phone the wall shows its first six, the rest a link away", () => {
@@ -742,14 +934,28 @@ describe("Flash Parlour's home page: flash leads", () => {
 		assert.doesNotMatch(html, /id="good-to-know"/);
 	});
 
-	test("a closed studio offers no booking link and says so; its wall asks for nothing", () => {
-		const html = homeHtml(parlour({}, CLOSED_STUDIO), [
-			{ ...SITA, acceptingInquiries: false },
-			ARJUN,
-		]);
+	test("a closed studio offers no general booking link and says so; each design asks for itself as its artist's flash setting says", () => {
+		// `requestable` is the artist's flash setting (the API's), not the studio's switch.
+		const flash = flashWith(3, (design, index) =>
+			index === 1 ? { ...design, requestable: false, price: null } : design,
+		);
+		const html = homeHtml(
+			parlour({}, CLOSED_STUDIO),
+			[{ ...SITA, acceptingInquiries: false }, ARJUN],
+			null,
+			flash,
+		);
 		assertSafePage(html);
+		assert.equal(html.match(/<li class="fp-card/g)?.length, 3);
 		assert.doesNotMatch(html, /href="\/book"/);
 		assert.match(html, /Not taking new inquiries right now/);
+		assert.equal(html.match(/class="fp-card-request"/g)?.length, 2);
+		const closed = /<li class="fp-card fp-card-closed">([\s\S]*?)<\/li>/.exec(
+			html,
+		)?.[1];
+		assert.ok(closed, "the design its artist takes no requests for");
+		assert.doesNotMatch(closed, /fp-card-request|Ask for a price|Price:/);
+		assert.match(closed, /Not taking flash requests right now/);
 	});
 
 	test("a long Devanagari name wraps (clamped to two lines in the header) and never widens the page", () => {
@@ -1230,7 +1436,206 @@ describe("the other themes are unchanged by Flash Parlour", () => {
 	});
 });
 
+/**
+ * The flash reads a page's loader makes (their URLs), for a studio saved as
+ * it is, previewed in `preview` when given (Page look's "Preview" links).
+ */
+async function flashReads(
+	studio: Studio,
+	load: typeof loadStudioPage | typeof loadRequestPage,
+	preview: ThemeKey | null = null,
+	flash: unknown = EMPTY_FLASH_PAGE,
+): Promise<string[]> {
+	const API = "http://api.test";
+	const { calls, fetch } = fakeFetch(({ url }) => {
+		if (url.endsWith("/artists")) return json(200, { data: [SITA] });
+		if (url.includes("/work?")) return json(200, galleryPage(0));
+		if (url.includes("/flash?")) return json(200, flash);
+		return json(404, { error: { code: "not_found", message: "x" } });
+	});
+	const api = createApiContext("server");
+	connectServer(api, { config: { apiUrl: API, mediaUrl: API }, studio, fetch });
+	seedStudio(api, studio);
+	const site = new SiteRef();
+	site.connect(ORIGIN, null, preview);
+	await load({ ...api, site }, {});
+	return calls
+		.map((call) => call.url.replace(`${API}/api/v1/tenants/${STUDIO.slug}`, ""))
+		.filter((url) => url.startsWith("/flash"));
+}
+
+const ATELIER_SAVED = (): Studio =>
+	withStorefront({ ...DEFAULT_STOREFRONT, theme: "atelier" });
+
+describe("the review's fixes", () => {
+	test("a preview reads what the previewed theme's home needs: twelve for Flash Parlour, six back in Atelier", async () => {
+		assert.deepEqual(
+			await flashReads(ATELIER_SAVED(), loadStudioPage, "flash-parlour"),
+			["/flash?available=true&limit=12"],
+		);
+		assert.deepEqual(await flashReads(parlour(), loadStudioPage, "atelier"), [
+			"/flash?available=true&limit=6",
+		]);
+		assert.deepEqual(await flashReads(ATELIER_SAVED(), loadStudioPage), [
+			"/flash?available=true&limit=6",
+		]);
+	});
+
+	test("/book reads whether there is flash only for Flash Parlour with Flash shown, and speaks of the wall only then", async () => {
+		assert.deepEqual(await flashReads(parlour(), loadRequestPage), [
+			"/flash?available=true&limit=1",
+		]);
+		assert.deepEqual(
+			await flashReads(ATELIER_SAVED(), loadRequestPage, "flash-parlour"),
+			["/flash?available=true&limit=1"],
+		);
+		assert.deepEqual(await flashReads(ATELIER_SAVED(), loadRequestPage), []);
+		assert.deepEqual(
+			await flashReads(
+				parlour({ sections: [{ type: "work" }, { type: "inquiry" }] }),
+				loadRequestPage,
+			),
+			[],
+		);
+		const line = (hasFlash: boolean) =>
+			renderToStaticMarkup(
+				createElement(ThemedRequestPage, {
+					data: requestPageData(
+						parlour(),
+						[SITA, ARJUN],
+						{},
+						ORIGIN,
+						IMAGE_ORIGIN,
+						null,
+						null,
+						hasFlash,
+					),
+				}),
+			);
+		assert.match(
+			line(true),
+			/Pick a design off the wall or bring your own idea\./,
+		);
+		assert.doesNotMatch(line(false), /wall/);
+		assert.match(line(false), /Bring your own idea\./);
+	});
+
+	test("/flash makes no claim about the designs: pick one and ask", () => {
+		const html = renderToStaticMarkup(
+			createElement(ThemedFlashPage, {
+				data: flashPageData(
+					parlour(),
+					[SITA],
+					flashPage(1),
+					{},
+					ORIGIN,
+					IMAGE_ORIGIN,
+				),
+			}),
+		);
+		assert.match(
+			html,
+			/<p class="fp-page-line">Pick a design and ask for it\.<\/p>/,
+		);
+		assert.doesNotMatch(html, /ready to tattoo/);
+	});
+
+	test("an unpriced design asks for a price only while it can be asked for, on its sheet and its page", () => {
+		const closed = { ...flashPage(2).data[1], requestable: false };
+		const data = flashDesignPageData(
+			parlour(),
+			[SITA, ARJUN],
+			closed,
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(data);
+		const page = renderToStaticMarkup(
+			createElement(ThemedFlashDesignPage, { data }),
+		);
+		assert.doesNotMatch(page, /Ask for a price|<dt>Price<\/dt>/);
+		const open = flashDesignPageData(
+			parlour(),
+			[SITA, ARJUN],
+			flashPage(2).data[1],
+			ORIGIN,
+			IMAGE_ORIGIN,
+		);
+		assert.ok(open);
+		assert.match(
+			renderToStaticMarkup(
+				createElement(ThemedFlashDesignPage, { data: open }),
+			),
+			/<dt>Price<\/dt><dd>Ask for a price<\/dd>/,
+		);
+	});
+
+	test("a short wall sits in the middle, its sheets as wide as a full row's", () => {
+		const grid = ruleOf(pagesCss, ".fp-flash-grid");
+		assert.match(grid, /display: flex;/);
+		assert.match(grid, /flex-wrap: wrap;/);
+		assert.match(grid, /justify-content: center;/);
+		assert.match(
+			ruleOf(pagesCss, ".fp-card"),
+			/flex: 0 0\s+calc\(\(100% - \(var\(--fp-cols\) - 1\) \* var\(--fp-gap\)\) \/ var\(--fp-cols\)\);/,
+		);
+		for (const html of [
+			homeHtml(parlour(), [SITA], null, flashPage(1)),
+			homeHtml(parlour(), [SITA], null, flashPage(2)),
+		]) {
+			assertSafePage(html);
+			assert.match(
+				html,
+				/<ul class="fp-flash-grid fp-flash-grid-wall" role="list">/,
+			);
+		}
+	});
+
+	test("the invitation's button sits under its centred words; a two-line 'Ask for a price' keeps square corners", () => {
+		assert.match(ruleOf(pagesCss, ".fp-band .stack"), /justify-items: center;/);
+		assert.match(
+			ruleOf(pagesCss, ".fp-card-price-ask"),
+			/border-radius: var\(--radius\);/,
+		);
+	});
+});
+
 /** `text` as a literal in a regular expression. */
 function escapeRegExp(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The width in px a `sizes` list asks for at `viewport` px (the browser's
+ * choice: the first entry whose `(min-width: …rem)` holds, else the last),
+ * for the shapes sizes.ts writes: rem, vw, vh, calc() and min(). A screen
+ * 800 px tall.
+ */
+function evaluateSizes(sizes: string, viewport: number, rem: number): number {
+	const entries: string[] = [];
+	let depth = 0;
+	let start = 0;
+	for (let i = 0; i < sizes.length; i++) {
+		if (sizes[i] === "(") depth++;
+		if (sizes[i] === ")") depth--;
+		if (sizes[i] === "," && depth === 0) {
+			entries.push(sizes.slice(start, i).trim());
+			start = i + 1;
+		}
+	}
+	entries.push(sizes.slice(start).trim());
+	for (const entry of entries) {
+		const media = /^\(min-width: ([\d.]+)rem\) (.*)$/.exec(entry);
+		if (media && viewport < Number(media[1]) * rem) continue;
+		const value = media ? media[2] : entry;
+		const js = value
+			.replaceAll("min(", "Math.min(")
+			.replaceAll("calc(", "(")
+			.replace(/([\d.]+)rem/g, `($1*${rem})`)
+			.replace(/([\d.]+)vw/g, `($1*${viewport}/100)`)
+			.replace(/([\d.]+)vh/g, "($1*800/100)");
+		assert.match(js, /^[\d\s.()*+/,-]*(Math\.min[\d\s.()*+/,-]*)*$/, js);
+		return Function(`return ${js}`)() as number;
+	}
+	throw new Error(`no entry applies: ${sizes}`);
 }

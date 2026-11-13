@@ -78,11 +78,24 @@
 }
 
 :root.theme-flash-parlour body { background-color: var(--paper); }
-/* Shrikhand has one weight: never a made-up bold or slant on top of it. */
+/* Shrikhand has one weight: never a made-up bold or slant on top of it (the fallbacks have real ones). */
 :root.theme-flash-parlour { font-synthesis: none; }
-:root.theme-flash-parlour h1, :root.theme-flash-parlour h2, :root.theme-flash-parlour h3 { font-weight: 400; }
+/*
+ * Display text asks for bold: Shrikhand's one face is used as it is (no
+ * faux bold, `font-synthesis: none`), and a fallback (Serif or Plain picked
+ * in Page look, or Shrikhand missing its optional window) gets its real bold.
+ */
+:root.theme-flash-parlour h1, :root.theme-flash-parlour h2, :root.theme-flash-parlour h3 { font-weight: 700; }
 /* Focus: a heavy red ring, offset clear of the ink outlines. */
 :root.theme-flash-parlour :focus-visible { outline: 3px solid var(--stencil); outline-offset: 3px; }
+/*
+ * The chat button floats over the cream and over the black footer, so its
+ * ring is two-tone: a cream band, then an ink one, one of which reads on
+ * either surface (15.1:1 each). Neither is the accent, so a studio's colour
+ * can't weaken it. The transparent outline is what a forced-colour device
+ * draws (it drops box-shadows).
+ */
+:root.theme-flash-parlour .chat-float :focus-visible { outline: 3px solid transparent; outline-offset: 3px; box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ink); }
 
 /*
  * The shared pages (flash in another theme's markup never reaches here: this
@@ -148,7 +161,7 @@
  * full name is the link's accessible name), taking the squeeze before the
  * booking link does, so a long name wraps and the page never scrolls sideways.
  */
-.fp-brand { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; min-inline-size: 0; margin-inline-end: auto; color: var(--ink); font-family: var(--display-face); font-size: 1.375rem; line-height: 1.2; text-decoration: none; overflow-wrap: anywhere; }
+.fp-brand { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; min-inline-size: 0; margin-inline-end: auto; color: var(--ink); font-family: var(--display-face); font-weight: 700; font-size: 1.375rem; line-height: 1.2; text-decoration: none; overflow-wrap: anywhere; }
 .fp-brand .brand-name, .fp-header-cta > span, .fp-sheet-title .brand-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .fp-brand:hover { color: var(--stencil); }
 
@@ -187,10 +200,10 @@
  * the full width.
  */
 .fp-sheet { inline-size: 100%; max-inline-size: 26rem; gap: 1.5rem; padding: 1.25rem 1.25rem max(1.5rem, env(safe-area-inset-bottom)); border-inline-start: 4px solid var(--ink); background: var(--paper); overflow-y: auto; }
-.fp-sheet-title { display: flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; padding-inline-end: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.375rem; font-weight: 400; line-height: 1.2; overflow-wrap: anywhere; }
+.fp-sheet-title { display: flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; padding-inline-end: 3.5rem; color: var(--ink); font-family: var(--display-face); font-weight: 700; font-size: 1.375rem; line-height: 1.2; overflow-wrap: anywhere; }
 .fp-sheet-list { display: grid; margin: 0; padding: 0; list-style: none; border-block-start: 3px solid var(--ink); }
 .fp-sheet-list li { border-block-end: 2px dashed var(--line-strong); }
-.fp-sheet-list a { display: flex; align-items: center; gap: 0.75rem; min-block-size: 3.5rem; color: var(--ink); font-family: var(--display-face); font-size: 1.625rem; line-height: 1.2; text-decoration: none; overflow-wrap: anywhere; }
+.fp-sheet-list a { display: flex; align-items: center; gap: 0.75rem; min-block-size: 3.5rem; color: var(--ink); font-family: var(--display-face); font-weight: 700; font-size: 1.625rem; line-height: 1.2; text-decoration: none; overflow-wrap: anywhere; }
 .fp-sheet-list a::before { content: ''; flex: none; inline-size: 1rem; block-size: 1rem; background: transparent; clip-path: polygon(50% 0, 64% 36%, 100% 50%, 64% 64%, 50% 100%, 36% 64%, 0 50%, 36% 36%); }
 .fp-sheet-list a:hover { color: var(--stencil); }
 .fp-sheet-list a[aria-current]::before { background: var(--fp-red); }
@@ -210,7 +223,7 @@
 :root.theme-flash-parlour .fp-footer :focus-visible { outline-color: var(--fp-mustard); }
 .fp-footer-inner { display: grid; gap: 3rem; padding-block: 3.5rem 2rem; }
 .fp-footer-lead { display: grid; gap: 0.75rem; align-content: start; justify-items: start; }
-.fp-footer-name { color: var(--paper); font-family: var(--display-face); font-size: clamp(2rem, 1.4rem + 3vw, 3.5rem); line-height: 1.1; text-wrap: balance; }
+.fp-footer-name { color: var(--paper); font-family: var(--display-face); font-weight: 700; font-size: clamp(2rem, 1.4rem + 3vw, 3.5rem); line-height: 1.1; text-wrap: balance; }
 .fp-footer-kind { color: var(--paper); font-weight: 600; }
 .fp-footer-cta { margin-block-start: 0.5rem; }
 /* On the black the red would read at 2.7:1: the footer's button is the mustard, the ink on it, with a cream print shadow. */

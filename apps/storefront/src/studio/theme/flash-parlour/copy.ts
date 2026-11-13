@@ -12,8 +12,8 @@ export const flashParlourCopy = {
 		/** A design whose price the studio keeps to itself. */
 		askPrice: "Ask for a price",
 		request: "Request this design",
-		/** After "Request this design", for a screen reader: which one. */
-		requestOf: ": {name}",
+		/** The request link's name for a screen reader: which one. */
+		requestOf: "Request this design: {name}",
 	},
 	home: {
 		/** The second way on from the first screen: the gallery. */
@@ -30,7 +30,7 @@ export const flashParlourCopy = {
 	flash: {
 		label: "Walk in or book ahead",
 		title: "Flash",
-		line: "Every design here is ready to tattoo. Ask for one and the artist will reply.",
+		line: "Pick a design and ask for it.",
 		/** The design's own page. */
 		back: "Back to the flash",
 		kicker: "Flash",
@@ -91,8 +91,10 @@ export const flashParlourCopy = {
 	book: {
 		label: "Booking",
 		open: "Request a session",
-		openLine:
+		/** While the studio shows flash and has designs on its wall. */
+		openLineFlash:
 			"Pick a design off the wall or bring your own idea. The artist will reply with the next steps.",
+		openLine: "Bring your own idea. The artist will reply with the next steps.",
 		closed: "Requests",
 	},
 } as const;
