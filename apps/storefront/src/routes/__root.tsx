@@ -12,6 +12,7 @@ import { TattooProvider } from "@tattoo-drip/react";
 import type { ApiContext } from "../api/context.ts";
 import bodoniLatin from "../assets/fonts/bodoni-moda/bodoni-moda-latin-500-normal.woff2?url";
 import eczarLatin from "../assets/fonts/eczar/eczar-latin-700-normal.woff2?url";
+import shrikhandLatin from "../assets/fonts/shrikhand/shrikhand-latin-400-normal.woff2?url";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import type { SiteContext } from "../site/context.ts";
 import {
@@ -23,23 +24,27 @@ import { loadPageStudio } from "../studio/loaders.ts";
 import { PreviewLinks } from "../studio/preview-links.tsx";
 import { rootMeta } from "../studio/seo.ts";
 import {
-	type FontKey,
-	studioFontKey,
-	type ThemeKey,
-} from "../studio/theme/config.ts";
-import {
+	type HeadingFontFile,
 	isUnthemedPage,
+	matchedHeadingFont,
 	matchedThemeKey,
 	THEME_HTML,
 } from "../studio/theme/html.ts";
 import { previewExitHref } from "../studio/theme/preview.ts";
 import appCss from "../styles.css?url";
 
-/** The heading font file this page preloads (see the root head below). */
-function preloadedFont(theme: ThemeKey, font: FontKey) {
+/** Each heading font file's address in the build. */
+const HEADING_FONT_URLS: Record<HeadingFontFile, string> = {
+	eczar: eczarLatin,
+	"bodoni-moda": bodoniLatin,
+	shrikhand: shrikhandLatin,
+};
+
+/** The heading font file this page preloads (theme/html.ts, matchedHeadingFont). */
+function preloadedFont(file: HeadingFontFile) {
 	return {
 		rel: "preload",
-		href: theme === "atelier" && font === "eczar" ? bodoniLatin : eczarLatin,
+		href: HEADING_FONT_URLS[file],
 		as: "font",
 		type: "font/woff2",
 		crossOrigin: "anonymous" as const,
@@ -70,11 +75,12 @@ export const Route = createRootRouteWithContext<ApiContext & SiteContext>()({
 		],
 		links: [
 			// One heading font is preloaded, the one the page's headings use: Atelier's
-			// Bodoni (src/studio/theme/atelier/styles.css) while an Atelier studio
-			// keeps the default font, else Eczar's Latin subset (the others load when
-			// a page holds their characters; font-display: optional, src/styles.css).
-			// No other theme ever loads Bodoni.
-			preloadedFont(matchedThemeKey(matches), studioFontKey(loaderData)),
+			// Bodoni (src/studio/theme/atelier/styles.css) or Flash Parlour's Shrikhand
+			// (src/studio/theme/flash-parlour/styles.css) while such a studio keeps
+			// the default font, else Eczar's Latin subset (the others load when a page
+			// holds their characters; font-display: optional, src/styles.css). No
+			// other theme ever loads Bodoni or Shrikhand.
+			preloadedFont(matchedHeadingFont(matches)),
 			{
 				rel: "stylesheet",
 				href: appCss,

@@ -40,7 +40,7 @@ import {
 	flashDesignView,
 	flashListView,
 	flashQuery,
-	HOME_FLASH_COUNT,
+	homeFlashCount,
 } from "./flash.ts";
 import {
 	filterStyles,
@@ -143,7 +143,8 @@ export interface StudioPageData {
 	readonly recentWork: GalleryView;
 	/**
 	 * The studio's newest flash designs for the Flash section (TAT-129), at
-	 * most HOME_FLASH_COUNT. Empty when there are none, the page hides Flash
+	 * most HOME_FLASH_COUNT (FLASH_WALL_COUNT for Flash Parlour's wall,
+	 * homeFlashCount). Empty when there are none, the page hides Flash
 	 * or the read failed, which leaves the section out.
 	 */
 	readonly flash: FlashListView;
@@ -345,6 +346,12 @@ export interface RequestPageData {
 	 * page can do with it; null for any other address.
 	 */
 	readonly flash: FlashRequestView | null;
+	/**
+	 * Whether the studio shows Flash and has an available design on it: read
+	 * only for a theme whose booking page speaks of its flash (Flash Parlour,
+	 * loadRequestPage), false otherwise and when the read failed.
+	 */
+	readonly hasFlash: boolean;
 	/** What the booking flow knows of the studio, its artists and the piece asked about (Prompt 6). */
 	readonly booking: BookingContext;
 }
@@ -454,6 +461,7 @@ export function requestPageData(
 	imageOrigin: string | null = null,
 	flash: FlashLookup | null = null,
 	artworkPhoto: unknown = null,
+	hasFlash = false,
 ): RequestPageData {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists, imageOrigin);
@@ -500,6 +508,7 @@ export function requestPageData(
 			),
 			theme,
 			flash: view,
+			hasFlash,
 			booking: bookingContextOf(studio, artistViews, artists, null, search.ref),
 		};
 	}
@@ -539,6 +548,7 @@ export function requestPageData(
 		seo: requestPageSeo(studioView, artist, origin, inquiry.kind === "open"),
 		theme,
 		flash: found ? found.view : null,
+		hasFlash,
 		booking: bookingContextOf(
 			studio,
 			artistViews,
@@ -897,7 +907,7 @@ export async function loadArtistsPage(
  * and, only when the studio's sections include Recent work, its newest photos
  * (loadRecentWork: a failed read leaves the section out, never the page), and
  * likewise, when they include Flash, its newest 6 flash designs
- * (loadHomeFlash). A studio that hid Recent work costs the API no `/work`
+ * (loadHomeFlash; 12 for Flash Parlour's wall, homeFlashCount). A studio that hid Recent work costs the API no `/work`
  * read, and one that hid Flash no `/flash` read.
  */
 export async function loadStudioPage(
@@ -909,7 +919,9 @@ export async function loadStudioPage(
 	const [artists, recentWork, flash] = await Promise.all([
 		loadArtists(context),
 		theme.sections.includes("work") ? loadRecentWork(context) : null,
-		theme.sections.includes("flash") ? loadHomeFlash(context) : null,
+		theme.sections.includes("flash")
+			? loadHomeFlash(context, homeFlashCount(theme.key))
+			: null,
 	]);
 	const data = studioPageData(
 		studio,
@@ -967,19 +979,30 @@ export async function loadArtistPage(
  * and never throws: see loadFlashLookup. `search` is what `readRequestSearch` gave (the route's
  * `loaderDeps` re-reads the merged search through it, so a stray key never
  * reaches here). The artists are read as on the other pages: a failure is an
- * error page, a list the API does not know the not-found.
+ * error page, a list the API does not know the not-found. On a Flash Parlour
+ * page that shows Flash, one more read says whether the studio has a design
+ * on its wall (loadHasFlash), for the opening's words.
  */
 export async function loadRequestPage(
 	context: PageContext,
 	search: RequestSearch,
 ): Promise<RequestPageData> {
-	const [studio, artists, flash, artwork] = await Promise.all([
-		loadPageStudio(context),
+	const studio = await loadPageStudio(context);
+	const theme = parseThemeConfig(
+		storefrontInput(studio),
+		context.tattoo.connection.mediaUrl,
+	);
+	const [artists, flash, artwork, hasFlash] = await Promise.all([
 		loadArtists(context),
 		search.flash === undefined ? null : loadFlashLookup(context, search.flash),
 		search.artwork === undefined || search.flash !== undefined
 			? null
 			: loadArtworkLookup(context, search.artwork),
+		// Only Flash Parlour's opening speaks of the flash wall: every other
+		// theme's booking page reads no flash list.
+		theme.key === "flash-parlour" && theme.sections.includes("flash")
+			? loadHasFlash(context)
+			: false,
 	]);
 	return requestPageData(
 		studio,
@@ -989,6 +1012,7 @@ export async function loadRequestPage(
 		context.tattoo.connection.mediaUrl,
 		flash,
 		artwork,
+		hasFlash,
 	);
 }
 
@@ -1272,19 +1296,42 @@ async function loadRecentWork(context: ApiContext): Promise<unknown> {
  * deploy order safe: this storefront can run against a platform without
  * `/flash`).
  */
-async function loadHomeFlash(context: ApiContext): Promise<unknown> {
+async function loadHomeFlash(
+	context: ApiContext,
+	count: number,
+): Promise<unknown> {
 	try {
 		return await context.queryClient.query({
 			...tattooQueries.flash(
 				context.tattoo.client,
 				// Claimed designs stay out of the home's Flash section.
-				flashQuery({}, HOME_FLASH_COUNT, true),
+				flashQuery({}, count, true),
 			),
 			staleTime: "static",
 		});
 	} catch (error) {
 		logReadFailed("Flash", context, error);
 		return null;
+	}
+}
+
+/**
+ * Whether the studio has an available design to show (one read, the newest);
+ * a failed read is logged and is false, so the booking page never speaks of
+ * flash it can't vouch for.
+ */
+async function loadHasFlash(context: ApiContext): Promise<boolean> {
+	try {
+		const page = await context.queryClient.query({
+			...tattooQueries.flash(context.tattoo.client, flashQuery({}, 1, true)),
+			staleTime: "static",
+		});
+		return (
+			flashListView(page, context.tattoo.connection.mediaUrl).designs.length > 0
+		);
+	} catch (error) {
+		logReadFailed("Flash", context, error);
+		return false;
 	}
 }
 

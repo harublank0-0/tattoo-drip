@@ -4,7 +4,11 @@ import { studioCopy } from "./copy.ts";
 import { flashDesignHref, requestHref } from "./links.ts";
 import { largeSource } from "./srcset.ts";
 import { cleanLine } from "./text.ts";
-import { type BrandImage, readBrandImage } from "./theme/config.ts";
+import {
+	type BrandImage,
+	readBrandImage,
+	type ThemeKey,
+} from "./theme/config.ts";
 import { ARTIST_SLUG, type ArtistView } from "./view-model.ts";
 
 /**
@@ -20,6 +24,20 @@ export const FLASH_ID =
 
 /** The home page's Flash section shows this many of the newest designs. */
 export const HOME_FLASH_COUNT = 6;
+/**
+ * Flash Parlour's home page opens on a wall of flash: up to this many of the
+ * newest available designs (two rows of six on a wide screen, three of four
+ * on a laptop), within the contract's `limit`.
+ */
+export const FLASH_WALL_COUNT = 12;
+
+/**
+ * How many designs the home page reads for a theme: Flash Parlour's wall, else
+ * the Flash section's six. Every other theme's read is unchanged.
+ */
+export function homeFlashCount(theme: ThemeKey): number {
+	return theme === "flash-parlour" ? FLASH_WALL_COUNT : HOME_FLASH_COUNT;
+}
 /** An artist's page shows this many, then "All flash by {name}". */
 export const ARTIST_FLASH_COUNT = 12;
 /** `/flash` loads this many designs a page. */
@@ -259,4 +277,52 @@ export function closedNoteFor(
 		? artists.find(({ slug }) => slug === design.artist?.slug)
 		: undefined;
 	return artist?.closedMessage ?? studioCopy.flash.closed;
+}
+
+/** What a design's own page offers: where its one button goes and what it says. */
+export interface FlashDesignAction {
+	/** `request`: ask for this design; `similar`: ask its artist for something like a claimed one; `idea`: the studio's general request. */
+	readonly kind: "request" | "similar" | "idea";
+	readonly href: string;
+	readonly label: string;
+}
+
+/**
+ * The one action a flash design's page offers (TAT-129), every theme's: for
+ * a claimed design, "Ask for something similar" (the design's request, which
+ * the request page turns into the artist's custom request) while its artist
+ * takes new work (`similar` "artist"), else "Send your idea" (the studio's
+ * general request) while the studio does ("studio"), else nothing (null);
+ * for any other design, "Request this design" while it can be asked for
+ * (`closedNote` null), else nothing. Pure.
+ */
+export function flashDesignAction(
+	design: Pick<FlashDesignView, "claimed" | "requestHref">,
+	closedNote: string | null,
+	similar: "artist" | "studio" | null,
+): FlashDesignAction | null {
+	if (design.claimed) {
+		if (similar === "artist") {
+			return {
+				kind: "similar",
+				href: design.requestHref,
+				label: studioCopy.flash.similar,
+			};
+		}
+		if (similar === "studio") {
+			return {
+				kind: "idea",
+				href: requestHref({}),
+				label: studioCopy.sendIdea,
+			};
+		}
+		return null;
+	}
+	return closedNote === null
+		? {
+				kind: "request",
+				href: design.requestHref,
+				label: studioCopy.flash.request,
+			}
+		: null;
 }

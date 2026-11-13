@@ -19,6 +19,15 @@ import { AtelierGalleryPage } from "./atelier/gallery-page.tsx";
 import { AtelierStudioPage } from "./atelier/home-page.tsx";
 import { AtelierShell } from "./atelier/shell.tsx";
 import { DEFAULT_THEME_KEY, type ThemeKey } from "./config.ts";
+import { FlashParlourArtistPage } from "./flash-parlour/artist-page.tsx";
+import { FlashParlourArtistsPage } from "./flash-parlour/artists-page.tsx";
+import { FlashParlourArtworkPage } from "./flash-parlour/artwork-page.tsx";
+import { FlashParlourBookPage } from "./flash-parlour/book-page.tsx";
+import { FlashParlourFlashDesignPage } from "./flash-parlour/flash-design-page.tsx";
+import { FlashParlourFlashPage } from "./flash-parlour/flash-page.tsx";
+import { FlashParlourGalleryPage } from "./flash-parlour/gallery-page.tsx";
+import { FlashParlourStudioPage } from "./flash-parlour/home-page.tsx";
+import { FlashParlourShell } from "./flash-parlour/shell.tsx";
 import { InkNoirArtistPage } from "./ink-noir/artist/artist-page.tsx";
 import { InkNoirArtistsPage } from "./ink-noir/artists/artists-page.tsx";
 import { InkNoirBookPage } from "./ink-noir/book/book-page.tsx";
@@ -76,8 +85,10 @@ export interface Theme {
  * artist, gallery, tattoo and booking pages; the flash and informational
  * pages are the shared ones in its shell. Atelier (theme/atelier/) is a
  * quiet-luxury catalogue on stone paper, with the same set of its own pages.
- * A theme's colours come from the
- * `<html>` class the root route sets (theme/html.ts), not from here.
+ * Flash Parlour (theme/flash-parlour/) is a traditional walk-in shop's wall
+ * of flash on cream, with its own pages including the flash page and a
+ * design's page, since there flash is the point. A theme's colours come from
+ * the `<html>` class the root route sets (theme/html.ts), not from here.
  */
 export const THEMES: Record<ThemeKey, Theme> = {
 	"stencil-and-ink": {
@@ -126,6 +137,18 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		FlashPage,
 		FlashDesignPage,
 		RequestPage: AtelierBookPage,
+		InfoPage,
+	},
+	"flash-parlour": {
+		Shell: FlashParlourShell,
+		StudioPage: FlashParlourStudioPage,
+		ArtistPage: FlashParlourArtistPage,
+		ArtistsPage: FlashParlourArtistsPage,
+		WorkPage: FlashParlourGalleryPage,
+		ArtworkPage: FlashParlourArtworkPage,
+		FlashPage: FlashParlourFlashPage,
+		FlashDesignPage: FlashParlourFlashDesignPage,
+		RequestPage: FlashParlourBookPage,
 		InfoPage,
 	},
 };

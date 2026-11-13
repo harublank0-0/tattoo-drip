@@ -23,6 +23,7 @@ export const THEME_NAMES: Record<ThemeKey, string> = {
 	"ink-noir": "Ink Noir",
 	irezumi: "Irezumi",
 	atelier: "Atelier",
+	"flash-parlour": "Flash Parlour",
 };
 
 /** A theme key exactly as this app has it, else null: nothing else is a preview. */

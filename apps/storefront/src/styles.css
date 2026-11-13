@@ -20,6 +20,9 @@
 /* Atelier's tokens, its Bodoni faces and shell, under `<html class="theme-atelier">`, and its pages' `atl-` classes. */
 @import './studio/theme/atelier/styles.css';
 @import './studio/theme/atelier/pages.css';
+/* Flash Parlour's tokens, its Shrikhand face and shell, under `<html class="theme-flash-parlour">`, and its pages' `fp-` classes. */
+@import './studio/theme/flash-parlour/styles.css';
+@import './studio/theme/flash-parlour/pages.css';
 @plugin '@tailwindcss/typography';
 
 /*
@@ -159,14 +162,14 @@
 
 /*
  * Tailwind's `dark:` (the shadcn components use it): the device's dark scheme,
- * except under a theme that is always light (Atelier), and a theme that is
+ * except under a theme that is always light (Atelier, Flash Parlour), and a theme that is
  * always dark (Ink Noir). Irezumi follows the device, as the default does.
  * After the dark block above:
  * the tests find that block as the file's first dark media query.
  */
 @custom-variant dark {
   @media (prefers-color-scheme: dark) {
-    &:not(:where(.theme-atelier, .theme-atelier *)) {
+    &:not(:where(.theme-atelier, .theme-atelier *, .theme-flash-parlour, .theme-flash-parlour *)) {
       @slot;
     }
   }

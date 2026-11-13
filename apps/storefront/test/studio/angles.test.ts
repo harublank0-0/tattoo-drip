@@ -62,7 +62,13 @@ import { IMAGE_ORIGIN, withStorefront } from "./theme-fixtures.ts";
  * one photo is pinned unchanged by the existing render tests.
  */
 
-const THEMES = ["stencil-and-ink", "ink-noir", "irezumi", "atelier"] as const;
+const THEMES = [
+	"stencil-and-ink",
+	"ink-noir",
+	"irezumi",
+	"atelier",
+	"flash-parlour",
+] as const;
 const SHARED_CSS = readFileSync(
 	new URL("../../src/styles.css", import.meta.url),
 	"utf8",

@@ -1,0 +1,282 @@
+/*
+ * Flash Parlour: a traditional walk-in shop's wall of flash
+ * (src/studio/theme/flash-parlour/). Everything here applies only under
+ * `<html class="theme-flash-parlour">`, which the root route sets for a
+ * studio that picked the theme (src/studio/theme/html.ts), or to `fp-`
+ * classes only Flash Parlour's components render, so no other theme is
+ * touched.
+ *
+ * One light scheme, whatever the device prefers. The values are theme.ts's
+ * FLASH_PARLOUR_SCHEME and the accent tokens accentTokens() gives for the red
+ * #b02a1b (test/studio/flash-parlour.test.ts pins both). On the cream paper
+ * #f5ead3, the raised cream #ecdcb8 and the sheet #fdf8ec: ink 15.1 / 13.3 /
+ * 17.0:1, ink-muted 7.1 / 6.2 / 8.0:1, red 5.5 / 4.9 / 6.2:1, green 6.7 /
+ * 5.9 / 7.6:1, line-strong 4.6 / 4.0 / 5.2:1. Text on a red fill is the
+ * paper (5.5:1); text on the mustard is the ink (8.3:1). The mustard is a
+ * fill and decoration only, never text on cream; the black footer's text is
+ * the paper (15.1:1) and the mustard (8.3:1).
+ *
+ * `:root.theme-flash-parlour` (0,2,0) outranks styles.css's `:root` and its
+ * dark scheme's; the brand's `html:root.theme-flash-parlour` (0,2,1)
+ * outranks this.
+ *
+ * Type: Shrikhand (SIL OFL 1.1, src/assets/fonts/shrikhand/, vendored from
+ * @fontsource/shrikhand 5.3.0: Latin and Latin Extended, its one weight) for
+ * names, headings and prices, unless the studio picked another face in Page
+ * look (brandingCss sets --display-face on this class): a heavy, warm
+ * hand-lettered face from the sign-painting tradition flash lettering comes
+ * from. The body face for text; bold capitals only for fixed English labels
+ * (names may be Devanagari, which falls back to the serifs). font-display:
+ * optional, and the Latin file is preloaded only on a Flash Parlour page
+ * (src/routes/__root.tsx), so no other theme downloads it.
+ */
+@font-face {
+  font-family: 'Shrikhand';
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url('../../../assets/fonts/shrikhand/shrikhand-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Shrikhand';
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url('../../../assets/fonts/shrikhand/shrikhand-latin-ext-400-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root.theme-flash-parlour {
+  color-scheme: light;
+  --paper: #f5ead3;
+  /* The raised cream: the wall behind the flash, and the bands. */
+  --paper-raised: #ecdcb8;
+  --ink: #1a1613;
+  --ink-muted: #5b4a38;
+  --stencil: #b02a1b;
+  --stencil-strong: #8b2519;
+  --on-stencil: #f5ead3;
+  --stencil-wash: #edd3bd;
+  --line: #c9b48f;
+  --line-strong: #7a6650;
+  --destructive: #9e1f14;
+  --card: var(--paper);
+  --popover: var(--paper);
+  --radius: 0.25rem;
+  --site-bar-height: 4.5rem;
+  --fp-column: min(76rem, 100% - 2.5rem);
+  /* A flash sheet and a photo's mat; the flat flash colours (fills and decoration); the heavy outline and its print shadow. */
+  --fp-sheet: #fdf8ec;
+  --fp-red: #b02a1b;
+  --fp-mustard: #e2a628;
+  --fp-mustard-deep: #c98d1c;
+  --fp-green: #1e5b3f;
+  --fp-outline: 3px solid var(--ink);
+  --fp-shadow: 4px 4px 0 var(--ink);
+  --display-face: 'Shrikhand', 'Noto Serif Devanagari', 'Noto Serif', Georgia, 'Times New Roman', serif;
+}
+
+:root.theme-flash-parlour body { background-color: var(--paper); }
+/* Shrikhand has one weight: never a made-up bold or slant on top of it (the fallbacks have real ones). */
+:root.theme-flash-parlour { font-synthesis: none; }
+/*
+ * Display text asks for bold: Shrikhand's one face is used as it is (no
+ * faux bold, `font-synthesis: none`), and a fallback (Serif or Plain picked
+ * in Page look, or Shrikhand missing its optional window) gets its real bold.
+ */
+:root.theme-flash-parlour h1, :root.theme-flash-parlour h2, :root.theme-flash-parlour h3 { font-weight: 700; }
+/* Focus: a heavy red ring, offset clear of the ink outlines. */
+:root.theme-flash-parlour :focus-visible { outline: 3px solid var(--stencil); outline-offset: 3px; }
+/*
+ * The chat button floats over the cream and over the black footer, so its
+ * ring is two-tone: a cream band, then an ink one, one of which reads on
+ * either surface (15.1:1 each). Neither is the accent, so a studio's colour
+ * can't weaken it. The transparent outline is what a forced-colour device
+ * draws (it drops box-shadows).
+ */
+:root.theme-flash-parlour .chat-float :focus-visible { outline: 3px solid transparent; outline-offset: 3px; box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ink); }
+
+/*
+ * The shared pages (flash in another theme's markup never reaches here: this
+ * theme draws its own; the informational pages, Good to know and the
+ * booking flow) in Flash Parlour's frame: no stencil frame behind photos and
+ * panels; panels on the sheet with the heavy outline; section titles in
+ * Shrikhand; actions chunky, outlined and printed with a hard shadow.
+ */
+:root.theme-flash-parlour .artist-photo::after,
+:root.theme-flash-parlour .profile-cover::after,
+:root.theme-flash-parlour .inquiry-aside::after { display: none; }
+:root.theme-flash-parlour .inquiry-aside { border: var(--fp-outline); background: var(--fp-sheet); box-shadow: var(--fp-shadow); }
+:root.theme-flash-parlour .section-title { font-size: clamp(1.75rem, 1.35rem + 1.8vw, 2.625rem); line-height: 1.15; overflow-wrap: anywhere; }
+:root.theme-flash-parlour .page { width: var(--fp-column); padding-block: 3rem 5rem; }
+:root.theme-flash-parlour .text-link { color: var(--ink); text-decoration-color: var(--stencil); text-decoration-thickness: 2px; text-underline-offset: 0.25em; }
+:root.theme-flash-parlour .text-link:hover { color: var(--stencil); }
+:root.theme-flash-parlour .work-dialog { background: var(--paper); }
+:root.theme-flash-parlour .action { border: var(--fp-outline); font-weight: 700; box-shadow: 3px 3px 0 var(--ink); transition: none; }
+:root.theme-flash-parlour .action:active { translate: 2px 2px; box-shadow: 1px 1px 0 var(--ink); }
+:root.theme-flash-parlour .action-primary:hover { border-color: var(--ink); }
+:root.theme-flash-parlour .action-secondary { background: var(--fp-sheet); color: var(--ink); }
+:root.theme-flash-parlour .action-secondary:hover { background: var(--paper-raised); }
+:root.theme-flash-parlour .know-more,
+:root.theme-flash-parlour .faq-item { border-color: var(--ink); }
+
+/*
+ * The shared pages composed as this theme's own: a top-level section's first
+ * title (and a status page's) centred under three diamonds in the flash colours; the
+ * informational pages' text read from the start in a centred column.
+ */
+:root.theme-flash-parlour main.page > section > .section-title:first-child,
+:root.theme-flash-parlour .status-page > .section-title { text-align: center; text-wrap: balance; }
+:root.theme-flash-parlour main.page > section > .section-title:first-child::before,
+:root.theme-flash-parlour .status-page > .section-title::before { content: ''; display: block; inline-size: 4.5rem; block-size: 1.5rem; margin: 0 auto 0.75rem; background: linear-gradient(90deg, var(--fp-red) 0 33.4%, var(--fp-mustard) 33.4% 66.6%, var(--fp-green) 66.6%); clip-path: polygon(0 50%, 16.67% 0, 33.33% 50%, 50% 0, 66.67% 50%, 83.33% 0, 100% 50%, 83.33% 100%, 66.67% 50%, 50% 100%, 33.33% 50%, 16.67% 100%); }
+:root.theme-flash-parlour .info-page > .measure { margin-inline: auto; }
+:root.theme-flash-parlour .info-page > .measure > div,
+:root.theme-flash-parlour .info-page > .measure > ul,
+:root.theme-flash-parlour .info-page > .measure > ol,
+:root.theme-flash-parlour .info-page > .measure > dl,
+:root.theme-flash-parlour .info-page > .measure > section { justify-self: stretch; }
+/* A page that isn't there, or can't load: in the middle of the cream (main.page.status-page outranks main.page's padding). */
+:root.theme-flash-parlour main.page.status-page { justify-items: center; padding-block: clamp(4rem, 3rem + 6vw, 8rem); text-align: center; }
+/* Forced colours and print can't draw the diamond stars: there they take no space. */
+@media (forced-colors: active), print {
+  :root.theme-flash-parlour main.page > section > .section-title:first-child::before,
+  :root.theme-flash-parlour .status-page > .section-title::before { display: none; }
+}
+
+/* Keyboard users skip the header: hidden above the top until it has focus. */
+.fp-skip { position: absolute; inset-inline-start: 1rem; inset-block-start: 0.75rem; z-index: 3; padding: 0.75rem 1rem; border: 3px solid var(--fp-mustard); background: var(--ink); color: var(--paper); font-weight: 700; text-decoration: none; translate: 0 -200%; }
+.fp-skip:focus { translate: 0 0; }
+
+.fp-container { width: var(--fp-column); margin-inline: auto; }
+
+/*
+ * The header: a cream shop sign over a heavy ink rule, sticky. No blur and
+ * no scroll animation.
+ */
+.fp-header { position: sticky; inset-block-start: 0; z-index: 1; border-block-end: 4px solid var(--ink); background: var(--paper); }
+.fp-header-inner { display: flex; align-items: center; gap: 0.625rem; min-block-size: var(--site-bar-height); padding-block: 0.625rem; }
+/*
+ * The studio's mark: the name in the display face, two lines at most (the
+ * full name is the link's accessible name), taking the squeeze before the
+ * booking link does, so a long name wraps and the page never scrolls sideways.
+ */
+.fp-brand { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; min-inline-size: 0; margin-inline-end: auto; color: var(--ink); font-family: var(--display-face); font-weight: 700; font-size: 1.375rem; line-height: 1.2; text-decoration: none; overflow-wrap: anywhere; }
+.fp-brand .brand-name, .fp-header-cta > span, .fp-sheet-title .brand-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.fp-brand:hover { color: var(--stencil); }
+
+.fp-nav { display: none; }
+.fp-nav-list { display: flex; gap: 0.25rem; margin: 0; padding: 0; list-style: none; }
+.fp-nav-list a { position: relative; display: inline-flex; align-items: center; min-block-size: 2.75rem; padding-inline: 0.625rem; color: var(--ink); font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; }
+/* The current page: a mustard bar under its word (and an underline, which a forced-colour device keeps). */
+.fp-nav-list a::after { content: ''; position: absolute; inset-inline: 0.5rem; inset-block-end: 0.25rem; block-size: 0.375rem; background: transparent; }
+.fp-nav-list a:hover { color: var(--stencil); }
+.fp-nav-list a[aria-current]::after { background: var(--fp-mustard); }
+.fp-nav-list a[aria-current] { text-decoration: underline; text-decoration-color: transparent; }
+
+/* The booking link keeps its words whole (at most half the bar, two lines); the studio's mark takes the squeeze. */
+.fp-header-cta { flex: 0 0 auto; max-inline-size: 50%; min-block-size: 2.75rem; padding: 0.375rem 0.75rem; font-size: 0.9375rem; overflow-wrap: normal; text-wrap: balance; }
+
+/* The phone's menu button: 44 px, outlined; its word beside the icon while there is room. */
+.fp-menu-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; flex: none; min-inline-size: 2.75rem; min-block-size: 2.75rem; padding-inline: 0.625rem; border: var(--fp-outline); border-radius: var(--radius); background: var(--fp-sheet); color: var(--ink); font: inherit; font-size: 0.875rem; font-weight: 800; cursor: pointer; }
+.fp-menu-button:hover { background: var(--fp-mustard); }
+.fp-menu-button svg { flex: none; inline-size: 1.25rem; block-size: 1.25rem; }
+@media (max-width: 26rem) {
+  .fp-menu-label { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+@media (min-width: 64rem) {
+  .fp-header-inner { gap: 1rem; }
+  .fp-brand { margin-inline-end: 0; }
+  .fp-nav { display: block; margin-inline-start: auto; }
+  .fp-menu-button { display: none; }
+  .fp-header-cta { max-inline-size: 16rem; }
+}
+
+/*
+ * The menu (shadcn's Sheet): cream, the full width of a phone up to 26rem,
+ * a heavy ink rule at its edge. The pages large in the display face, the
+ * current one marked with a red diamond star; the way to book at the foot,
+ * the full width.
+ */
+.fp-sheet { inline-size: 100%; max-inline-size: 26rem; gap: 1.5rem; padding: 1.25rem 1.25rem max(1.5rem, env(safe-area-inset-bottom)); border-inline-start: 4px solid var(--ink); background: var(--paper); overflow-y: auto; }
+.fp-sheet-title { display: flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; padding-inline-end: 3.5rem; color: var(--ink); font-family: var(--display-face); font-weight: 700; font-size: 1.375rem; line-height: 1.2; overflow-wrap: anywhere; }
+.fp-sheet-list { display: grid; margin: 0; padding: 0; list-style: none; border-block-start: 3px solid var(--ink); }
+.fp-sheet-list li { border-block-end: 2px dashed var(--line-strong); }
+.fp-sheet-list a { display: flex; align-items: center; gap: 0.75rem; min-block-size: 3.5rem; color: var(--ink); font-family: var(--display-face); font-weight: 700; font-size: 1.625rem; line-height: 1.2; text-decoration: none; overflow-wrap: anywhere; }
+.fp-sheet-list a::before { content: ''; flex: none; inline-size: 1rem; block-size: 1rem; background: transparent; clip-path: polygon(50% 0, 64% 36%, 100% 50%, 64% 64%, 50% 100%, 36% 64%, 0 50%, 36% 36%); }
+.fp-sheet-list a:hover { color: var(--stencil); }
+.fp-sheet-list a[aria-current]::before { background: var(--fp-red); }
+.fp-sheet-list a[aria-current] { text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: var(--fp-mustard); text-underline-offset: 0.2em; }
+.fp-sheet-cta { inline-size: 100%; margin-block-start: auto; }
+.fp-sheet > button:focus:not(:focus-visible) { box-shadow: none; }
+
+/*
+ * The footer: an ink-black shop sign. Three stars, the studio's name large in
+ * the display face in cream, its kind and the way to book (a mustard button:
+ * the red reads at 2.7:1 on black, the mustard at 8.3:1); then small
+ * columns in cream under mustard headings. Stacked on a phone, two across
+ * from 40rem, beside the name from 60rem.
+ */
+.fp-footer { margin-block-start: 0; border-block-start: 4px solid var(--fp-mustard); background: var(--ink); color: var(--paper); font-size: 0.9375rem; line-height: 1.55; overflow-wrap: anywhere; }
+/* On the black, focus is the mustard (8.3:1; the red would be 2.7:1). */
+:root.theme-flash-parlour .fp-footer :focus-visible { outline-color: var(--fp-mustard); }
+.fp-footer-inner { display: grid; gap: 3rem; padding-block: 3.5rem 2rem; }
+.fp-footer-lead { display: grid; gap: 0.75rem; align-content: start; justify-items: start; }
+.fp-footer-name { color: var(--paper); font-family: var(--display-face); font-weight: 700; font-size: clamp(2rem, 1.4rem + 3vw, 3.5rem); line-height: 1.1; text-wrap: balance; }
+.fp-footer-kind { color: var(--paper); font-weight: 600; }
+.fp-footer-cta { margin-block-start: 0.5rem; }
+/* On the black the red would read at 2.7:1: the footer's button is the mustard, the ink on it, with a cream print shadow. */
+:root.theme-flash-parlour .fp-footer .fp-footer-cta { border-color: var(--fp-mustard); background: var(--fp-mustard); color: var(--ink); box-shadow: 3px 3px 0 var(--paper); }
+:root.theme-flash-parlour .fp-footer .fp-footer-cta:hover { border-color: var(--paper); background: var(--paper); }
+.fp-footer-columns { display: grid; gap: 2rem; }
+.fp-footer-column { display: grid; gap: 0.5rem; align-content: start; justify-items: start; }
+.fp-footer-heading { margin: 0; color: var(--fp-mustard); font-family: var(--body-face); font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.4; }
+.fp-footer-links { display: grid; margin: 0; padding: 0; list-style: none; }
+.fp-footer-links a, .fp-footer-map { display: inline-flex; align-items: center; gap: 0.5rem; min-block-size: 2.75rem; color: var(--paper); text-decoration: none; }
+.fp-footer-links a:hover, .fp-footer-map:hover { text-decoration: underline; text-decoration-color: var(--fp-mustard); text-decoration-thickness: 2px; text-underline-offset: 0.25em; }
+.fp-footer-links a[aria-current] { text-decoration: underline; text-decoration-color: var(--fp-mustard); text-decoration-thickness: 2px; text-underline-offset: 0.25em; }
+.fp-footer-map svg { flex: none; inline-size: 1rem; block-size: 1rem; color: var(--fp-mustard); }
+.fp-footer-address { display: grid; gap: 0.25rem; justify-items: start; }
+.fp-footer-hours { display: grid; gap: 0.25rem; margin: 0.5rem 0 0; }
+.fp-footer-hours dt { font-weight: 700; }
+.fp-footer-hours dd { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 1.5rem; margin: 0; min-inline-size: min(100%, 15rem); }
+.fp-footer-legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 2rem; padding-block-start: 1.5rem; border-block-start: 2px dashed var(--ink-muted); font-size: 0.875rem; }
+/* The chat button stands over the footer's last line: clear it. */
+:root:has(.chat-float) .fp-footer-inner { padding-block-end: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+
+@media (min-width: 40rem) {
+  .fp-footer-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 60rem) {
+  .fp-footer-inner { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 4rem; padding-block-start: 4.5rem; }
+  .fp-footer-columns { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
+  .fp-footer-legal { grid-column: 1 / -1; }
+}
+
+/*
+ * The ornaments (ornaments.tsx): stars and a ribbon's tails as inline SVG,
+ * filled from the flat flash colours and outlined in ink. Decoration only.
+ */
+.fp-star { display: inline-block; flex: none; inline-size: 1.5rem; block-size: 1.5rem; overflow: visible; stroke: var(--ink); stroke-width: 1.75; stroke-linejoin: round; }
+.fp-star-red { fill: var(--fp-red); }
+.fp-star-mustard { fill: var(--fp-mustard); }
+.fp-star-green { fill: var(--fp-green); }
+.fp-star-ink { fill: var(--ink); }
+.fp-star-paper { fill: var(--paper); }
+.fp-star-row { display: flex; justify-content: center; gap: 0.75rem; }
+.fp-footer .fp-star-row { justify-content: start; }
+.fp-footer .fp-star { stroke: var(--paper); }
+.fp-ribbon-tail { display: block; flex: none; inline-size: 1.75rem; block-size: auto; align-self: stretch; margin-block: 0.5rem -0.5rem; fill: var(--fp-mustard-deep); stroke: var(--ink); stroke-width: 3; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.fp-ribbon-tail-start { margin-inline-end: -0.25rem; }
+.fp-ribbon-tail-end { margin-inline-start: -0.25rem; scale: -1 1; }
+/* A device forcing its own colours draws the stars in its text colour and leaves the tails out. */
+@media (forced-colors: active) {
+  .fp-star { fill: CanvasText; stroke: CanvasText; }
+  .fp-ribbon-tail { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root.theme-flash-parlour .action:active { translate: none; }
+  .fp-sheet, :root.theme-flash-parlour [data-slot="sheet-overlay"] { animation: none; }
+}
