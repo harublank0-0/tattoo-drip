@@ -16,6 +16,7 @@ const PUBLIC_ONLY = [
 	"publicTenant",
 	"publicCache",
 	"intakeGuard",
+	"reviewGuard",
 	"apiLimit",
 ];
 
@@ -27,6 +28,8 @@ const PUBLIC_ONLY = [
 const UNCACHED_GET_ROUTES: Record<string, string> = {
 	"/api/v1/tenants/:tenant/deposits/:token":
 		"A private deposit page behind a bearer link: never cached (TAT-65).",
+	"/api/v1/tenants/:tenant/review":
+		"A client's private review page behind a bearer link: never cached (Reviews and Fresh ink).",
 };
 
 const isApi = (pattern: string) =>

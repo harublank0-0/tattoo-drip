@@ -38,6 +38,14 @@ export type DepositPaymentMethod = Schemas["DepositPaymentMethod"];
 export type DepositPage = Schemas["DepositPage"];
 export type DepositSession = Schemas["DepositSession"];
 export type DepositProofForm = Schemas["DepositProofForm"];
+export type ReviewPage = Schemas["ReviewPage"];
+export type ReviewTakedown = Schemas["ReviewTakedown"];
+export type ClientReview = Schemas["ClientReview"];
+export type ClientPost = Schemas["ClientPost"];
+export type ReviewMedia = Schemas["ReviewMedia"];
+export type ReviewSubmission = Schemas["ReviewSubmission"];
+export type ReviewVideoSignInput = Schemas["ReviewVideoSignInput"];
+export type ReviewVideoUpload = Schemas["ReviewVideoUpload"];
 
 export type ListServicesQuery = NonNullable<
 	operations["listServices"]["parameters"]["query"]

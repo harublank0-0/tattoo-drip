@@ -20,7 +20,8 @@ export default defineConfig({
 	 * The default worker runs the "default" queue only (`queue:work` with no
 	 * `--queue`). Video angles' transcodes have their own queue, "video"
 	 * (ProcessWorkVideoJob), run by their own worker at concurrency 1
-	 * (`queue:work --queue=video --concurrency=1`, deploy/compose.yml's
+	 * (`queue:work --queue=video,client_video --concurrency=1`: clients'
+	 * Fresh ink videos have the second queue, asked after the first; deploy/compose.yml's
 	 * video-worker), so a transcode never holds up an email or an alert.
 	 * `maxStalledCount` is 1 unless QUEUE_MAX_STALLED_COUNT says otherwise
 	 * (the video worker sets 3).

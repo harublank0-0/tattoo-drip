@@ -69,7 +69,14 @@ export type ApiErrorCode =
 	| "challenge_unavailable"
 	// submitDepositProof (TAT-65)
 	| "deposit_not_due"
-	| "deposit_changed";
+	| "deposit_changed"
+	// The review page (Reviews and Fresh ink, slice 1)
+	| "review_locked"
+	| "post_full"
+	| "post_needs_photo"
+	| "remove_failed"
+	| "taken_down"
+	| "post_limit";
 
 export type ErrorKind = { status: number; code: string; message: string };
 
@@ -175,6 +182,44 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		code: "deposit_changed",
 		message:
 			"The deposit amount changed. Check the new amount before you upload.",
+	},
+	// Something TattooDrip took down, or a post the studio declined or
+	// unpublished: its content can't change (its consents, name and delete can).
+	review_locked: {
+		status: 409,
+		code: "review_locked",
+		message: "This can't be changed now. Reload the page to see why.",
+	},
+	post_full: {
+		status: 409,
+		code: "post_full",
+		message:
+			"Your post already has 8 photos and videos. Remove one to add another.",
+	},
+	post_needs_photo: {
+		status: 409,
+		code: "post_needs_photo",
+		message:
+			"A video can't be the main picture: keep a photo first in your post.",
+	},
+	// A file couldn't be deleted: nothing was, the client tries again.
+	remove_failed: {
+		status: 503,
+		code: "remove_failed",
+		message: "We couldn't remove it just now. Try again.",
+	},
+	// A new review or post after TattooDrip took the last one down (finding 1).
+	taken_down: {
+		status: 409,
+		code: "taken_down",
+		message: "This was taken down by TattooDrip. Contact the studio.",
+	},
+	// A third post for one tattoo: a declined post may be posted again once.
+	post_limit: {
+		status: 409,
+		code: "post_limit",
+		message:
+			"This tattoo already had two posts. Contact the studio to change it.",
 	},
 };
 

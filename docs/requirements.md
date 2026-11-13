@@ -143,6 +143,18 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 - The page shows only what the public API returns, always as text, and loads no analytics or third-party scripts (the intake form's bot challenge, Cloudflare Turnstile, is the one exception, loaded only once someone starts filling the form in).
 - The deposit page (`/deposit#<token>`) is the one page that shows a project's deposit, the studio's deposit-page payment methods and its deposit policy and, once the deposit is paid, the date, time and artist of the project's next session (TAT-110), to whoever holds the link: never cached or indexed, sending no Referer, and the token, in the link's fragment, never reaches the studio page's server or anything but the API.
 
+## Reviews and Fresh ink
+
+Agreed with the product owner on 2026-11-12; the rulings are in the [spec](superpowers/specs/2026-11-12-reviews-and-fresh-ink-design.md). Slice 1 (data, links and the client's page) exists behind the `REVIEWS_ENABLED` setting, off until the [client content terms](legal/client-content-terms.md) are legally reviewed; while it is off, every review link is a not-found page.
+
+- Only a real client posts, through the studio's private link for one project (no open form, no client account). The link works for 12 months from when it is made and can be revoked; an expired or revoked link says "This link no longer works" with the studio's contact links and never shows what was posted. What was posted stays after the link ends.
+- A studio can make a project's link only once its tattoo work is done: a completed tattoo session, and the project in progress, in its healing check or completed. One live link per project; asking again shows the same link, or a new one after a revoke or expiry.
+- One review and one Fresh ink post per project, either without the other. A review is a rating of 1 to 5 whole stars and 20 to 2,000 characters of plain text. A post is 1 to 8 photos or videos (a photo leads; videos up to 60 seconds and 100 MB, kept without sound), up to three of the studio's styles, a caption of up to 280 characters and, optionally, where it is on the body.
+- The client chooses where it shows, with two separate unticked boxes: the studio's page, and TattooDrip Discover (offered only while the studio is listed). Either can change later. Nothing is public in slice 1.
+- The shown name is the client's first name and the initial of the last name unless the client changes it (1 to 40 characters, any script); never the phone, email or full name.
+- The client can change or delete either through the link. A post the studio declined or unpublished reads "Not shown by the studio" and can be deleted but not changed; something TattooDrip took down shows a fixed sentence for its reason.
+- The link's token never appears in a URL a server sees, a log or an error: it is the link's fragment, sent to the API in a header. Every input is checked again on the platform; the page is rate-limited per address and per link, and the submit runs the bot challenge.
+
 ## Not yet
 
 Each of these waits for a gate or for evidence. The [roadmap](roadmap.md) says when, and the [research](research.md) says why.
@@ -157,6 +169,6 @@ Each of these waits for a gate or for evidence. The [roadmap](roadmap.md) says w
 - Commissions and payouts, and multi-location (V2)
 - Consent forms (V2, after legal review)
 - Native apps
-- Loyalty, gift cards and reviews
+- Loyalty and gift cards (reviews are no longer here: see Reviews and Fresh ink)
 - Webhooks
 - GraphQL

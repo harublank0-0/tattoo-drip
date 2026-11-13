@@ -8,6 +8,8 @@ import {
 	INQUIRY_CHALLENGE_ACTION,
 	INQUIRY_HONEYPOT_FIELD,
 	isTattooApiError,
+	REVIEW_CHALLENGE_ACTION,
+	REVIEW_TOKEN_HEADER,
 	type Studio,
 	TattooApiError,
 } from "../src/index.js";
@@ -1293,5 +1295,104 @@ describe("lists with query parameters", () => {
 		assert.ok(isTattooApiError(error));
 		assert.equal(error.status, 404);
 		assert.equal(error.code, "not_found");
+	});
+});
+
+describe("reviews", () => {
+	const TOKEN = "R".repeat(43);
+	const PAGE = {
+		studio: { name: "Black Needle", onDiscover: false },
+		project: { artistName: "Sita", tattooedOn: "2026-10-01" },
+		link: { expiresAt: "2027-10-01T00:00:00.000Z" },
+		styles: [{ slug: "fine-line", name: "Fine line" }],
+		defaults: { shownName: "Maya G.", styles: [], placement: null },
+		review: null,
+		post: null,
+		blocks: { review: null, post: null },
+	};
+	const ROOT = "https://api.example.com/api/v1/tenants/api-needle-32/review";
+	const header = (call: Call, name: string) =>
+		new Headers(call.init.headers).get(name);
+
+	test("the token rides in X-Review-Token, never in the URL", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: PAGE }));
+		const reviews = client(fetch).reviews;
+
+		assert.deepEqual(await reviews.get(TOKEN), PAGE);
+		await reviews.deleteReview(TOKEN);
+		await reviews.deletePost(TOKEN);
+		await reviews.removeMedia(TOKEN, "a/b");
+		await reviews.addVideo(TOKEN, "upload-token");
+		await reviews.signVideo(TOKEN, { type: "video/mp4", size: 10 });
+		await reviews.reorder(TOKEN, ["b", "a"]);
+
+		assert.deepEqual(
+			calls.map((call) => [call.init.method ?? "GET", call.url]),
+			[
+				["GET", ROOT],
+				["DELETE", `${ROOT}/review`],
+				["DELETE", `${ROOT}/post`],
+				["DELETE", `${ROOT}/media/a%2Fb`],
+				["POST", `${ROOT}/videos`],
+				["POST", `${ROOT}/videos/sign`],
+				["PUT", `${ROOT}/post/order`],
+			],
+		);
+		for (const call of calls) {
+			assert.equal(header(call, REVIEW_TOKEN_HEADER), TOKEN);
+			assert.ok(!call.url.includes(TOKEN));
+			assert.equal(call.init.credentials, "omit");
+		}
+		assert.deepEqual(JSON.parse(String(calls[4].init.body)), {
+			upload: "upload-token",
+		});
+		assert.deepEqual(JSON.parse(String(calls[6].init.body)), {
+			order: ["b", "a"],
+		});
+	});
+
+	test("submit PUTs JSON with the challenge token in its own header, not the body", async () => {
+		const { calls, fetch } = fakeFetch(() => json(200, { data: PAGE }));
+
+		await client(fetch).reviews.submit(TOKEN, {
+			shownName: "Maya G.",
+			consentStudioPage: true,
+			consentDiscover: false,
+			review: { rating: 5, body: "Healed beautifully, crisp lines." },
+			challengeToken: "turnstile",
+		});
+
+		assert.equal(calls[0].init.method, "PUT");
+		assert.equal(calls[0].url, ROOT);
+		assert.equal(header(calls[0], "X-Challenge-Token"), "turnstile");
+		assert.equal(header(calls[0], "Content-Type"), "application/json");
+		const body = JSON.parse(String(calls[0].init.body));
+		assert.equal(body.challengeToken, undefined);
+		assert.equal(body.review.rating, 5);
+		assert.equal(REVIEW_CHALLENGE_ACTION, "review");
+	});
+
+	test("addPhoto posts one multipart photo with the token header", async () => {
+		const { calls, fetch } = fakeFetch(() => json(201, { data: PAGE }));
+		const photo = new Blob([new Uint8Array([0xff, 0xd8])], {
+			type: "image/jpeg",
+		});
+
+		await client(fetch).reviews.addPhoto(TOKEN, photo);
+
+		assert.equal(calls[0].url, `${ROOT}/photos`);
+		assert.ok(calls[0].init.body instanceof FormData);
+		assert.ok((calls[0].init.body as FormData).get("photo") instanceof Blob);
+		assert.equal(header(calls[0], "Content-Type"), null);
+		assert.equal(header(calls[0], REVIEW_TOKEN_HEADER), TOKEN);
+	});
+
+	test("a dead link is a 404 TattooApiError", async () => {
+		const { fetch } = fakeFetch(() =>
+			json(404, { error: { code: "not_found", message: "Not found." } }),
+		);
+		const error = await rejection(client(fetch).reviews.get(TOKEN));
+		assert.ok(isTattooApiError(error));
+		assert.equal(error.status, 404);
 	});
 });

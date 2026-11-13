@@ -46,6 +46,15 @@ export const IMAGE_PURPOSES = {
 	// Video angles: a video's poster, with a photo's copies; its MP4
 	// renditions sit beside it under the same purpose (VideoService).
 	work_video: { visibility: "public", variants: VARIANT_WIDTHS },
+	// Reviews and Fresh ink: a client's photos of their healed tattoo, and a
+	// client's video's poster (its renditions beside it, VideoService), with a
+	// photo's copies. PRIVATE until published: the client's page reads them
+	// through 5-minute signed URLs. Slices 2 and 3 copy a post's files to a
+	// public purpose only once the studio approved it and the client
+	// consented, and delete those copies on a decline, an unpublish, a
+	// takedown or a withdrawn consent (backend.md, Reviews and Fresh ink).
+	client_post_photo: { visibility: "private", variants: VARIANT_WIDTHS },
+	client_post_video: { visibility: "private", variants: VARIANT_WIDTHS },
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;

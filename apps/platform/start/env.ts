@@ -103,6 +103,12 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	// Staff alert emails (TAT-52): unset or true sends them; false keeps the
 	// alerts in the dashboard only (until the sending domain exists, TAT-20).
 	ALERT_EMAILS: Env.schema.boolean.optional(),
+
+	// Reviews and Fresh ink (slice 1): the client's review page and its public
+	// API routes. Off unless true: they stay off until the client content terms
+	// (docs/legal/) are legally reviewed. Off, every review route is a 404 and
+	// no review link can be made.
+	REVIEWS_ENABLED: Env.schema.boolean.optional(),
 });
 
 // In production the dashboard's origin is https and off the studio pages'

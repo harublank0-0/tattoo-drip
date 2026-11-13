@@ -13,6 +13,8 @@ import { FSDriver } from "@adonisjs/drive/drivers/fs";
 import drive from "@adonisjs/drive/services/main";
 import { VideoDeleteError } from "#modules/media/errors";
 import ImageService, {
+	IMAGE_PURPOSES,
+	PRIVATE_CACHE_CONTROL,
 	type ShownImage,
 	STORED_CACHE_CONTROL,
 } from "#modules/media/services/image_service";
@@ -41,6 +43,16 @@ type TenantRef = Pick<Tenant, "id">;
 
 /** The poster's purpose; the renditions sit beside it under the same folder. */
 export const VIDEO_PURPOSE = "work_video";
+/**
+ * The purposes a video's poster and renditions are stored under: a work
+ * video angle's (public), and a client's Fresh ink video (Reviews and Fresh
+ * ink: private until published, so its renditions are read through 5-minute
+ * signed URLs). Every method takes the purpose, `work_video` when left out,
+ * and uses that purpose's disk (IMAGE_PURPOSES); the staging prefix is
+ * shared, so the one lifecycle rule expires both.
+ */
+export const VIDEO_PURPOSES = ["work_video", "client_post_video"] as const;
+export type VideoPurpose = (typeof VIDEO_PURPOSES)[number];
 /** The private folder the browser uploads into, per tenant (never served). */
 const STAGING = "work_video_upload";
 /** How long a signed upload may start: a 100 MB file on a slow line takes minutes. */
@@ -206,7 +218,8 @@ export default class VideoService {
 	 * staged object is copied to a temp folder, probed (readProbe: the
 	 * container and codec, the measured length, the size), transcoded into
 	 * its renditions and its poster (one at a time per process, transcodeSlot),
-	 * and stored on the public disk under `work_video`. Nothing it stored is
+	 * and stored on the public disk under `purpose` (`work_video` unless a
+	 * client's Fresh ink video says `client_post_video`). Nothing it stored is
 	 * left behind when it fails; the temp folder always goes. Throws for what
 	 * a retry may fix (storage, a killed ffmpeg); a missing upload or a file
 	 * ffprobe can't read is a refusal.
@@ -219,6 +232,7 @@ export default class VideoService {
 		tenant: TenantRef,
 		stagingKey: string,
 		signal?: AbortSignal,
+		purpose: VideoPurpose = VIDEO_PURPOSE,
 	): Promise<ProcessedVideo | RefusedVideo> {
 		if (currentClient()) {
 			throw new Error(
@@ -281,22 +295,20 @@ export default class VideoService {
 				return { kind: "refused", reason: VIDEO_REFUSALS.failed };
 			}
 
-			const base = `tenants/${tenant.id}/${VIDEO_PURPOSE}/${randomUUID()}`;
+			const base = `tenants/${tenant.id}/${purpose}/${randomUUID()}`;
 			const keys: string[] = [];
 			for (const output of outputs) {
 				const key = renditionKey(base, output);
 				stored.push(key); // before the put: a half-written file goes too
-				await drive
-					.use("public")
-					.putStream(key, createReadStream(output.path), {
-						contentType: "video/mp4",
-						cacheControl: STORED_CACHE_CONTROL.public,
-					});
+				await diskOf(purpose).putStream(key, createReadStream(output.path), {
+					contentType: "video/mp4",
+					cacheControl: STORED_CACHE_CONTROL[visibilityOf(purpose)],
+				});
 				keys.push(key);
 			}
 			const poster = await this.images.storeBytes(await readFile(posterPath), {
 				tenant,
-				purpose: VIDEO_PURPOSE,
+				purpose,
 			});
 			posterKey = poster.key;
 			const largest = plan[plan.length - 1];
@@ -309,7 +321,7 @@ export default class VideoService {
 				keys,
 			};
 		} catch (error) {
-			await this.removeFiles(posterKey, stored);
+			await this.removeFiles(posterKey, stored, purpose);
 			throw error;
 		} finally {
 			await rm(folder, { recursive: true, force: true });
@@ -361,15 +373,16 @@ export default class VideoService {
 	async removeFiles(
 		posterKey: string | null,
 		keys: readonly string[] | null,
+		purpose: VideoPurpose = VIDEO_PURPOSE,
 	): Promise<void> {
 		for (const key of keys ?? []) {
 			try {
-				await drive.use("public").delete(key);
+				await diskOf(purpose).delete(key);
 			} catch (error) {
 				logger.error({ err: error, key }, "could not delete a stored video");
 			}
 		}
-		if (posterKey) await this.images.delete(VIDEO_PURPOSE, posterKey);
+		if (posterKey) await this.images.delete(purpose, posterKey);
 	}
 
 	/**
@@ -381,12 +394,13 @@ export default class VideoService {
 		tenant: TenantRef,
 		posterKey: string | null,
 		keys: readonly string[] | null,
+		purpose: VideoPurpose = VIDEO_PURPOSE,
 	): Promise<void> {
 		const failed: string[] = [];
 		for (const key of keys ?? []) {
-			assertVideoKeyOf(tenant, key);
+			assertVideoKeyOf(tenant, key, purpose);
 			try {
-				await drive.use("public").delete(key);
+				await diskOf(purpose).delete(key);
 			} catch (error) {
 				failed.push(key);
 				logger.error({ err: error, key }, "could not delete a stored video");
@@ -394,7 +408,7 @@ export default class VideoService {
 		}
 		if (posterKey) {
 			try {
-				await this.images.deleteOrThrow(VIDEO_PURPOSE, posterKey);
+				await this.images.deleteOrThrow(purpose, posterKey);
 			} catch (error) {
 				if (!(error instanceof Error && "failed" in error)) throw error;
 				failed.push(...(error as VideoDeleteError).failed);
@@ -408,22 +422,30 @@ export default class VideoService {
 		tenant: TenantRef,
 		posterKey: string,
 		size: { width: number; height: number },
+		purpose: VideoPurpose = VIDEO_PURPOSE,
 	): Promise<ShownImage> {
-		return this.images.shownImage(VIDEO_PURPOSE, posterKey, tenant, size);
+		return this.images.shownImage(purpose, posterKey, tenant, size);
 	}
 
 	/** A ready video's renditions as the public API shows them, smallest first; a key that names no size is left out. */
 	async sources(
 		tenant: TenantRef,
 		keys: readonly string[],
+		purpose: VideoPurpose = VIDEO_PURPOSE,
 	): Promise<ShownVideoSource[]> {
 		const shown: ShownVideoSource[] = [];
 		for (const key of keys) {
-			assertVideoKeyOf(tenant, key);
+			assertVideoKeyOf(tenant, key, purpose);
 			const size = renditionOfKey(key);
 			if (!size) continue;
 			shown.push({
-				url: await drive.use("public").getUrl(key),
+				url:
+					visibilityOf(purpose) === "private"
+						? await diskOf(purpose).getSignedUrl(key, {
+								expiresIn: SIGNED_SOURCE_TTL,
+								cacheControl: PRIVATE_CACHE_CONTROL,
+							})
+						: await diskOf(purpose).getUrl(key),
 				type: "video/mp4",
 				width: size.width,
 				height: size.height,
@@ -432,6 +454,18 @@ export default class VideoService {
 		return shown.sort((a, b) => a.width * a.height - b.width * b.height);
 	}
 }
+
+/** A purpose's disk, as ImageService decides it: work videos public, a client's private until published. */
+function visibilityOf(purpose: VideoPurpose): "public" | "private" {
+	return IMAGE_PURPOSES[purpose].visibility;
+}
+
+function diskOf(purpose: VideoPurpose) {
+	return drive.use(visibilityOf(purpose));
+}
+
+/** How long a private rendition's signed URL works, as a private image's. */
+const SIGNED_SOURCE_TTL = "5 minutes";
 
 function assertSize(size: number) {
 	if (!Number.isInteger(size) || size < 1 || size > MAX_VIDEO_BYTES) {
@@ -442,9 +476,13 @@ function assertSize(size: number) {
 }
 
 /** Defence in depth for a rendition's key, like ImageService's: this tenant's, this purpose's. */
-function assertVideoKeyOf(tenant: TenantRef, key: string) {
+function assertVideoKeyOf(
+	tenant: TenantRef,
+	key: string,
+	purpose: VideoPurpose = VIDEO_PURPOSE,
+) {
 	if (
-		!key.startsWith(`tenants/${tenant.id}/${VIDEO_PURPOSE}/`) ||
+		!key.startsWith(`tenants/${tenant.id}/${purpose}/`) ||
 		key.includes("..")
 	) {
 		throw new Error("VideoService was given a key of another tenant");

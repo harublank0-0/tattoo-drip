@@ -120,10 +120,13 @@ test.group("Public API: CORS", () => {
 
 		response.assertStatus(204);
 		response.assertHeader("access-control-allow-origin", STUDIO_PAGE);
-		response.assertHeader("access-control-allow-methods", "GET,HEAD,POST");
+		response.assertHeader(
+			"access-control-allow-methods",
+			"GET,HEAD,POST,PUT,DELETE",
+		);
 		response.assertHeader(
 			"access-control-allow-headers",
-			"accept,content-type,x-challenge-token",
+			"accept,content-type,x-challenge-token,x-review-token",
 		);
 		response.assertHeader("access-control-max-age", "600");
 		assert.isUndefined(response.header("access-control-allow-credentials"));
@@ -147,7 +150,7 @@ test.group("Public API: CORS", () => {
 		response.assertHeader("access-control-allow-origin", STUDIO_PAGE);
 		response.assertHeader(
 			"access-control-allow-headers",
-			"accept,content-type,x-challenge-token",
+			"accept,content-type,x-challenge-token,x-review-token",
 		);
 		assert.isUndefined(response.header("access-control-allow-credentials"));
 		assertNoCookies(response);
@@ -184,8 +187,10 @@ test.group("Public API: CORS", () => {
 		client,
 		assert,
 	}) => {
+		// PUT and DELETE are the review page's (Reviews and Fresh ink); PATCH
+		// stays refused.
 		for (const [method, headers] of [
-			["PUT", "content-type"],
+			["PATCH", "content-type"],
 			["POST", "authorization"],
 			["POST", "cookie"],
 		]) {

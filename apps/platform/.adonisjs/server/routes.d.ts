@@ -168,6 +168,16 @@ export type ScannedRoutes = {
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
     'api.v1.deposits.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
+    'api.v1.review.show': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.review.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.post.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.post.order': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.photos.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.videos.sign': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.videos.stage': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.videos.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.media.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'media': ParamValue} }
   }
   GET: {
     'drive.public.serve': { paramsTuple: [...ParamValue[]]; params: {'*': ParamValue[]} }
@@ -241,6 +251,7 @@ export type ScannedRoutes = {
     'api.v1.flash.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.flash.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'design': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
+    'api.v1.review.show': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
   HEAD: {
     'drive.public.serve': { paramsTuple: [...ParamValue[]]; params: {'*': ParamValue[]} }
@@ -314,6 +325,7 @@ export type ScannedRoutes = {
     'api.v1.flash.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.flash.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'design': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
+    'api.v1.review.show': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
   POST: {
     'new_account.store': { paramsTuple?: []; params?: {} }
@@ -368,6 +380,9 @@ export type ScannedRoutes = {
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
+    'api.v1.review.photos.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.videos.sign': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.videos.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
   PUT: {
     'tenant.inventory.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -400,6 +415,9 @@ export type ScannedRoutes = {
     'tenant.projects.notes.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.artist.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'account.password.update': { paramsTuple?: []; params?: {} }
+    'api.v1.review.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.post.order': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.videos.stage': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
   DELETE: {
     'tenant.inventory.archive': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -413,6 +431,9 @@ export type ScannedRoutes = {
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.flash.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'api.v1.review.review.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.post.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.media.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'media': ParamValue} }
   }
 }
 declare module '@adonisjs/core/types/http' {

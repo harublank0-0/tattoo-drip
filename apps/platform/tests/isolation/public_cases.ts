@@ -1,11 +1,18 @@
+import drive from "@adonisjs/drive/services/main";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import FlashDesign from "#modules/flash/models/flash_design";
+import ImageService from "#modules/media/services/image_service";
+import VideoService from "#modules/media/services/video_service";
 import DepositLink from "#modules/payments/models/deposit_link";
 import Payment from "#modules/payments/models/payment";
+import { clientVideoUploadToken } from "#modules/reviews/client_video_uploads";
+import { REVIEW_TOKEN_HEADER } from "#modules/reviews/review_links";
 import Tenant from "#modules/tenancy/models/tenant";
 import { type ProofPart, proofPart } from "#tests/helpers/deposits";
+import { testImages } from "#tests/helpers/images";
 import { intakeFields, intakeRows } from "#tests/helpers/intake";
+import { reviewBody, reviewRows } from "#tests/helpers/reviews";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
 /**
@@ -17,13 +24,20 @@ import { inTenant, type Studio } from "#tests/helpers/tenants";
  * is simply another tenant.
  */
 export type PublicIsolationCase = {
-	method: "GET" | "POST";
+	method: "GET" | "POST" | "PUT" | "DELETE";
 	/** The route as the router prints it, e.g. /api/v1/tenants/:tenant */
 	pattern: string;
-	/** A valid body for writes, built for the studio sending it. */
-	body?: (own: Studio) => Record<string, unknown>;
-	/** How `body` is sent: JSON (the default) or multipart form fields. */
-	encoding?: "json" | "multipart";
+	/** A valid body for writes, built for the studio sending it (it may stage what the write needs). */
+	body?: (
+		own: Studio,
+	) => Record<string, unknown> | Promise<Record<string, unknown>>;
+	/**
+	 * How `body` is sent: JSON (the default) or multipart form fields; `raw`
+	 * sends `raw`'s bytes with its type (a video's upload).
+	 */
+	encoding?: "json" | "multipart" | "raw";
+	/** The raw body of a `raw` write, built for the studio sending it. */
+	raw?: (own: Studio) => { type: string; data: Buffer };
 	/**
 	 * Values for the pattern's parameters other than :tenant, built for one
 	 * studio (TAT-65: a deposit link's token). With them, the harness also
@@ -31,10 +45,18 @@ export type PublicIsolationCase = {
 	 * it was.
 	 */
 	params?: (studio: Studio) => Record<string, string>;
+	/**
+	 * Request headers built for one studio (the review page: its link's
+	 * token in X-Review-Token). Cross-sent like `params`: B's under A's slug
+	 * and A's under B's must be the 404.
+	 */
+	headers?: (studio: Studio) => Record<string, string>;
+	/** A query string built for one studio (a video's upload token), cross-sent like `params`. */
+	query?: (studio: Studio) => Record<string, string>;
 	/** File parts of a multipart write, built for the studio sending it (TAT-65: the proof). */
 	files?: (own: Studio) => Promise<ProofPart[]>;
 	/** The status of A's own request: the positive control. */
-	ownStatus: 200 | 201;
+	ownStatus: 200 | 201 | 204;
 	/** Strings A's own answer must contain, so an empty answer can't pass. */
 	ownMarkers: (own: Studio) => string[];
 	/** Reads the state of the studio that the route could change. */
@@ -70,6 +92,25 @@ const depositRows = (target: Studio) =>
 			row.serialize(),
 		),
 	}));
+
+/** The review page's token header, for one studio (Reviews and Fresh ink). */
+const reviewHeaders = (studio: Studio) => ({
+	[REVIEW_TOKEN_HEADER]: studio.reviewToken,
+});
+
+/** A video upload staged for the studio's seeded draft post: 4 bytes, and the token the sign step would give. */
+async function stagedVideo(own: Studio) {
+	const videos = new VideoService(new ImageService());
+	const key = videos.stagingKey(own.tenant);
+	await drive.use("private").put(key, Buffer.from("mp4!"));
+	return clientVideoUploadToken({
+		tenantId: own.tenant.id,
+		postId: own.clientPost.id,
+		key,
+		type: "video/mp4",
+		size: 4,
+	});
+}
 
 export const publicIsolationCases: PublicIsolationCase[] = [
 	{
@@ -167,5 +208,115 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 		// The answer is the page in `submitted`, with A's reference code.
 		ownMarkers: (own) => [own.depositReferenceCode],
 		snapshot: depositRows,
+	},
+	// The review page (Reviews and Fresh ink, slice 1): the link's token in
+	// X-Review-Token, cross-sent by the harness like a path parameter.
+	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/review",
+		headers: reviewHeaders,
+		ownStatus: 200,
+		ownMarkers: (own) => [own.tenant.name, own.clientPostPhoto.id],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "PUT",
+		pattern: "/api/v1/tenants/:tenant/review",
+		headers: reviewHeaders,
+		body: () => reviewBody(),
+		ownStatus: 200,
+		ownMarkers: (own) => [own.tenant.name, "Healed beautifully"],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "DELETE",
+		pattern: "/api/v1/tenants/:tenant/review/review",
+		headers: reviewHeaders,
+		ownStatus: 200,
+		ownMarkers: (own) => [own.tenant.name],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "DELETE",
+		pattern: "/api/v1/tenants/:tenant/review/post",
+		headers: reviewHeaders,
+		ownStatus: 200,
+		ownMarkers: (own) => [own.tenant.name],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "PUT",
+		pattern: "/api/v1/tenants/:tenant/review/post/order",
+		headers: reviewHeaders,
+		body: (own) => ({ order: [own.clientPostPhoto.id] }),
+		ownStatus: 200,
+		ownMarkers: (own) => [own.tenant.name, own.clientPostPhoto.id],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "POST",
+		pattern: "/api/v1/tenants/:tenant/review/photos",
+		headers: reviewHeaders,
+		encoding: "multipart",
+		files: async () => [
+			{
+				field: "photo",
+				name: "healed.png",
+				type: "image/png",
+				data: await testImages.png(),
+			},
+		],
+		ownStatus: 201,
+		ownMarkers: (own) => [own.tenant.name, own.clientPostPhoto.id],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "POST",
+		pattern: "/api/v1/tenants/:tenant/review/videos/sign",
+		headers: reviewHeaders,
+		body: () => ({ type: "video/mp4", size: 1000 }),
+		ownStatus: 200,
+		// On the local disk the upload goes to A's own staging route.
+		ownMarkers: (own) => [
+			`/api/v1/tenants/${own.tenant.slug}/review/videos/stage`,
+		],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "PUT",
+		pattern: "/api/v1/tenants/:tenant/review/videos/stage",
+		// The upload token is the credential here, as a presigned URL's is.
+		query: (studio) => ({
+			upload: clientVideoUploadToken({
+				tenantId: studio.tenant.id,
+				postId: studio.clientPost.id,
+				key: new VideoService(new ImageService()).stagingKey(studio.tenant),
+				type: "video/mp4",
+				size: 4,
+			}),
+		}),
+		encoding: "raw",
+		raw: () => ({ type: "video/mp4", data: Buffer.from("mp4!") }),
+		ownStatus: 204,
+		ownMarkers: () => [],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "POST",
+		pattern: "/api/v1/tenants/:tenant/review/videos",
+		headers: reviewHeaders,
+		body: async (own) => ({ upload: await stagedVideo(own) }),
+		ownStatus: 201,
+		ownMarkers: (own) => [own.tenant.name, "processing"],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "DELETE",
+		pattern: "/api/v1/tenants/:tenant/review/media/:media",
+		headers: reviewHeaders,
+		params: (studio) => ({ media: studio.clientPostPhoto.id }),
+		ownStatus: 200,
+		ownMarkers: (own) => [own.tenant.name],
+		snapshot: (target) => reviewRows(target.tenant),
 	},
 ];
