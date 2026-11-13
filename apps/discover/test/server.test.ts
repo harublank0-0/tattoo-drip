@@ -384,6 +384,7 @@ describe("the built Discover server, indexing off", { skip }, () => {
 		assert.match(studios, /Discover is being prepared for launch/);
 		const pricing = await (await discover.get("/pricing")).text();
 		assert.match(pricing, /Simple plans for tattoo professionals\./);
+		assert.match(pricing, /Your own studio website, in one of five themes/);
 		assert.match(pricing, /Nothing on this site takes payment/);
 		assert.deepEqual(api.requests, []);
 	});
