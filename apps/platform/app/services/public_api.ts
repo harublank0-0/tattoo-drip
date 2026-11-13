@@ -74,7 +74,9 @@ export type ApiErrorCode =
 	| "review_locked"
 	| "post_full"
 	| "post_needs_photo"
-	| "remove_failed";
+	| "remove_failed"
+	| "taken_down"
+	| "post_limit";
 
 export type ErrorKind = { status: number; code: string; message: string };
 
@@ -205,6 +207,19 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		status: 503,
 		code: "remove_failed",
 		message: "We couldn't remove it just now. Try again.",
+	},
+	// A new review or post after TattooDrip took the last one down (finding 1).
+	taken_down: {
+		status: 409,
+		code: "taken_down",
+		message: "This was taken down by TattooDrip. Contact the studio.",
+	},
+	// A third post for one tattoo: a declined post may be posted again once.
+	post_limit: {
+		status: 409,
+		code: "post_limit",
+		message:
+			"This tattoo already had two posts. Contact the studio to change it.",
 	},
 };
 

@@ -918,6 +918,9 @@ router
 							.delete("/post", [controllers.PublicReviews, "destroyPost"])
 							.as("api.v1.review.post.destroy");
 						router
+							.put("/post/order", [controllers.PublicReviews, "reorder"])
+							.as("api.v1.review.post.order");
+						router
 							.post("/photos", [controllers.PublicReviews, "storePhoto"])
 							.as("api.v1.review.photos.store");
 						router

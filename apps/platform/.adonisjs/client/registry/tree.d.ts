@@ -323,6 +323,7 @@ export interface ApiDefinition {
         }
         post: {
           destroy: typeof routes['api.v1.review.post.destroy']
+          order: typeof routes['api.v1.review.post.order']
         }
         photos: {
           store: typeof routes['api.v1.review.photos.store']

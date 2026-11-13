@@ -2023,6 +2023,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['destroyPost']>>>
     }
   }
+  'api.v1.review.post.order': {
+    methods: ["PUT"]
+    pattern: '/api/v1/tenants/:tenant/review/post/order'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/reviews/validators/review_page').reorderPostValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/reviews/validators/review_page').reorderPostValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['reorder']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_reviews_controller').default['reorder']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'api.v1.review.photos.store': {
     methods: ["POST"]
     pattern: '/api/v1/tenants/:tenant/review/photos'

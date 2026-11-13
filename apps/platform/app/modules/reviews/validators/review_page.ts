@@ -14,6 +14,7 @@ import {
 	MAX_SHOWN_NAME_LENGTH,
 	MIN_RATING,
 	MIN_REVIEW_LENGTH,
+	shownNameAllowed,
 } from "#modules/reviews/rules";
 
 /** The client's words, as the review page shows them (Reviews and Fresh ink). */
@@ -21,7 +22,7 @@ export const REVIEW_MESSAGES = {
 	rating: `Choose a rating from ${MIN_RATING} to ${MAX_RATING} stars.`,
 	bodyShort: `Write at least ${MIN_REVIEW_LENGTH} characters.`,
 	bodyLong: `Keep your review to ${MAX_REVIEW_LENGTH.toLocaleString("en")} characters.`,
-	shownName: `Write the name to show, up to ${MAX_SHOWN_NAME_LENGTH} characters.`,
+	shownName: `Write the name to show: up to ${MAX_SHOWN_NAME_LENGTH} characters, letters you can see.`,
 	caption: `Keep the caption to ${MAX_CAPTION_LENGTH} characters.`,
 	placement: `Keep it to ${MAX_PLACEMENT_LENGTH} characters.`,
 	styles: `Choose up to ${MAX_POST_STYLES} styles from the list.`,
@@ -64,6 +65,20 @@ const oneLine = vine.createRule(
 	},
 );
 
+/**
+ * A shown name (ruling 9, finding 9): 1 to 40 characters, no control,
+ * bidi or zero-width character, not blank (shownNameAllowed; the database
+ * checks the same).
+ */
+const shownName = vine.createRule(
+	(value: unknown, _options: undefined, field: FieldContext) => {
+		if (typeof value !== "string") return;
+		if (!shownNameAllowed(value)) {
+			field.report(REVIEW_MESSAGES.shownName, "shownName", field);
+		}
+	},
+);
+
 /** A length in characters as PostgreSQL counts them (code points), so any script counts as people see it. */
 const characters = vine.createRule(
 	(
@@ -88,18 +103,7 @@ const characters = vine.createRule(
  * kept as it was while the studio is not listed (the page never showed it).
  */
 export const submitReviewPageValidator = vine.create({
-	shownName: vine
-		.string()
-		.trim()
-		.use(oneLine())
-		.use(
-			characters({
-				min: 1,
-				max: MAX_SHOWN_NAME_LENGTH,
-				short: REVIEW_MESSAGES.shownName,
-				long: REVIEW_MESSAGES.shownName,
-			}),
-		),
+	shownName: vine.string().trim().use(shownName()),
 	consentStudioPage: vine.boolean({ strict: true }),
 	consentDiscover: vine.boolean({ strict: true }),
 	review: vine
@@ -229,4 +233,22 @@ addPostVideoValidator.messagesProvider = new SimpleMessagesProvider({
 	"upload.required": REVIEW_MESSAGES.video,
 	"upload.string": REVIEW_MESSAGES.video,
 	"upload.maxLength": REVIEW_MESSAGES.video,
+});
+
+/** The post's new order alone ("Make photo 3 the main photo"): every item's id, a photo first. */
+export const reorderPostValidator = vine.create({
+	order: vine
+		.array(vine.string().uuid())
+		.minLength(1)
+		.maxLength(MAX_POST_MEDIA)
+		.distinct(),
+});
+reorderPostValidator.messagesProvider = new SimpleMessagesProvider({
+	"order.required": REVIEW_MESSAGES.order,
+	"order.array": REVIEW_MESSAGES.order,
+	"order.minLength": REVIEW_MESSAGES.order,
+	"order.maxLength": REVIEW_MESSAGES.order,
+	"order.distinct": REVIEW_MESSAGES.order,
+	"order.*.string": REVIEW_MESSAGES.order,
+	"order.*.uuid": REVIEW_MESSAGES.order,
 });

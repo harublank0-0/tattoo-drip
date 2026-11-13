@@ -80,3 +80,25 @@ export class ReviewInputError extends Error {
 		super(message);
 	}
 }
+
+/**
+ * A new review or post for a project whose last one TattooDrip took down
+ * (finding 1): deleting a taken-down item doesn't let the client post it
+ * again, until an operator restores it. The message is for the client.
+ */
+export class ReviewTakenDownError extends Error {
+	constructor() {
+		super("This was taken down by TattooDrip. Contact the studio.");
+	}
+}
+
+/**
+ * A third Fresh ink post for one project (finding 1): a declined post may be
+ * deleted and posted again once, so a project has at most MAX_POSTS_PER_PROJECT
+ * posts, deleted ones included.
+ */
+export class PostLimitError extends Error {
+	constructor() {
+		super("This tattoo already had its posts");
+	}
+}

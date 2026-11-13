@@ -14,12 +14,12 @@ import { assertApiError } from "#tests/helpers/api";
 import { enableChallenge, siteverify, verdict } from "#tests/helpers/challenge";
 import { testImages } from "#tests/helpers/images";
 import {
-	publicFiles,
 	reviewBody,
 	reviewRequest,
 	reviewRows,
 	reviewServices,
 	seedPost,
+	storedFiles,
 } from "#tests/helpers/reviews";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
 
@@ -316,21 +316,39 @@ test.group("Review page: the review", (group) => {
 		assert.isTrue(listed.body().data.studio.onDiscover);
 		assert.isTrue(listed.body().data.review.consentDiscover);
 
-		// Unlisted, the page offers no Discover box: what it sends is ignored
-		// and the stored choice stays (it returns if the studio lists again).
+		// Unlisted, a ticked consent stays only while the client keeps it
+		// ticked: sending true keeps it, unticking withdraws it (finding 2).
 		await inTenant(a.tenant, () =>
 			reviewServices().publication.disable(a.tenant),
 		);
-		const unlisted = await reviewRequest(
+		const kept = await reviewRequest(
+			client,
+			"PUT",
+			at(a),
+			"",
+			a.reviewToken,
+		).json(reviewBody({ consentDiscover: true }));
+		kept.assertStatus(200);
+		assert.isFalse(kept.body().data.studio.onDiscover);
+		assert.isTrue(kept.body().data.review.consentDiscover);
+		const withdrawn = await reviewRequest(
 			client,
 			"PUT",
 			at(a),
 			"",
 			a.reviewToken,
 		).json(reviewBody({ consentDiscover: false }));
-		unlisted.assertStatus(200);
-		assert.isFalse(unlisted.body().data.studio.onDiscover);
-		assert.isTrue(unlisted.body().data.review.consentDiscover);
+		assert.isFalse(withdrawn.body().data.review.consentDiscover);
+		// Once withdrawn it can't be ticked anew while unlisted.
+		const again = await reviewRequest(
+			client,
+			"PUT",
+			at(a),
+			"",
+			a.reviewToken,
+		).json(reviewBody({ consentDiscover: true }));
+		assert.isFalse(again.body().data.review.consentDiscover);
+		assert.isFalse(again.body().data.post.consentDiscover);
 	});
 
 	test("every field is checked again: rating, length in any script, name, types", async ({
@@ -637,11 +655,11 @@ test.group("Review page: the Fresh ink post", (group) => {
 		const added = page.post.media[1];
 		assert.match(added.image.url, /\/client_post_photo\//);
 		assert.isArray(added.image.variants);
-		assert.lengthOf(await publicFiles(a.tenant, "client_post_photo"), 7);
+		assert.lengthOf(await storedFiles(a.tenant, "client_post_photo"), 7);
 
 		assertApiError(await sendPhoto(client, a), 409, "post_full");
 		assert.lengthOf(
-			await publicFiles(a.tenant, "client_post_photo"),
+			await storedFiles(a.tenant, "client_post_photo"),
 			7,
 			"the refused photo isn't kept",
 		);
@@ -893,7 +911,7 @@ test.group("Review page: the Fresh ink post", (group) => {
 			[0, 1],
 		);
 		assert.lengthOf(
-			await publicFiles(a.tenant, "client_post_photo"),
+			await storedFiles(a.tenant, "client_post_photo"),
 			1,
 			"its files went first",
 		);
@@ -1019,7 +1037,7 @@ test.group("Review page: the Fresh ink post", (group) => {
 	}) => {
 		const { a } = await twoStudios();
 		await sendPhoto(client, a);
-		assert.lengthOf(await publicFiles(a.tenant, "client_post_photo"), 1);
+		assert.lengthOf(await storedFiles(a.tenant, "client_post_photo"), 1);
 		const deleted = await reviewRequest(
 			client,
 			"DELETE",
@@ -1029,7 +1047,7 @@ test.group("Review page: the Fresh ink post", (group) => {
 		);
 		deleted.assertStatus(200);
 		assert.isNull(deleted.body().data.post);
-		assert.deepEqual(await publicFiles(a.tenant, "client_post_photo"), []);
+		assert.deepEqual(await storedFiles(a.tenant, "client_post_photo"), []);
 		const rows = await reviewRows(a.tenant);
 		assert.lengthOf(rows.media, 0);
 		assert.lengthOf(rows.posts, 1);

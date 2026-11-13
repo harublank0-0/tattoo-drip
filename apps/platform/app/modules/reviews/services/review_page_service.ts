@@ -39,7 +39,9 @@ import {
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientPostService, {
 	PHOTO_PURPOSE,
+	type PostBlock,
 	type SharedChoices,
+	type Submitter,
 	VIDEO_PURPOSE,
 } from "#modules/reviews/services/client_post_service";
 import ClientReviewService from "#modules/reviews/services/client_review_service";
@@ -78,6 +80,8 @@ export type ReviewPage = {
 	defaults: { shownName: string; styles: string[]; placement: string | null };
 	review: ClientReview | null;
 	post: { post: ClientPost; media: ShownMedia[] } | null;
+	/** Why the client can't start a new review or post now (finding 1), when they have none. */
+	blocks: { review: "taken_down" | null; post: PostBlock | null };
 };
 
 /**
@@ -117,7 +121,9 @@ export default class ReviewPageService {
 		const project = await this.projects.findLive(tenant, link.projectId);
 		if (!project) throw new ReviewPageNotFoundError();
 		const client = await this.clients.find(tenant, project.clientId);
-		if (!client) throw new ReviewPageNotFoundError();
+		// An anonymised client's link is dead (finding 8): the privacy
+		// deletion also erased what they posted.
+		if (!client || client.anonymizedAt) throw new ReviewPageNotFoundError();
 		const session = await this.sessions.lastCompletedTattoo(tenant, project);
 		if (!session) throw new ReviewPageNotFoundError();
 		return {
@@ -140,6 +146,13 @@ export default class ReviewPageService {
 		const inquiry = project.inquiryId
 			? await this.inquiries.find(tenant, project.inquiryId)
 			: null;
+		const blocks = {
+			review:
+				!review && (await this.reviews.newReviewBlocked(tenant, project.id))
+					? ("taken_down" as const)
+					: null,
+			post: post ? null : await this.posts.newPostBlock(tenant, project.id),
+		};
 		// Last, and alone: readDiscovery clears the context in a savepoint.
 		const listedOnDiscover = await this.publication.listedNow(tenant);
 
@@ -173,6 +186,7 @@ export default class ReviewPageService {
 			},
 			review,
 			post: post ? { post, media: shown } : null,
+			blocks,
 		};
 	}
 
@@ -185,7 +199,11 @@ export default class ReviewPageService {
 	 * (ReviewInputError). A submit that leaves neither a review nor a
 	 * submitted post is refused.
 	 */
-	async submit(ctx: ReviewContext, input: ReviewPageSubmission): Promise<void> {
+	async submit(
+		ctx: ReviewContext,
+		input: ReviewPageSubmission,
+		submitter?: Submitter,
+	): Promise<void> {
 		const { tenant, project } = ctx;
 		const listed = await this.publication.listedNow(tenant);
 		if (input.post) {
@@ -206,21 +224,25 @@ export default class ReviewPageService {
 			await this.posts.lockProject(trx, ctx);
 			const review = await this.reviews.find(tenant, project.id, trx);
 			const post = await this.posts.find(tenant, project.id);
+			// Unlisted, the Discover consent can only be withdrawn (finding 2):
+			// the page shows the box while it is ticked, so it can be unticked,
+			// never ticked anew.
+			const stored = review?.consentDiscover ?? post?.consentDiscover ?? false;
 			const shared: SharedChoices = {
 				shownName: input.shownName,
 				consentStudioPage: input.consentStudioPage,
 				consentDiscover: listed
 					? input.consentDiscover
-					: (review?.consentDiscover ?? post?.consentDiscover ?? false),
+					: stored && input.consentDiscover,
 			};
 			if (!input.review && !input.post && !review && !post?.submittedAt) {
 				throw new ReviewInputError("review", REVIEW_MESSAGES.nothing);
 			}
 			if (input.review) {
-				await this.reviews.save(trx, ctx, input.review, shared);
+				await this.reviews.save(trx, ctx, input.review, shared, submitter);
 			}
 			if (input.post) {
-				const saved = await this.posts.save(trx, ctx, input.post);
+				const saved = await this.posts.save(trx, ctx, input.post, submitter);
 				if (saved === "needs_media") {
 					throw new ReviewInputError("post", REVIEW_MESSAGES.needsMedia);
 				}
@@ -235,6 +257,24 @@ export default class ReviewPageService {
 		await withTransaction(async (trx) => {
 			await this.posts.lockProject(trx, ctx);
 			await this.reviews.delete(trx, ctx);
+		});
+	}
+
+	/**
+	 * The privacy deletion's part for reviews (finding 8, for TAT-42's
+	 * anonymise step to call in its transaction): the client's reviews and
+	 * posts are erased as their own deletes erase them (files first, then
+	 * rows scrubbed and soft-deleted, the dispute record cleared), and the
+	 * review links of their projects revoked.
+	 */
+	async forgetClient(
+		tenant: Pick<Tenant, "id">,
+		clientId: string,
+	): Promise<void> {
+		await withTransaction(async (trx) => {
+			await this.reviews.eraseForClient(trx, tenant, clientId);
+			await this.posts.eraseForClient(trx, tenant, clientId);
+			await this.links.revokeForClient(trx, tenant, clientId);
 		});
 	}
 

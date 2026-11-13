@@ -19,9 +19,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * up, `failed()` marks the video failed if it is still processing.
  */
 export default class ProcessClientPostVideoJob extends Job<Payload> {
-	static readonly queueName = "video";
+	/**
+	 * Its own queue (finding 4), served by the video worker after `video`
+	 * (`queue:work --queue=video,client_video`: the worker asks the queues in
+	 * that order), so a studio's work video never waits behind a client's.
+	 */
+	static readonly queueName = "client_video";
 
-	static options: JobOptions = { queue: "video", timeout: "30m" };
+	static options: JobOptions = { queue: "client_video", timeout: "30m" };
 
 	async execute(): Promise<void> {
 		const { tenantId, mediaId } = checked(this.payload);

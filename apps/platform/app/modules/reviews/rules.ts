@@ -22,6 +22,8 @@ export const MAX_PLACEMENT_LENGTH = 120;
 export const MAX_POST_STYLES = 3;
 /** Photos and videos per post: a lead photo and up to seven more (ruling 5). */
 export const MAX_POST_MEDIA = 8;
+/** Fresh ink posts per project, deleted ones included: a declined post may be posted again once (finding 1). */
+export const MAX_POSTS_PER_PROJECT = 2;
 
 /** The project statuses whose tattoo work may be done (ruling 3). */
 export const REVIEWABLE_STATUSES = [
@@ -90,19 +92,49 @@ function firstGrapheme(word: string): string {
 }
 
 /**
+ * Characters a shown name may never hold (finding 9): bidi controls, which
+ * can make a name read as something else, and zero-width characters, which
+ * make two names look the same. The database checks the same set.
+ */
+export const INVISIBLE_NAME_CHARACTERS =
+	/[\u200B-\u200D\u202A-\u202E\u2066-\u2069\uFEFF]/u;
+
+/** Whether a shown name is allowed: 1 to 40 characters, no control or invisible character, not blank. */
+export function shownNameAllowed(name: string): boolean {
+	const length = charLength(name);
+	return (
+		length >= 1 &&
+		length <= MAX_SHOWN_NAME_LENGTH &&
+		name.trim() !== "" &&
+		!INVISIBLE_NAME_CHARACTERS.test(name) &&
+		// biome-ignore lint/suspicious/noControlCharactersInRegex: refusing control characters is the point.
+		!/[\u0000-\u001f\u007f\u2028\u2029]/.test(name)
+	);
+}
+
+/**
  * The name a review or post shows until the client changes it (ruling 9):
  * the client record's first name and the initial of their last name
  * ("Sita Rai" is "Sita R."), the first name alone for a one-word name, and
- * "Client" for a record with no name left (an anonymised one). Never the
- * full name, the phone or the email. Cut to MAX_SHOWN_NAME_LENGTH.
+ * "Client" for a record with no name left (an anonymised one) or a
+ * one-word name that looks like a handle or a number (digits or "@": a
+ * studio that saved a phone or an Instagram handle as the name). Never the
+ * full name, the phone or the email. Invisible characters are dropped; cut
+ * to MAX_SHOWN_NAME_LENGTH.
  */
 export function defaultShownName(fullName: string): string {
-	const words = fullName.trim().split(/\s+/u).filter(Boolean);
+	const words = fullName
+		.replace(new RegExp(INVISIBLE_NAME_CHARACTERS.source, "gu"), "")
+		.trim()
+		.split(/\s+/u)
+		.filter(Boolean);
 	if (words.length === 0) return "Client";
 	const first = words[0];
+	if (words.length === 1 && /[\p{Nd}@]/u.test(first)) return "Client";
 	const shown =
 		words.length > 1 ? `${first} ${firstGrapheme(words.at(-1) ?? "")}.` : first;
-	return Array.from(shown).slice(0, MAX_SHOWN_NAME_LENGTH).join("");
+	const cut = Array.from(shown).slice(0, MAX_SHOWN_NAME_LENGTH).join("");
+	return shownNameAllowed(cut) ? cut : "Client";
 }
 
 /**

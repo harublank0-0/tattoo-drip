@@ -109,8 +109,11 @@ export async function makeClip({
 	return { path, type, size };
 }
 
-/** ffprobe's JSON for a stored file (a rendition, by its key on the public disk). */
-export async function probeStored(key: string): Promise<{
+/** ffprobe's JSON for a stored file (a rendition, by its key on the public disk, or `disk`'s). */
+export async function probeStored(
+	key: string,
+	disk: "public" | "private" = "public",
+): Promise<{
 	format: { tags?: Record<string, string>; duration?: string };
 	streams: {
 		codec_type: string;
@@ -123,7 +126,7 @@ export async function probeStored(key: string): Promise<{
 		side_data_list?: { rotation?: number }[];
 	}[];
 }> {
-	const path = app.tmpPath("storage", "public", key);
+	const path = app.tmpPath("storage", disk, key);
 	const { stdout } = await run("ffprobe", [
 		"-v",
 		"error",

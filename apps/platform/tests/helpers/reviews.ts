@@ -9,7 +9,10 @@ import ArtistService from "#modules/artists/services/artist_service";
 import type Client from "#modules/clients/models/client";
 import PublicationService from "#modules/discovery/services/publication_service";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
-import ImageService from "#modules/media/services/image_service";
+import ImageService, {
+	IMAGE_PURPOSES,
+	type ImagePurpose,
+} from "#modules/media/services/image_service";
 import VideoService from "#modules/media/services/video_service";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import type { ProjectStatus } from "#modules/projects/models/tattoo_project";
@@ -224,12 +227,18 @@ export function reviewRows(tenant: TenantRef) {
 	}));
 }
 
-/** The files a studio has under a public purpose folder. */
-export async function publicFiles(tenant: TenantRef, purpose: string) {
+/** The files a studio has under a purpose's folder, on that purpose's disk (client media are private). */
+export async function storedFiles(tenant: TenantRef, purpose: ImagePurpose) {
 	try {
 		return (
 			await readdir(
-				app.tmpPath("storage", "public", "tenants", tenant.id, purpose),
+				app.tmpPath(
+					"storage",
+					IMAGE_PURPOSES[purpose].visibility,
+					"tenants",
+					tenant.id,
+					purpose,
+				),
 			)
 		).sort();
 	} catch {

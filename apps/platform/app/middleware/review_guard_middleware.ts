@@ -17,10 +17,13 @@ import { ApiException } from "#services/public_api_errors";
 
 const STAGE_ROUTE = "api.v1.review.videos.stage";
 
-/** The routes that carry a file or a video's signature: counted as uploads. */
+/**
+ * The routes that carry a file: counted as uploads. A video's sign counts as
+ * a write (finding 7): with the reservation cap it bounds staged objects
+ * without a bot challenge per file.
+ */
 const UPLOAD_ROUTES = new Set([
 	"api.v1.review.photos.store",
-	"api.v1.review.videos.sign",
 	"api.v1.review.videos.stage",
 	"api.v1.review.videos.store",
 ]);

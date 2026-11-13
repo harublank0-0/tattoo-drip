@@ -15,7 +15,9 @@ const ALLOWLIST = {
 	ProcessClientPostVideoJob:
 		"Reviews and Fresh ink: a client's video on the work videos' pipeline, for the same reason; it reads and writes its item only in short withDbContext transactions scoped to the payload's tenantId (ClientPostService.processVideo)",
 	SweepStuckVideosJob:
-		"reads only ids from stuck_video_candidates() and queues one FailStuckVideoJob (a TenantJob) per row; reads and writes no tenant table itself",
+		"reads only ids from stuck_video_candidates() and stuck_client_video_candidates() and queues one FailStuckVideoJob or FailStuckClientVideoJob (TenantJobs) per row; reads and writes no tenant table itself",
+	SweepStaleSubmittersJob:
+		"Reviews and Fresh ink: reads only tenant ids from stale_submitter_tenants() and queues one ClearSubmittersJob (a TenantJob) per tenant; reads and writes no tenant table itself",
 	SweepExpiredQuotesJob:
 		"reads only ids from expired_quote_candidates() and queues one ExpireQuoteJob (a TenantJob) per row; reads and writes no tenant table itself",
 };

@@ -46,6 +46,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	client_reviews: ["tenant_isolation:ALL"],
 	client_posts: ["tenant_isolation:ALL"],
 	client_post_media: ["tenant_isolation:ALL"],
+	client_video_reservations: ["tenant_isolation:ALL"],
 	deposit_outcomes: ["tenant_isolation:ALL"],
 	flash_designs: ["tenant_isolation:ALL"],
 	inquiries: ["tenant_isolation:ALL"],
@@ -99,6 +100,16 @@ const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
 		args: "requested_hash text",
 		reason:
 			"the id of the live tenant holding the invitation whose token hash is exactly the argument, for the invitation page (TAT-33)",
+	},
+	"public.stale_submitter_tenants": {
+		args: "",
+		reason:
+			"lists the tenant ids holding a review or post submitter digest older than 90 days, for the disputes record's sweep (Reviews and Fresh ink)",
+	},
+	"public.stuck_client_video_candidates": {
+		args: "",
+		reason:
+			"lists (tenant_id, media_id) of client videos still processing an hour after they were added, for the stuck-video sweep (Reviews and Fresh ink)",
 	},
 	"public.stuck_video_candidates": {
 		args: "",

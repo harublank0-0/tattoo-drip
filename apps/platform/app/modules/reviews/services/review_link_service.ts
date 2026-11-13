@@ -1,4 +1,5 @@
 import { inject } from "@adonisjs/core";
+import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -144,6 +145,25 @@ export default class ReviewLinkService {
 			.whereNull("revoked_at")
 			.update({ revoked_at: new Date() });
 		return Number(changed[0] ?? 0) > 0;
+	}
+
+	/**
+	 * Revokes every live link of the client's projects (the privacy
+	 * deletion, finding 8). In the caller's transaction.
+	 */
+	async revokeForClient(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		clientId: string,
+	): Promise<void> {
+		const byClient = await this.projects.idsByClient(tenant, [clientId]);
+		const ids = byClient.get(clientId) ?? [];
+		if (ids.length === 0) return;
+		await ReviewLink.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.whereIn("project_id", ids)
+			.whereNull("revoked_at")
+			.update({ revoked_at: new Date() });
 	}
 
 	/**

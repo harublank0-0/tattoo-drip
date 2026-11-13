@@ -1014,6 +1014,12 @@ const routes = {
     tokens: [{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/post","type":0,"val":"post","end":""}],
     types: placeholder as Registry['api.v1.review.post.destroy']['types'],
   },
+  'api.v1.review.post.order': {
+    methods: ["PUT"],
+    pattern: '/api/v1/tenants/:tenant/review/post/order',
+    tokens: [{"old":"/api/v1/tenants/:tenant/review/post/order","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/review/post/order","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/review/post/order","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/review/post/order","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/review/post/order","type":0,"val":"review","end":""},{"old":"/api/v1/tenants/:tenant/review/post/order","type":0,"val":"post","end":""},{"old":"/api/v1/tenants/:tenant/review/post/order","type":0,"val":"order","end":""}],
+    types: placeholder as Registry['api.v1.review.post.order']['types'],
+  },
   'api.v1.review.photos.store': {
     methods: ["POST"],
     pattern: '/api/v1/tenants/:tenant/review/photos',

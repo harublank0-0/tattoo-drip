@@ -245,6 +245,15 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 		snapshot: (target) => reviewRows(target.tenant),
 	},
 	{
+		method: "PUT",
+		pattern: "/api/v1/tenants/:tenant/review/post/order",
+		headers: reviewHeaders,
+		body: (own) => ({ order: [own.clientPostPhoto.id] }),
+		ownStatus: 200,
+		ownMarkers: (own) => [own.tenant.name, own.clientPostPhoto.id],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
 		method: "POST",
 		pattern: "/api/v1/tenants/:tenant/review/photos",
 		headers: reviewHeaders,

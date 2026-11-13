@@ -13,6 +13,8 @@ import { FSDriver } from "@adonisjs/drive/drivers/fs";
 import drive from "@adonisjs/drive/services/main";
 import { VideoDeleteError } from "#modules/media/errors";
 import ImageService, {
+	IMAGE_PURPOSES,
+	PRIVATE_CACHE_CONTROL,
 	type ShownImage,
 	STORED_CACHE_CONTROL,
 } from "#modules/media/services/image_service";
@@ -43,9 +45,11 @@ type TenantRef = Pick<Tenant, "id">;
 export const VIDEO_PURPOSE = "work_video";
 /**
  * The purposes a video's poster and renditions are stored under: a work
- * video angle's, and a client's Fresh ink video (Reviews and Fresh ink).
- * Every method takes the purpose, `work_video` when left out; the staging
- * prefix is shared, so the one lifecycle rule expires both.
+ * video angle's (public), and a client's Fresh ink video (Reviews and Fresh
+ * ink: private until published, so its renditions are read through 5-minute
+ * signed URLs). Every method takes the purpose, `work_video` when left out,
+ * and uses that purpose's disk (IMAGE_PURPOSES); the staging prefix is
+ * shared, so the one lifecycle rule expires both.
  */
 export const VIDEO_PURPOSES = ["work_video", "client_post_video"] as const;
 export type VideoPurpose = (typeof VIDEO_PURPOSES)[number];
@@ -296,12 +300,10 @@ export default class VideoService {
 			for (const output of outputs) {
 				const key = renditionKey(base, output);
 				stored.push(key); // before the put: a half-written file goes too
-				await drive
-					.use("public")
-					.putStream(key, createReadStream(output.path), {
-						contentType: "video/mp4",
-						cacheControl: STORED_CACHE_CONTROL.public,
-					});
+				await diskOf(purpose).putStream(key, createReadStream(output.path), {
+					contentType: "video/mp4",
+					cacheControl: STORED_CACHE_CONTROL[visibilityOf(purpose)],
+				});
 				keys.push(key);
 			}
 			const poster = await this.images.storeBytes(await readFile(posterPath), {
@@ -375,7 +377,7 @@ export default class VideoService {
 	): Promise<void> {
 		for (const key of keys ?? []) {
 			try {
-				await drive.use("public").delete(key);
+				await diskOf(purpose).delete(key);
 			} catch (error) {
 				logger.error({ err: error, key }, "could not delete a stored video");
 			}
@@ -398,7 +400,7 @@ export default class VideoService {
 		for (const key of keys ?? []) {
 			assertVideoKeyOf(tenant, key, purpose);
 			try {
-				await drive.use("public").delete(key);
+				await diskOf(purpose).delete(key);
 			} catch (error) {
 				failed.push(key);
 				logger.error({ err: error, key }, "could not delete a stored video");
@@ -437,7 +439,13 @@ export default class VideoService {
 			const size = renditionOfKey(key);
 			if (!size) continue;
 			shown.push({
-				url: await drive.use("public").getUrl(key),
+				url:
+					visibilityOf(purpose) === "private"
+						? await diskOf(purpose).getSignedUrl(key, {
+								expiresIn: SIGNED_SOURCE_TTL,
+								cacheControl: PRIVATE_CACHE_CONTROL,
+							})
+						: await diskOf(purpose).getUrl(key),
 				type: "video/mp4",
 				width: size.width,
 				height: size.height,
@@ -446,6 +454,18 @@ export default class VideoService {
 		return shown.sort((a, b) => a.width * a.height - b.width * b.height);
 	}
 }
+
+/** A purpose's disk, as ImageService decides it: work videos public, a client's private until published. */
+function visibilityOf(purpose: VideoPurpose): "public" | "private" {
+	return IMAGE_PURPOSES[purpose].visibility;
+}
+
+function diskOf(purpose: VideoPurpose) {
+	return drive.use(visibilityOf(purpose));
+}
+
+/** How long a private rendition's signed URL works, as a private image's. */
+const SIGNED_SOURCE_TTL = "5 minutes";
 
 function assertSize(size: number) {
 	if (!Number.isInteger(size) || size < 1 || size > MAX_VIDEO_BYTES) {

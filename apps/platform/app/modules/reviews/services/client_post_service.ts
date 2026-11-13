@@ -8,24 +8,33 @@ import ImageService from "#modules/media/services/image_service";
 import VideoService, {
 	type SignedUpload,
 } from "#modules/media/services/video_service";
-import { VIDEO_GAVE_UP, type VideoType } from "#modules/media/video";
+import {
+	STUCK_AFTER_MINUTES,
+	VIDEO_GAVE_UP,
+	VIDEO_STUCK,
+	type VideoType,
+} from "#modules/media/video";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ProjectService from "#modules/projects/services/project_service";
 import type { ClientVideoUpload } from "#modules/reviews/client_video_uploads";
 import {
 	ClientVideoUploadError,
 	PostFullError,
+	PostLimitError,
 	PostNeedsPhotoError,
 	ReviewLockedError,
 	ReviewPageNotFoundError,
+	ReviewTakenDownError,
 } from "#modules/reviews/errors";
 import ProcessClientPostVideoJob from "#modules/reviews/jobs/process_client_post_video_job";
 import ClientPost from "#modules/reviews/models/client_post";
 import ClientPostMedia from "#modules/reviews/models/client_post_media";
+import ClientVideoReservation from "#modules/reviews/models/client_video_reservation";
 import type { ReviewContext } from "#modules/reviews/review_context";
 import {
 	leadFirst,
 	MAX_POST_MEDIA,
+	MAX_POSTS_PER_PROJECT,
 	orderWithout,
 	postContentEditable,
 } from "#modules/reviews/rules";
@@ -58,6 +67,15 @@ export type SharedChoices = {
 	consentStudioPage: boolean;
 	consentDiscover: boolean;
 };
+
+/** Who submitted, for disputes only (#modules/reviews/submitters). */
+export type Submitter = { digest: string; at: DateTime };
+
+/** Why the client can't start a new post: the last one was taken down, or the project had its posts. */
+export type PostBlock = "taken_down" | "post_limit";
+
+/** How long a signed, unfinished video upload holds a place: the upload token's hour. */
+export const RESERVATION_MINUTES = 60;
 
 /** What the worker did with a video (processVideo). */
 export type VideoRun = "ready" | "failed" | "skipped";
@@ -113,6 +131,26 @@ export default class ClientPostService {
 			.where("tenant_id", tenant.id)
 			.where("project_id", projectId)
 			.first();
+	}
+
+	/**
+	 * Why a new post can't be started for the project now, or null (finding
+	 * 1): its latest post, deleted or not, was taken down by TattooDrip (until
+	 * an operator restores it), or it already had MAX_POSTS_PER_PROJECT posts,
+	 * deleted ones included (a declined post may be deleted and posted again
+	 * once). Only asked when there is no live post.
+	 */
+	async newPostBlock(
+		tenant: TenantRef,
+		projectId: string,
+	): Promise<PostBlock | null> {
+		const rows = await ClientPost.withTrashed()
+			.where("tenant_id", tenant.id)
+			.where("project_id", projectId)
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc");
+		if (rows[0]?.takenDownAt) return "taken_down";
+		return rows.length >= MAX_POSTS_PER_PROJECT ? "post_limit" : null;
 	}
 
 	/** The tenant's live post with this id, or null (the local upload route's check). */
@@ -203,12 +241,46 @@ export default class ClientPostService {
 		ctx: ReviewContext,
 		{ type, size }: { type: VideoType; size: number },
 	): Promise<{ post: ClientPost; key: string; upload: SignedUpload | null }> {
-		const post = await this.checkVideoRoom(ctx);
-		const key = this.videos.stagingKey(ctx.tenant);
-		const upload = await this.videos.signUpload(ctx.tenant, key, {
-			type,
-			size,
+		await this.checkVideoRoom(ctx);
+		const { tenant } = ctx;
+		const key = this.videos.stagingKey(tenant);
+		// Finding 7: under the locks, the signs outstanding (reservations not
+		// expired) and the items may never exceed the post's places, so a
+		// script can't stage more uploads than the post could ever take.
+		const post = await withTransaction(async (trx) => {
+			await this.lockProject(trx, ctx);
+			const live = await this.livePost(trx, ctx);
+			if (!live) throw new PostNeedsPhotoError();
+			if (!postContentEditable(live)) throw new ReviewLockedError();
+			const now = DateTime.now();
+			await ClientVideoReservation.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("post_id", live.id)
+				.where("expires_at", "<=", now.toJSDate())
+				.delete();
+			const media = await this.mediaOf(tenant, live, trx);
+			if (!media.some((item) => item.kind === "photo")) {
+				throw new PostNeedsPhotoError();
+			}
+			const held = await ClientVideoReservation.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("post_id", live.id);
+			if (media.length + held.length >= MAX_POST_MEDIA) {
+				throw new PostFullError();
+			}
+			await ClientVideoReservation.create(
+				{
+					tenantId: tenant.id,
+					postId: live.id,
+					stagingKey: key,
+					createdAt: now,
+					expiresAt: now.plus({ minutes: RESERVATION_MINUTES }),
+				},
+				{ client: trx },
+			);
+			return live;
 		});
+		const upload = await this.videos.signUpload(tenant, key, { type, size });
 		return { post, key, upload };
 	}
 
@@ -251,6 +323,11 @@ export default class ClientPostService {
 				if (used) {
 					throw new ClientVideoUploadError("This video was added already.");
 				}
+				// Its place is now the item's: the sign's reservation goes.
+				await ClientVideoReservation.query({ client: trx })
+					.where("tenant_id", tenant.id)
+					.where("staging_key", upload.key)
+					.delete();
 				const video = await ClientPostMedia.create(
 					{
 						tenantId: tenant.id,
@@ -305,9 +382,31 @@ export default class ClientPostService {
 			if (!postContentEditable(post)) throw new ReviewLockedError();
 			const order = orderWithout(media, mediaId);
 			if (!order) throw new PostNeedsPhotoError();
-			await this.deleteFiles(ctx, [target]);
+			await this.deleteFiles(tenant, [target]);
 			await target.delete();
 			await reposition(trx, tenant, post, order);
+			await contentChanged(post);
+		});
+	}
+
+	/**
+	 * "Make photo 3 the main photo" (finding 13): the post's order alone,
+	 * every item once and a photo first, in one UPDATE; no other field, no
+	 * consent and no bot challenge (rate-limited as a write). A change of an
+	 * approved post puts it back in the studio's queue, like any content.
+	 */
+	async reorder(ctx: ReviewContext, order: readonly string[]): Promise<void> {
+		const { tenant } = ctx;
+		await withTransaction(async (trx) => {
+			await this.lockProject(trx, ctx);
+			const post = await this.livePost(trx, ctx);
+			if (!post) throw new PostMediaNotFoundError();
+			if (!postContentEditable(post)) throw new ReviewLockedError();
+			const media = await this.mediaOf(tenant, post, trx);
+			const asked = ordered(media, order);
+			if (asked[0].kind !== "photo") throw new PostNeedsPhotoError();
+			if (asked.every((item, index) => item.id === media[index].id)) return;
+			await reposition(trx, tenant, post, asked);
 			await contentChanged(post);
 		});
 	}
@@ -325,6 +424,7 @@ export default class ClientPostService {
 		trx: TransactionClientContract,
 		ctx: ReviewContext,
 		input: PostInput,
+		submitter?: Submitter,
 	): Promise<"needs_media" | "saved"> {
 		const { tenant } = ctx;
 		const post = await this.livePost(trx, ctx);
@@ -335,15 +435,7 @@ export default class ClientPostService {
 
 		let order = media;
 		if (input.order) {
-			const byId = new Map(media.map((item) => [item.id, item]));
-			const asked = input.order.map((id) => byId.get(id));
-			if (
-				asked.length !== media.length ||
-				asked.some((item) => item === undefined)
-			) {
-				throw new OrderMismatchError();
-			}
-			order = asked as ClientPostMedia[];
+			order = ordered(media, input.order);
 			if (order[0].kind !== "photo") throw new PostNeedsPhotoError();
 		}
 		const caption = blankAsNull(input.caption);
@@ -364,6 +456,10 @@ export default class ClientPostService {
 		} else if (changed && post.status === "approved") {
 			backToQueue(post);
 		}
+		if (submitter) {
+			post.submitterDigest = submitter.digest;
+			post.submitterRecordedAt = submitter.at;
+		}
 		await post.save();
 		return "saved";
 	}
@@ -374,9 +470,11 @@ export default class ClientPostService {
 		ctx: ReviewContext,
 		shared: SharedChoices,
 	): Promise<void> {
+		// Never a deleted post (finding 6): its scrubbed name stays scrubbed.
 		await ClientPost.query({ client: trx })
 			.where("tenant_id", ctx.tenant.id)
 			.where("project_id", ctx.project.id)
+			.whereNull("deleted_at")
 			.update({
 				shown_name: shared.shownName,
 				consent_studio_page: shared.consentStudioPage,
@@ -386,24 +484,104 @@ export default class ClientPostService {
 	}
 
 	/**
-	 * The client deletes their post (ruling 2): every item's files first,
-	 * then the items, then the post is soft-deleted (the studio's record of
-	 * what was posted, with no photos left). Staged uploads of videos still
-	 * processing go after the commit. Nothing to delete is no error.
+	 * The client deletes their post (ruling 2, finding 22): every item's
+	 * files first, then the items and the reservations, then the post is
+	 * scrubbed (no caption, placement, styles or name) and soft-deleted, so
+	 * only its ids, dates, decision and any takedown record stay. Staged
+	 * uploads of videos still processing go after the commit. Nothing to
+	 * delete is no error.
 	 */
 	async delete(ctx: ReviewContext): Promise<void> {
-		const { tenant } = ctx;
 		await withTransaction(async (trx) => {
 			await this.lockProject(trx, ctx);
 			const post = await this.livePost(trx, ctx);
-			if (!post) return;
-			const media = await this.mediaOf(tenant, post, trx);
-			await this.deleteFiles(ctx, media);
-			await ClientPostMedia.query({ client: trx })
+			if (post) await this.erase(trx, ctx.tenant, post);
+		});
+	}
+
+	/**
+	 * Every live post of the client (the privacy deletion, finding 8):
+	 * erased as the client's own delete erases one. In the caller's
+	 * transaction.
+	 */
+	async eraseForClient(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		clientId: string,
+	): Promise<void> {
+		const posts = await ClientPost.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("client_id", clientId)
+			.forUpdate();
+		for (const post of posts) await this.erase(trx, tenant, post);
+		await ClientPost.withTrashed()
+			.where("tenant_id", tenant.id)
+			.where("client_id", clientId)
+			.update({
+				shown_name: "",
+				caption: null,
+				placement: null,
+				styles: [],
+				consent_studio_page: false,
+				consent_discover: false,
+				submitter_digest: null,
+				submitter_recorded_at: null,
+			});
+	}
+
+	/** A post's files, items and reservations gone, the post scrubbed and soft-deleted. */
+	private async erase(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		post: ClientPost,
+	): Promise<void> {
+		const media = await this.mediaOf(tenant, post, trx);
+		await this.deleteFiles(tenant, media);
+		await ClientPostMedia.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("post_id", post.id)
+			.delete();
+		await ClientVideoReservation.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("post_id", post.id)
+			.delete();
+		post.caption = null;
+		post.placement = null;
+		post.styles = [];
+		post.shownName = "";
+		post.consentStudioPage = false;
+		post.consentDiscover = false;
+		await post.softDelete(trx);
+	}
+
+	/**
+	 * The stuck-video sweep for client videos (FailStuckClientVideoJob,
+	 * finding 4): a video still `processing` STUCK_AFTER_MINUTES after it was
+	 * added is failed with VIDEO_STUCK under its row's lock, and its staged
+	 * upload deleted after the commit. True when it did; a video that
+	 * finished, was removed or is younger is left as it is.
+	 */
+	async failStuckVideo(tenant: TenantRef, mediaId: string): Promise<boolean> {
+		return withTransaction(async (trx) => {
+			const row = await ClientPostMedia.query({ client: trx })
 				.where("tenant_id", tenant.id)
-				.where("post_id", post.id)
-				.delete();
-			await post.softDelete(trx);
+				.where("id", mediaId)
+				.forUpdate()
+				.first();
+			if (!row) return false;
+			const { rows } = await trx.rawQuery(
+				`update client_post_media set video_state = 'failed', video_failure = ?, updated_at = now()
+				where tenant_id = ? and id = ? and kind = 'video' and video_state = 'processing'
+					and created_at <= now() - make_interval(mins => ?)
+				returning video_staging_key`,
+				[VIDEO_STUCK, tenant.id, mediaId, STUCK_AFTER_MINUTES],
+			);
+			const staged = (rows as { video_staging_key: string }[])[0];
+			if (!staged) return false;
+			afterCommit(() =>
+				this.videos.deleteStaged(tenant, staged.video_staging_key),
+			);
+			return true;
 		});
 	}
 
@@ -502,6 +680,7 @@ export default class ClientPostService {
 	): Promise<ClientPost> {
 		const post = await this.livePost(trx, ctx);
 		if (post) return post;
+		await this.assertCanStart(ctx);
 		return ClientPost.create(
 			{
 				tenantId: ctx.tenant.id,
@@ -535,6 +714,7 @@ export default class ClientPostService {
 		const post = await this.find(ctx.tenant, ctx.project.id);
 		if (!post) {
 			if (kind === "video") throw new PostNeedsPhotoError();
+			await this.assertCanStart(ctx);
 			return null;
 		}
 		if (!postContentEditable(post)) throw new ReviewLockedError();
@@ -546,12 +726,18 @@ export default class ClientPostService {
 		return post;
 	}
 
+	/** Refuses a new post the project may not have (newPostBlock). */
+	private async assertCanStart(ctx: ReviewContext): Promise<void> {
+		const block = await this.newPostBlock(ctx.tenant, ctx.project.id);
+		if (block === "taken_down") throw new ReviewTakenDownError();
+		if (block === "post_limit") throw new PostLimitError();
+	}
+
 	/** Deletes these items' files, or throws ImageDeleteError (then nothing is deleted from the database). */
 	private async deleteFiles(
-		ctx: ReviewContext,
+		tenant: TenantRef,
 		media: readonly ClientPostMedia[],
 	): Promise<void> {
-		const { tenant } = ctx;
 		for (const item of media) {
 			if (item.kind === "photo") {
 				if (item.imageKey) {
@@ -622,6 +808,24 @@ export class OrderMismatchError extends Error {
 	constructor() {
 		super("The order doesn't name the post's photos and videos");
 	}
+}
+
+/** The post's items in the order `ids` asks: every item exactly once, else OrderMismatchError (a stale page). */
+function ordered(
+	media: readonly ClientPostMedia[],
+	ids: readonly string[],
+): ClientPostMedia[] {
+	const byId = new Map(media.map((item) => [item.id, item]));
+	const asked = ids.map((id) => byId.get(id));
+	if (
+		media.length === 0 ||
+		asked.length !== media.length ||
+		new Set(ids).size !== ids.length ||
+		asked.some((item) => item === undefined)
+	) {
+		throw new OrderMismatchError();
+	}
+	return asked as ClientPostMedia[];
 }
 
 /** Puts the items in this order, positions 0..n-1, in one UPDATE (the deferrable unique place). */

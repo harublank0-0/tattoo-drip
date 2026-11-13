@@ -172,6 +172,7 @@ export type ScannedRoutes = {
     'api.v1.review.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.review.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.post.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.post.order': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.photos.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.videos.sign': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.videos.stage': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -415,6 +416,7 @@ export type ScannedRoutes = {
     'tenant.projects.artist.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'account.password.update': { paramsTuple?: []; params?: {} }
     'api.v1.review.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.review.post.order': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.videos.stage': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
   DELETE: {

@@ -2,6 +2,7 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import app from "@adonisjs/core/services/app";
 import { urlFor } from "@adonisjs/core/services/url_builder";
+import { DateTime } from "luxon";
 import { publicTenantContext } from "#middleware/public_tenant_middleware";
 import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -14,10 +15,12 @@ import {
 import {
 	ClientVideoUploadError,
 	PostFullError,
+	PostLimitError,
 	PostNeedsPhotoError,
 	ReviewInputError,
 	ReviewLockedError,
 	ReviewPageNotFoundError,
+	ReviewTakenDownError,
 } from "#modules/reviews/errors";
 import type { ReviewContext } from "#modules/reviews/review_context";
 import { REVIEW_TOKEN_HEADER } from "#modules/reviews/review_links";
@@ -28,13 +31,16 @@ import ClientPostService, {
 } from "#modules/reviews/services/client_post_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ReviewPageService from "#modules/reviews/services/review_page_service";
+import { submitterDigest } from "#modules/reviews/submitters";
 import {
 	addPostPhotoValidator,
 	addPostVideoValidator,
 	REVIEW_MESSAGES,
+	reorderPostValidator,
 	signPostVideoValidator,
 	submitReviewPageValidator,
 } from "#modules/reviews/validators/review_page";
+import { callerIp } from "#services/api_caller";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import BotChallenge, {
 	CHALLENGE_ACTIONS,
@@ -85,7 +91,23 @@ export default class PublicReviewsController {
 				throw ApiException.of("challenge_unavailable");
 			}
 			const input = await ctx.request.validateUsing(submitReviewPageValidator);
-			await this.pages.submit(review, input);
+			await this.pages.submit(review, input, {
+				digest: submitterDigest(
+					callerIp(ctx),
+					ctx.request.header("user-agent"),
+				),
+				at: DateTime.now(),
+			});
+			return ctx.serialize(await this.page(review));
+		});
+	}
+
+	/** The post's order alone ("Make photo 3 the main photo"): no other field, no bot challenge. */
+	async reorder(ctx: HttpContext) {
+		return this.run(async () => {
+			const review = await this.open(ctx);
+			const { order } = await ctx.request.validateUsing(reorderPostValidator);
+			await this.posts.reorder(review, order);
 			return ctx.serialize(await this.page(review));
 		});
 	}
@@ -277,6 +299,9 @@ function toApiError(error: unknown) {
 	) {
 		return ApiException.notFound();
 	}
+	if (error instanceof ReviewTakenDownError)
+		return ApiException.of("taken_down");
+	if (error instanceof PostLimitError) return ApiException.of("post_limit");
 	if (error instanceof ReviewLockedError)
 		return ApiException.of("review_locked");
 	if (error instanceof PostFullError) return ApiException.of("post_full");

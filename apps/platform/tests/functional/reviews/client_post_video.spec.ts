@@ -7,9 +7,9 @@ import ProcessClientPostVideoJob from "#modules/reviews/jobs/process_client_post
 import ClientPostMedia from "#modules/reviews/models/client_post_media";
 import { assertApiError } from "#tests/helpers/api";
 import {
-	publicFiles,
 	reviewRequest,
 	stageReviewClip,
+	storedFiles,
 } from "#tests/helpers/reviews";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
 import { makeClip, probeStored } from "#tests/helpers/videos";
@@ -112,7 +112,7 @@ test.group("Review page: Fresh ink videos", (group) => {
 		).json({ upload: token });
 		assertApiError(twice, 422, "validation_failed");
 
-		await processQueued(["video"]);
+		await processQueued(["client_video"]);
 		const ready = await mediaRow(a, added.id);
 		assert.equal(ready.videoState, "ready");
 		assert.equal(ready.videoDurationMs, 2000);
@@ -123,7 +123,7 @@ test.group("Review page: Fresh ink videos", (group) => {
 				key,
 				new RegExp(`^tenants/${a.tenant.id}/client_post_video/`),
 			);
-			const probed = await probeStored(key);
+			const probed = await probeStored(key, "private");
 			assert.deepEqual(
 				probed.streams.map((stream) => stream.codec_type),
 				["video"],
@@ -142,6 +142,10 @@ test.group("Review page: Fresh ink videos", (group) => {
 		assert.isAbove(shown.sources.length, 0);
 		assert.equal(shown.sources[0].type, "video/mp4");
 		assert.match(shown.image.url, /client_post_video/);
+		// Private until published: signed, never the public /uploads.
+		assert.notMatch(shown.image.url, /\/uploads\//);
+		assert.match(shown.image.url, /signature=/);
+		assert.match(shown.sources[0].url, /signature=/);
 
 		// Removing it deletes its renditions and poster first.
 		(
@@ -153,7 +157,7 @@ test.group("Review page: Fresh ink videos", (group) => {
 				a.reviewToken,
 			)
 		).assertStatus(200);
-		assert.deepEqual(await publicFiles(a.tenant, "client_post_video"), []);
+		assert.deepEqual(await storedFiles(a.tenant, "client_post_video"), []);
 	});
 
 	test("a clip over 60 seconds is refused with its reason, which the page shows", async ({
@@ -171,13 +175,13 @@ test.group("Review page: Fresh ink videos", (group) => {
 			a.reviewToken,
 		).json({ upload: token });
 		finished.assertStatus(201);
-		await processQueued(["video"]);
+		await processQueued(["client_video"]);
 		const page = (
 			await reviewRequest(client, "GET", a.tenant.slug, "", a.reviewToken)
 		).body().data;
 		assert.equal(page.post.media[1].state, "failed");
 		assert.equal(page.post.media[1].failure, VIDEO_REFUSALS.tooLong);
-		assert.deepEqual(await publicFiles(a.tenant, "client_post_video"), []);
+		assert.deepEqual(await storedFiles(a.tenant, "client_post_video"), []);
 	});
 
 	test("a video removed while processing: the worker finds no row and keeps nothing", async ({
@@ -205,8 +209,8 @@ test.group("Review page: Fresh ink videos", (group) => {
 				a.reviewToken,
 			)
 		).assertStatus(200);
-		await processQueued(["video"]);
-		assert.deepEqual(await publicFiles(a.tenant, "client_post_video"), []);
+		await processQueued(["client_video"]);
+		assert.deepEqual(await storedFiles(a.tenant, "client_post_video"), []);
 	});
 
 	test("another studio's upload token is refused, and so is one for a deleted post", async ({

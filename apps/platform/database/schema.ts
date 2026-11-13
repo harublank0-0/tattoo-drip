@@ -249,6 +249,8 @@ export class ClientPostSchema extends BaseModel {
 		"status",
 		"styles",
 		"submittedAt",
+		"submitterDigest",
+		"submitterRecordedAt",
 		"takedownNote",
 		"takedownReason",
 		"takenDownAt",
@@ -293,6 +295,10 @@ export class ClientPostSchema extends BaseModel {
 	@column.dateTime()
 	declare submittedAt: DateTime | null;
 	@column()
+	declare submitterDigest: string | null;
+	@column.dateTime()
+	declare submitterRecordedAt: DateTime | null;
+	@column()
 	declare takedownNote: string | null;
 	@column()
 	declare takedownReason: string | null;
@@ -321,6 +327,8 @@ export class ClientReviewSchema extends BaseModel {
 		"reportReason",
 		"reportedAt",
 		"shownName",
+		"submitterDigest",
+		"submitterRecordedAt",
 		"takedownNote",
 		"takedownReason",
 		"takenDownAt",
@@ -347,7 +355,7 @@ export class ClientReviewSchema extends BaseModel {
 	@column()
 	declare projectId: string;
 	@column()
-	declare rating: number;
+	declare rating: number | null;
 	@column.dateTime()
 	declare repliedAt: DateTime | null;
 	@column()
@@ -359,6 +367,10 @@ export class ClientReviewSchema extends BaseModel {
 	@column()
 	declare shownName: string;
 	@column()
+	declare submitterDigest: string | null;
+	@column.dateTime()
+	declare submitterRecordedAt: DateTime | null;
+	@column()
 	declare takedownNote: string | null;
 	@column()
 	declare takedownReason: string | null;
@@ -368,6 +380,30 @@ export class ClientReviewSchema extends BaseModel {
 	declare tenantId: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
+}
+
+export class ClientVideoReservationSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"expiresAt",
+		"id",
+		"postId",
+		"stagingKey",
+		"tenantId",
+	] as const;
+	$columns = ClientVideoReservationSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare expiresAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare postId: string;
+	@column()
+	declare stagingKey: string;
+	@column()
+	declare tenantId: string;
 }
 
 export class ClientSchema extends BaseModel {

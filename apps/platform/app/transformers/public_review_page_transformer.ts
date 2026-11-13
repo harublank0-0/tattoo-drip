@@ -34,6 +34,7 @@ export default class PublicReviewPageTransformer extends BaseTransformer<ReviewP
 			},
 			review: page.review ? reviewOf(page.review) : null,
 			post: page.post ? postOf(page.post.post, page.post.media) : null,
+			blocks: { review: page.blocks.review, post: page.blocks.post },
 		};
 	}
 }
