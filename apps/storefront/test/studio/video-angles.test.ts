@@ -4,7 +4,13 @@ import { describe, test } from "node:test";
 import type { GalleryPhoto, Studio, WorkPage } from "@tattoo-drip/sdk";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { TattooDialog } from "../../src/studio/angles.tsx";
+import { TattooDialog, TattooFigureVideo } from "../../src/studio/angles.tsx";
+import {
+	focusAfterViewerClose,
+	placeWords,
+	stepWords,
+	videoAttributes,
+} from "../../src/studio/angles-model.ts";
 import {
 	durationText,
 	galleryPhotoView,
@@ -258,7 +264,7 @@ describe("every theme says a tattoo has videos, and shows them", () => {
 			);
 			assert.match(
 				thumb[1],
-				/<span class="artwork-angle-play" aria-hidden="true"><\/span>/,
+				/<svg class="artwork-angle-play" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle [^>]*><\/circle><path [^>]*><\/path><\/svg>/,
 			);
 			assert.match(
 				thumb[1],
@@ -271,31 +277,42 @@ describe("every theme says a tattoo has videos, and shows them", () => {
 });
 
 describe("a video shown", () => {
-	test("in the viewer: muted, inline, controls, nothing loaded before play, the poster, never autoplayed, sources smallest first; no loop before the page knows the visitor's motion setting", () => {
+	const video = () =>
+		galleryPhotoView(tattoo(), IMAGE_ORIGIN)?.angles[1] as VideoAngleView;
+
+	test("its element: muted, inline, controls, nothing loaded before play, the poster, its own size, never autoplayed; it loops only without reduced motion", () => {
+		const one = video();
+		const moving = videoAttributes(one, false);
+		assert.deepEqual(moving, {
+			width: 1080,
+			height: 1920,
+			poster: `${UPLOADS}/v.320-640.jpg`,
+			"aria-label": "Video, 0:42",
+			muted: true,
+			playsInline: true,
+			loop: true,
+			controls: true,
+			preload: "none",
+			autoPlay: false,
+		});
+		assert.deepEqual(videoAttributes(one, true), { ...moving, loop: false });
+	});
+
+	test("in the viewer: its sources smallest first, the smaller for small screens, in the stage; the place says video and the steps name what comes next", () => {
 		const view = galleryPhotoView(tattoo(), IMAGE_ORIGIN);
 		assert.ok(view);
 		const html = renderToStaticMarkup(
 			createElement(TattooDialog, { photo: view, facts: null, index: 2 }),
 		);
 		assertSafePage(`<h1>x</h1>${html}`);
-		assert.match(html, /<p aria-live="polite">Photo 3 of 3<\/p>/);
+		assert.match(html, /<p aria-live="polite">Video 3 of 3<\/p>/);
 		assert.match(html, /^<dialog [^>]*aria-label="Video, 0:42"/);
-		const video = /<video [^>]*>([\s\S]*?)<\/video>/.exec(html);
-		assert.ok(video, "the video in the stage");
-		const tag = video[0].slice(0, video[0].indexOf(">") + 1);
-		assert.match(tag, / class="work-large work-video"/);
-		assert.match(tag, / width="1080" height="1920"/);
-		assert.match(tag, / poster="[^"]*v\.320-640\.jpg"/);
-		assert.match(tag, / muted=""/);
-		assert.match(tag, / playsInline=""/);
-		assert.match(tag, / controls=""/);
-		assert.match(tag, / preload="none"/);
-		assert.doesNotMatch(tag, /autoplay/i);
-		// The server treats every visitor as asking for reduced motion: no loop until the browser says otherwise.
-		assert.doesNotMatch(tag, / loop/);
+		const element = /<video [^>]*>([\s\S]*?)<\/video>/.exec(html);
+		assert.ok(element, "the video in the stage");
+		assert.match(element[0], /^<video class="work-large work-video"/);
 		assert.deepEqual(
 			Array.from(
-				video[1].matchAll(/<source ([^>]*?)\/?>/g),
+				element[1].matchAll(/<source ([^>]*?)\/?>/g),
 				(match) => match[1],
 			),
 			[
@@ -303,17 +320,88 @@ describe("a video shown", () => {
 				`src="${UPLOADS}/v.1080x1920.mp4" type="video/mp4"`,
 			],
 		);
-		// Its steps still there, the photo's swipe not on the video's controls.
-		assert.match(html, /Previous photo/);
-		assert.doesNotMatch(video[0], /draggable/);
+		// At the end: the step back names a photo, the step on is plain (it goes nowhere).
+		assert.match(
+			html,
+			/<button type="button" class="action action-secondary">Previous: photo<\/button>/,
+		);
+		assert.match(
+			html,
+			/<button type="button" class="action action-secondary" aria-disabled="true">Next<\/button>/,
+		);
+		assert.doesNotMatch(element[0], /draggable/);
+		// On the photo before it, the step on names the video.
+		const before = renderToStaticMarkup(
+			createElement(TattooDialog, { photo: view, facts: null, index: 1 }),
+		);
+		assert.match(before, /<p aria-live="polite">Photo 2 of 3<\/p>/);
+		assert.match(before, />Next: video<\/button>/);
 	});
 
-	test("the shared rules contain it whole and never crop it", () => {
+	test("a tattoo of photos only keeps its words", () => {
+		assert.deepEqual(stepWords(["photo", "photo", "photo"], 1), {
+			previous: "Previous photo",
+			next: "Next photo",
+		});
+		assert.equal(placeWords("photo", 2, 3), "Photo 2 of 3");
+		assert.deepEqual(stepWords(["photo", "video", "photo"], 0), {
+			previous: "Previous",
+			next: "Next: video",
+		});
+	});
+
+	test('on the page: in the main photo\'s box, with the line "Video, no sound" where "View full screen" stands, so nothing moves', () => {
+		const html = renderToStaticMarkup(
+			createElement(TattooFigureVideo, {
+				video: video(),
+				shapeClass: "artwork-ar-75",
+			}),
+		);
+		assert.match(
+			html,
+			/^<div class="artwork-open artwork-open-video"><video class="artwork-photo artwork-photo-steady artwork-video artwork-ar-75"/,
+		);
+		assert.match(
+			html,
+			/<\/video><span class="artwork-open-hint artwork-video-hint">Video, no sound<\/span><\/div>$/,
+		);
+	});
+
+	test("closing the viewer on a video sends focus to its thumbnail (the opener is gone); on a photo, to the opener", () => {
+		assert.deepEqual(focusAfterViewerClose("video", 2), {
+			target: "thumbnail",
+			index: 2,
+		});
+		assert.deepEqual(focusAfterViewerClose("photo", 1), { target: "opener" });
+	});
+
+	test("the shared rules keep a video whole in a fixed box, and its marks legible", () => {
+		const rule = (selector: string) => {
+			const bare = SHARED_CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+			const found = new RegExp(
+				`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`,
+			).exec(bare);
+			assert.ok(found, selector);
+			return found[1];
+		};
+		assert.match(
+			rule(".work-video,\n  .artwork-video"),
+			/object-fit: contain;/,
+		);
+		const stage = rule(".work-stage .work-video");
+		for (const value of [
+			"position: absolute;",
+			"inset: 0;",
+			"inline-size: 100%;",
+			"block-size: 100%;",
+		]) {
+			assert.ok(stage.includes(value), value);
+		}
+		assert.match(rule(".work-stage"), /block-size: clamp\(/);
+		assert.match(rule(".artwork-angle-time"), /font-size: 0\.75rem;/);
 		assert.match(
 			SHARED_CSS,
-			/\.work-video,\s*\.artwork-video \{[^}]*object-fit: contain;/,
+			/@media \(forced-colors: active\)[\s\S]*\.artwork-angle-play path \{ fill: CanvasText; \}/,
 		);
-		assert.match(SHARED_CSS, /\.artwork-angle-time \{/);
-		assert.match(SHARED_CSS, /\.artwork-angle-play \{/);
 	});
 });

@@ -90,6 +90,20 @@ export const studioCopy = {
 		tattooPhotos: "Photos of this tattoo",
 		previous: "Previous photo",
 		next: "Next photo",
+		/**
+		 * Video angles: the viewer's place when a video is shown, the steps of a
+		 * tattoo that has a video (naming what comes next, or plain at the
+		 * ends), and the line under a video on its page, where "View full
+		 * screen" stands for a photo, so nothing moves.
+		 */
+		videoOf: "Video {n} of {count}",
+		previousOf: "Previous: {kind}",
+		nextOf: "Next: {kind}",
+		previousPlain: "Previous",
+		nextPlain: "Next",
+		kindPhoto: "photo",
+		kindVideo: "video",
+		videoNoSound: "Video, no sound",
 		/** The All work page's form. */
 		filters: {
 			label: "Filter the photos",

@@ -5,15 +5,18 @@ import {
 	useState,
 	useSyncExternalStore,
 } from "react";
-import { fill } from "../intake/template.ts";
 import {
+	focusAfterViewerClose,
 	indexAfterClose,
 	keyStep,
+	placeWords,
 	type Swipe,
 	selectIndex,
 	stepTo,
+	stepWords,
 	swipeEnd,
 	swipeStart,
+	videoAttributes,
 } from "./angles-model.ts";
 import { studioCopy } from "./copy.ts";
 import {
@@ -85,7 +88,7 @@ function usePrefersReducedMotion(): boolean {
  * motion was asked for. Its width and height are the video's, so the box is
  * reserved before anything loads; the theme's box contains it whole.
  */
-function TattooVideo({
+export function TattooVideo({
 	video,
 	className,
 }: {
@@ -94,18 +97,7 @@ function TattooVideo({
 }) {
 	const reduced = usePrefersReducedMotion();
 	return (
-		<video
-			className={className}
-			width={video.width}
-			height={video.height}
-			poster={video.poster.src}
-			aria-label={video.alt}
-			muted
-			playsInline
-			loop={!reduced}
-			controls
-			preload="none"
-		>
+		<video className={className} {...videoAttributes(video, reduced)}>
 			{video.sources.map((source) => (
 				<source
 					key={source.src}
@@ -140,11 +132,14 @@ export function TattooDialog({
 	facts,
 	index,
 	onIndex,
+	onClosed,
 }: {
 	photo: GalleryPhotoView;
 	facts: ReactNode;
 	index?: number;
 	onIndex?: (index: number) => void;
+	/** After the dialog closed, with the place it closed on (the tattoo page moves focus with it). */
+	onClosed?: (at: number) => void;
 }) {
 	const [own, setOwn] = useState(0);
 	// Each close takes a video in the viewer off the page (a new key), so it stops.
@@ -155,6 +150,8 @@ export function TattooDialog({
 	const at = selectIndex(index ?? own, count);
 	const go = onIndex ?? setOwn;
 	const shot = shots[at];
+	const kinds = shots.map((one) => one.kind);
+	const words = stepWords(kinds, at);
 	const swipe = useRef<Swipe>(null);
 
 	const step = (delta: number) => {
@@ -178,12 +175,11 @@ export function TattooDialog({
 			onClose={() => {
 				setCloses((n) => n + 1);
 				if (!shared) setOwn(indexAfterClose(at, shared));
+				onClosed?.(at);
 			}}
 		>
 			<form method="dialog" className="work-dialog-bar">
-				<p aria-live="polite">
-					{fill(studioCopy.work.photoOf, { n: at + 1, count })}
-				</p>
+				<p aria-live="polite">{placeWords(shot.kind, at + 1, count)}</p>
 				<button type="submit" className="action action-secondary">
 					{studioCopy.work.close}
 				</button>
@@ -229,7 +225,7 @@ export function TattooDialog({
 					aria-disabled={at === 0 ? true : undefined}
 					onClick={() => step(-1)}
 				>
-					{studioCopy.work.previous}
+					{words.previous}
 				</button>
 				<button
 					type="button"
@@ -237,7 +233,7 @@ export function TattooDialog({
 					aria-disabled={at === count - 1 ? true : undefined}
 					onClick={() => step(1)}
 				>
-					{studioCopy.work.next}
+					{words.next}
 				</button>
 			</div>
 			{shot.caption ? (
@@ -273,18 +269,21 @@ export function TattooFigure({
 	const count = shots.length;
 	const at = selectIndex(chosen, count);
 	const shot = shots[at];
+	const thumbs = useRef<(HTMLButtonElement | null)[]>([]);
+	// The viewer closed on a video: the button that opened it is gone (a video
+	// shows in its place), so focus goes to the video's thumbnail, never the page.
+	const closed = (place: number) => {
+		const next = focusAfterViewerClose(shots[place]?.kind ?? "photo", place);
+		if (next.target === "thumbnail") thumbs.current[next.index]?.focus();
+	};
 	return (
 		<figure className={className}>
 			{shot.kind === "video" ? (
-				// A video is played where it is, in the main photo's box: its own
-				// controls, never a button around them (the photos open the viewer).
-				<div className="artwork-open artwork-open-video">
-					<TattooVideo
-						key={`video-${at}`}
-						video={shot}
-						className={`artwork-photo artwork-photo-steady artwork-video ${artworkShapeClass(photo)}`}
-					/>
-				</div>
+				<TattooFigureVideo
+					key={`video-${at}`}
+					video={shot}
+					shapeClass={artworkShapeClass(photo)}
+				/>
 			) : (
 				<button
 					type="button"
@@ -320,6 +319,9 @@ export function TattooFigure({
 						<button
 							// biome-ignore lint/suspicious/noArrayIndexKey: the photos never change order on the page
 							key={index}
+							ref={(node) => {
+								thumbs.current[index] = node;
+							}}
 							type="button"
 							className="artwork-angle artwork-angle-video"
 							aria-current={index === at ? "true" : undefined}
@@ -336,7 +338,16 @@ export function TattooFigure({
 								loading="lazy"
 								decoding="async"
 							/>
-							<span className="artwork-angle-play" aria-hidden="true" />
+							{/* An SVG, not a background: it stays in forced colours. */}
+							<svg
+								className="artwork-angle-play"
+								viewBox="0 0 24 24"
+								aria-hidden="true"
+								focusable="false"
+							>
+								<circle cx="12" cy="12" r="11" />
+								<path d="M9.5 7v10l8-5z" />
+							</svg>
 							<span className="artwork-angle-time" aria-hidden="true">
 								{thumb.durationText}
 							</span>
@@ -346,6 +357,9 @@ export function TattooFigure({
 							// The photos never change order on the page: their place is their key.
 							// biome-ignore lint/suspicious/noArrayIndexKey: see above
 							key={index}
+							ref={(node) => {
+								thumbs.current[index] = node;
+							}}
 							type="button"
 							className="artwork-angle"
 							aria-current={index === at ? "true" : undefined}
@@ -371,7 +385,35 @@ export function TattooFigure({
 				facts={facts}
 				index={at}
 				onIndex={setChosen}
+				onClosed={closed}
 			/>
 		</figure>
+	);
+}
+
+/**
+ * A video on the tattoo's page, in the main photo's box: played where it is
+ * (its own controls, never a button around them; the photos open the
+ * viewer), and under it the line a photo's "View full screen" takes, here
+ * "Video, no sound": the same class and height in every theme, so choosing
+ * the video moves nothing below, and it says the video is silent.
+ */
+export function TattooFigureVideo({
+	video,
+	shapeClass,
+}: {
+	video: VideoAngleView;
+	shapeClass: string;
+}) {
+	return (
+		<div className="artwork-open artwork-open-video">
+			<TattooVideo
+				video={video}
+				className={`artwork-photo artwork-photo-steady artwork-video ${shapeClass}`}
+			/>
+			<span className="artwork-open-hint artwork-video-hint">
+				{studioCopy.work.videoNoSound}
+			</span>
+		</div>
 	);
 }

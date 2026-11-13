@@ -371,9 +371,13 @@
   .work-stage .work-video { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; max-inline-size: 100%; max-block-size: 100%; }
   .artwork-open-video { cursor: auto; }
   .artwork-angle-video { position: relative; overflow: hidden; }
-  .artwork-angle-play { position: absolute; inset: 0; margin: auto; inline-size: 1.5rem; block-size: 1.5rem; border-radius: 50%; background: rgb(0 0 0 / 0.6); }
-  .artwork-angle-play::after { content: ""; position: absolute; inset-block-start: 50%; inset-inline-start: 55%; translate: -50% -50%; border-block: 0.3125rem solid transparent; border-inline-start: 0.5rem solid #fff; }
-  .artwork-angle-time { position: absolute; inset-inline-end: 0.125rem; inset-block-end: 0.125rem; padding: 0 0.1875rem; border-radius: 0.125rem; background: rgb(0 0 0 / 0.7); color: #fff; font-size: 0.625rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+  /* The play mark is an SVG (its circle and triangle are drawn, never a background), so forced colours keep it. */
+  .artwork-angle-play { position: absolute; inset: 0; margin: auto; inline-size: 1.5rem; block-size: 1.5rem; }
+  .artwork-angle-play circle { fill: rgb(0 0 0 / 0.6); stroke: #fff; stroke-width: 1.5; }
+  .artwork-angle-play path { fill: #fff; }
+  .artwork-angle-time { position: absolute; inset-inline-end: 0.125rem; inset-block-end: 0.125rem; padding: 0 0.1875rem; border-radius: 0.125rem; background: rgb(0 0 0 / 0.7); color: #fff; font-size: 0.75rem; line-height: 1.3; font-variant-numeric: tabular-nums; }
+  /* The line under a video on its page, where "View full screen" stands for a photo: the same line, not a link. */
+  .artwork-video-hint { text-decoration: none; }
   /*
    * The whole portfolio and the All work page (TAT-126). The artist page's
    * All / Healed links and the filter form are 3rem tall, like the buttons;
@@ -1032,4 +1036,11 @@
 .preview-banner-exit:hover { color: var(--stencil-strong); }
 @media (max-width: 40rem) {
   :root:has(.preview-banner) { --preview-bar: 5.75rem; }
+}
+
+/* Video angles: the play mark and the length stay legible in forced colours. */
+@media (forced-colors: active) {
+  .artwork-angle-play circle { fill: Canvas; stroke: CanvasText; }
+  .artwork-angle-play path { fill: CanvasText; }
+  .artwork-angle-time { background: Canvas; color: CanvasText; forced-color-adjust: none; }
 }
