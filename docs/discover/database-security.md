@@ -164,7 +164,7 @@ The style filter is the one slow shape. D03 should measure its real query and ma
 
 ```bash
 cd apps/platform
-node ace test functional --files=discovery.spec.ts      # the boundary, rules and publication changes (33 tests; two use PostgreSQL 18's MAINTAIN and fail on 16)
+node ace test functional --files=discovery.spec.ts      # the boundary, rules and publication changes (34 tests; two use PostgreSQL 18's MAINTAIN and fail on 16)
 node ace test functional --files=catalog_guard.spec.ts --files=setup_roles.spec.ts --files=policies.spec.ts
 ```
 
@@ -183,14 +183,19 @@ They use a real PostgreSQL. One test plants a volatile, near-free function (it r
 
 Migration `1791970000000_create_discovery_reviews_and_fresh_ink.ts`; [spec](../superpowers/specs/2026-11-12-reviews-and-fresh-ink-design.md), rulings 8 to 11; the API's reads: [Discover API](api.md#reviews-and-fresh-ink-slice-4).
 
-**Rules** (in the views' WHERE, and the never-leak part in the policies):
+**Rules** (in the views' WHERE, and the never-leak part in the policies, with two exceptions below):
 
 | Row | On Discover when |
 |---|---|
 | Review (`client_reviews`) | `consent_discover` and `taken_down_at is null` and `deleted_at is null` (and a rating: a client's delete scrubs it) and its artist is shown (above, which brings the listed studio) |
 | Its reply | as the review, and `reply_taken_down_at is null`; otherwise `reply` and `replied_at` are null in the view (a column rule: the review itself stays) |
 | Post (`client_posts`) | `status = 'approved'` and `published_at is not null` (its public copies exist, `PostPublicationService`) and `consent_discover` and not taken down and not deleted, and its artist is shown |
-| Media (`client_post_media`) | its post is on Discover, and a photo, or a video whose `video_state = 'ready'`; the view also needs the image (or poster) and its size, and every key of the shape `tenants/<the row's tenant>/client_post_photo/<file>` (a video: `client_post_video`) with no `..`; a row whose key isn't is left out |
+| Media (`client_post_media`) | its post is on Discover, and a photo, or a video whose `video_state = 'ready'`; the view also needs the image (or poster) and its size, and every key of the shape `tenants/<the row's tenant>/client_post_photo/<file>` (a video: `client_post_video`) with no `..` and no NULL among a video's renditions (`array_position(video_keys, null) is null`: a regex lets NULL through); a row whose key isn't is left out |
+
+**Two exceptions to "the policies stop what must never leak"** (defence in depth is thinner here, on purpose, and each is pinned by a test):
+
+1. **A taken-down reply.** The role may read `client_reviews.reply` of a published review even when TattooDrip took the reply down (`reply_taken_down_at`): the policies are per row, and the review itself is published. Only the view's `CASE WHEN r.reply_taken_down_at IS NULL THEN r.reply END` (and the same for `replied_at`) nulls it. `discovery.spec.ts` checks every `discovery` view's definition: only `discovery.reviews` reads `reply` or `replied_at`, and only inside those two CASEs.
+2. **The private keys.** The role may read `client_post_media.image_key` and `video_keys`, the PRIVATE originals' keys (`client_post_photo`, `client_post_video`), because the view computes the public copies' keys from them. No view selects a private key (tested: nothing named `client_post_` in `fresh_ink_media`), and a private key alone opens nothing (the private disk serves only signed URLs), but a new view or a mistaken column would expose them: review any change to `fresh_ink_media` with that in mind.
 
 **Policies** (TO the role only): `discovery_select` on each table checks the row's own flags (above); `discovery_only` (restrictive) adds the artist's rule for reviews and posts (an `exists` on `artists`, whose own restrictive policy brings the studio's) and the post's rule for media (an `exists` on `client_posts`, whose policy brings the rest). A studio that stops listing, is taken down or is deleted takes every review, post and photo off at once; listing again brings them back while the client's consent stands (tested).
 

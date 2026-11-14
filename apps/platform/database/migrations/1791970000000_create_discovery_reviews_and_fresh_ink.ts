@@ -20,7 +20,9 @@ import env from "#start/env";
  *   in the view to their public copies' (`fresh_ink_photo`,
  *   `fresh_ink_video`, the same file names, PostPublicationService), and a
  *   row whose key is not of that shape (another tenant's folder, `..`) is
- *   left out. A video still processing or failed is never a row.
+ *   left out (a video's every rendition key too: a NULL in `video_keys`
+ *   would slip through a regex, so `array_position(…, null)` refuses it). A
+ *   video still processing or failed is never a row.
  *
  * The boundary is D02's, unchanged in kind: owned by tattoo_drip_discovery
  * (the CREATE dance below; a superuser must run it, as D02's), not
@@ -223,6 +225,7 @@ where m.image_key is not null and m.width is not null and m.height is not null
   and ((m.kind = 'photo' and ${privateKey("m.image_key", "m", "client_post_photo")})
     or (m.kind = 'video' and m.video_state = 'ready' and ${privateKey("m.image_key", "m", "client_post_video")}
         and cardinality(m.video_keys) > 0
+        and array_position(m.video_keys, null) is null
         and not exists (select 1 from unnest(m.video_keys) as v(key)
                         where not ${privateKey("v.key", "m", "client_post_video")})))
   and ${postShown("p")} and ${artistShown("a")} and ${tenantListed("t")}`);

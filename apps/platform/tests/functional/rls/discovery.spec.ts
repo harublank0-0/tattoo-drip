@@ -1504,6 +1504,22 @@ async function seedClientContent(trx: Trx, { t, a }: Seeded) {
 			5,
 			`tenants/${t.studio}/client_post_photo/..`,
 		),
+		// A ready video whose renditions hold a NULL: a regex lets NULL through,
+		// so the view refuses it by array_position.
+		nullKey: await insert("client_post_media", {
+			tenant_id: t.studio,
+			post_id: p.shown,
+			position: 6,
+			kind: "video",
+			video_state: "ready",
+			video_staging_key: `client_video_upload/tenants/${t.studio}/null-key`,
+			image_key: `tenants/${t.studio}/client_post_video/n6.jpg`,
+			width: 1080,
+			height: 1920,
+			video_duration_ms: 12000,
+			video_keys: `{tenants/${t.studio}/client_post_video/n6.720x1280.mp4,NULL}`,
+			created_at: new Date(),
+		}),
 		ofWaiting: await photo(t.studio, p.waiting, 0),
 		ofStudioPageOnly: await photo(t.studio, p.studioPageOnly, 0),
 		ofHiddenArtist: await photo(t.studio, p.byHiddenArtist, 0),
@@ -1603,7 +1619,7 @@ test.group("Discover database: reviews and Fresh ink (slice 4)", () => {
 							context,
 						),
 					),
-					[m.lead, m.ready, m.foreignKey, m.climbing, m.solo].sort(),
+					[m.lead, m.ready, m.foreignKey, m.climbing, m.nullKey, m.solo].sort(),
 				);
 			}
 		});
@@ -1665,6 +1681,36 @@ test.group("Discover database: reviews and Fresh ink (slice 4)", () => {
 				await as(trx, APP, "select * from discovery.fresh_ink_media"),
 			);
 			assert.notInclude(all, "client_post_");
+		});
+	});
+
+	test("only the reviews view reads a reply, and only inside the CASE that nulls one taken down", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			// The never-leak rules are in the policies, with this exception: a
+			// reply TattooDrip took down is readable by the role (the review is
+			// published) and nulled by the view's CASE alone. No view may read
+			// client_reviews.reply any other way.
+			const allowed = [
+				"CASE WHEN (r.reply_taken_down_at IS NULL) THEN r.reply ELSE NULL::text END AS reply",
+				"CASE WHEN ((r.reply_taken_down_at IS NULL) AND (r.reply IS NOT NULL)) THEN r.replied_at ELSE NULL::timestamp with time zone END AS replied_at",
+			];
+			const views = await rows<{ name: string; definition: string }>(
+				trx,
+				"select viewname as name, definition from pg_views where schemaname = 'discovery' order by 1",
+			);
+			assert.lengthOf(views, VIEWS.length);
+			for (const { name, definition } of views) {
+				let rest = definition.replace(/\s+/g, " ");
+				if (name === "reviews") {
+					for (const each of allowed) {
+						assert.equal(rest.split(each).length, 2, `${name}: ${each}`);
+						rest = rest.replace(each, "");
+					}
+				}
+				assert.notMatch(rest, /\breply\b|replied_at/, name);
+			}
 		});
 	});
 
