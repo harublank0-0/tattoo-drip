@@ -47,9 +47,9 @@ These terms cover what a client posts through a studio's review link on TattooDr
 
 ## 6. Takedowns and reports
 
-6.1 The studio can report a review or post to us for hate, threats, personal data, being off-topic, or not coming from a client. A reported item stays up until we decide.
+6.1 The studio can report a review to us for hate, threats, personal data, being off-topic, or not coming from a client, with a note. A reported review stays up until we decide. (A Fresh ink post needs no report: the studio can decline it or stop showing it, section 2.4.)
 
-6.2 We can take anything down from every public surface, for a report we uphold, at your request, or where the law requires it. Your link page then says that it was taken down and why, in one fixed sentence. We may restore it if we were wrong.
+6.2 We can take anything down from every public surface (your review, the studio's reply to it, or your Fresh ink post), for a report we uphold, at your request, or where the law requires it. Your link page then says that your review or post was taken down and why, in one fixed sentence. We may restore it if we were wrong.
 
 6.3 Do not post: hate or harassment, threats, someone else's personal details, content you have no right to share, nudity beyond what the tattoo's placement needs, or anything unrelated to the tattoo or the studio.
 
@@ -63,7 +63,7 @@ These terms cover what a client posts through a studio's review link on TattooDr
 
 ## 9. Private until published
 
-9.1 Your photos and videos are stored privately: only you (through your link), the studio and TattooDrip can see them until the studio approves the post and you allow a surface. Copies shown on a public page are deleted when the post is declined, unpublished or taken down, or when you withdraw that surface.
+9.1 Your photos and videos are stored privately: only you (through your link), the studio and TattooDrip can see them until the studio approves the post and you allow a surface. Only then are public copies made. They are deleted when the post is declined, unpublished or taken down, when you change an approved post (it waits for the studio's approval again), when you delete it, or when you withdraw your last surface; withdrawing one surface takes it off that surface at once.
 
 ## 10. Contact
 
