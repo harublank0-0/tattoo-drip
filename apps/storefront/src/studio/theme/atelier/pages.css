@@ -913,3 +913,21 @@
 	margin: 1rem 0 0;
 	text-align: center;
 }
+
+/*
+ * `/reviews` and `/fresh-ink` in Atelier (./clients.tsx, AtelierReviewsPage
+ * and AtelierFreshInkPage): the gallery's head, then the body centred like
+ * the theme's other pages, its cards the home section's (`.atl-reviews`).
+ */
+.atl-client-body {
+	padding-block-start: 0;
+}
+.atl-client-body .client-review-summary {
+	margin-block-end: 1rem;
+}
+.atl-client-body .work-newest,
+.atl-client-body .flash-more-bar {
+	display: grid;
+	justify-items: center;
+	text-align: center;
+}

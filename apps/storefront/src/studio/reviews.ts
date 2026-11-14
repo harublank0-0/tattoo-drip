@@ -67,10 +67,12 @@ export interface RatingView {
 	/** "4.7": one decimal. */
 	readonly averageText: string;
 	readonly count: number;
-	/** "4.7 from 12 reviews". */
+	/** "4.7 from 12 reviews": what the page shows. */
 	readonly text: string;
-	/** "Rated 4.7 out of 5": the stars beside it, in words. */
-	readonly starsText: string;
+	/** "from 12 reviews": the line after the average, which a screen reader hears as "4.7 out of 5 from 12 reviews". */
+	readonly fromText: string;
+	/** The whole stars drawn beside it: the average rounded down (4.7 is four), so they never claim more. */
+	readonly stars: number;
 }
 
 export interface ReviewsView {
@@ -202,7 +204,8 @@ function readRating(value: unknown): RatingView | null {
 		averageText,
 		count,
 		text: fill(studioCopy.reviews.summary, { average: averageText, count }),
-		starsText: fill(studioCopy.reviews.averageStars, { average: averageText }),
+		fromText: fill(studioCopy.reviews.summaryFrom, { count }),
+		stars: Math.floor(Number(averageText)),
 	};
 }
 

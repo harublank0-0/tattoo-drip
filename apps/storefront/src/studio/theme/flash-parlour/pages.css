@@ -1394,3 +1394,24 @@
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }
+
+/*
+ * `/reviews` and `/fresh-ink` in Flash Parlour (./clients.tsx): its page head,
+ * then the body centred like its other pages, the tickets the home section's
+ * (`.fp-reviews`), the posts its own pieces.
+ */
+.fp-client-body {
+	padding-block-start: 0;
+}
+.fp-client-body .client-review-summary {
+	display: flex;
+	inline-size: fit-content;
+	max-inline-size: 100%;
+	margin-inline: auto;
+}
+.fp-client-body .work-newest,
+.fp-client-body .flash-more-bar {
+	display: grid;
+	justify-items: center;
+	text-align: center;
+}

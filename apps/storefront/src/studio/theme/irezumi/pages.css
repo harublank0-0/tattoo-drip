@@ -888,3 +888,15 @@
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
+
+/*
+ * `/reviews` and `/fresh-ink` in Irezumi (./clients.tsx): the gallery's head,
+ * then the page's column, the passages the home section's (`.irz-reviews`),
+ * the posts its hung pieces.
+ */
+.irz-client-body {
+	padding-block-start: 0;
+}
+.irz-client-body .client-review-summary {
+	margin-block-start: 0;
+}

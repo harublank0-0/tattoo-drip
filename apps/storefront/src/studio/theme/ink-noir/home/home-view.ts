@@ -325,6 +325,20 @@ export function featuredSizes(tile: Tile, image: ImageSize): string {
 }
 
 /**
+ * A Fresh ink tile (Reviews and Fresh ink, slice 3; home.css `.ink-fresh-tile`:
+ * 4:5, the photo covering it): a third of the column from 48rem, half of it
+ * below, each times how much wider than the tile the photo is drawn.
+ */
+export function freshInkSizes(image: ImageSize): string {
+	const factor = coverFactor(5 / 4, image);
+	return columnSizes(
+		1 / 3,
+		factor,
+		`(min-width: 48rem) NARROW, calc((100vw - ${GUTTER_REM}rem) * ${round(factor / 2)})`,
+	);
+}
+
+/**
  * An artist's portrait (4:5): a lone artist's takes 5/12 of the column from
  * 48rem; among several, the column shares them out (two across from 36rem,
  * up to four from 60rem); below that each is the column's width.

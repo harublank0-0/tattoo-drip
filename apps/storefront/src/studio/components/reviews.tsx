@@ -59,12 +59,20 @@ export function ReviewStars({
 	);
 }
 
-/** The studio's average from 3 reviews: its stars and "4.7 from 12 reviews". */
+/**
+ * The studio's average from 3 reviews: "4.7 from 12 reviews", which a screen
+ * reader hears as "4.7 out of 5 from 12 reviews", beside the average's whole
+ * stars rounded down (decoration: the words say it).
+ */
 export function RatingSummary({ rating }: { rating: RatingView }) {
 	return (
 		<p className="client-review-summary">
-			<ReviewStars rating={Math.round(rating.average)} label={null} />
-			<span className="client-review-summary-text">{rating.text}</span>
+			<ReviewStars rating={rating.stars} label={null} />
+			<span className="client-review-summary-text">
+				{rating.averageText}
+				<span className="sr-only">{studioCopy.reviews.outOfFive}</span>{" "}
+				{rating.fromText}
+			</span>
 		</p>
 	);
 }
@@ -156,11 +164,24 @@ export function ReviewList({
 export function AllReviewsLink({
 	view,
 	className = "text-link",
+	arrow = true,
 }: {
 	view: ReviewsView;
 	className?: string;
+	/**
+	 * Stencil & Ink's and Ink Noir's links end in an arrow; Irezumi's, Atelier's
+	 * and Flash Parlour's "All work" links are plain words, and so are these there.
+	 */
+	arrow?: boolean;
 }) {
 	if (view.nextCursor === null) return null;
+	if (!arrow) {
+		return (
+			<a className={className} href={reviewsHref({})}>
+				{studioCopy.reviews.all}
+			</a>
+		);
+	}
 	return (
 		<a className={className} href={reviewsHref({})}>
 			<span>{studioCopy.reviews.all}</span>

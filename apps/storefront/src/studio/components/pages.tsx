@@ -1,9 +1,11 @@
 import { useLocation } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
+import type { ComponentType } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { artworkTitle } from "../artwork.ts";
 import { studioCopy } from "../copy.ts";
 import { flashDesignAction } from "../flash.ts";
+import type { FreshInkPostView } from "../fresh-ink.ts";
 import {
 	flashHref,
 	freshInkHref,
@@ -523,22 +525,75 @@ export function FlashPage({
 	);
 }
 
+/** What a theme's head of `/reviews` and `/fresh-ink` gets: its h1's id and words, a kicker and a line. */
+export interface ClientPageHeadProps {
+	readonly id: string;
+	readonly label: string;
+	readonly title: string;
+	readonly line: string;
+}
+
 /**
- * `/reviews` (Reviews and Fresh ink, slice 3), in every theme's shell: the
- * average from 3 reviews, then the reviews newest first, 24 a page, "Show
- * more" a plain link to the next page and "Back to the newest" from a later
- * one, then the studio block. Never review structured data (ruling 10). The
- * loader makes a page with nothing on it the not-found page, so there is no
- * empty state here.
+ * How a theme composes `/reviews` and `/fresh-ink` (Reviews and Fresh ink,
+ * slice 3): its `<main>` class, its page head, the body's classes (its
+ * section, container and the class its home section's cards are styled
+ * under, so the page's cards match), the reviews list's class, the grid the
+ * posts hang in, the paging links' classes, and whether the studio block
+ * follows. Stencil & Ink's is the default (CLIENT_PAGE_LAYOUT).
+ */
+export interface ClientPageLayout {
+	readonly mainClassName?: string;
+	readonly Head: ComponentType<ClientPageHeadProps>;
+	readonly bodyClassName: string;
+	readonly listClassName: string;
+	readonly Posts: ComponentType<{ posts: readonly FreshInkPostView[] }>;
+	readonly linkClassName: string;
+	readonly moreClassName: string;
+	readonly aside: boolean;
+}
+
+/** Stencil & Ink's head: the section title as the h1 and the line under it. */
+function StencilClientHead({ id, title, line }: ClientPageHeadProps) {
+	return (
+		<>
+			<h1 id={id} className="section-title client-page-title">
+				{title}
+			</h1>
+			<p className="client-page-intro measure">{line}</p>
+		</>
+	);
+}
+
+/** Stencil & Ink's composition, and the default. */
+export const CLIENT_PAGE_LAYOUT: ClientPageLayout = {
+	Head: StencilClientHead,
+	bodyClassName: "client-page-body",
+	listClassName: "client-review-list",
+	Posts: FreshInkGrid,
+	linkClassName: "text-link",
+	moreClassName: "action action-secondary",
+	aside: true,
+};
+
+/**
+ * `/reviews` (Reviews and Fresh ink, slice 3), in every theme's shell and its
+ * composition (`layout`): the head, the average from 3 reviews, then the
+ * reviews newest first, 24 a page, "Show more" a plain link to the next page
+ * and "Back to the newest" from a later one. Never review structured data
+ * (ruling 10). The loader makes a page with nothing on it the not-found page,
+ * so there is no empty state here.
  */
 export function ReviewsPage({
 	data,
 	Shell = StencilShell,
+	layout = CLIENT_PAGE_LAYOUT,
 }: {
 	data: ReviewsPageData;
 	Shell?: Shell;
+	layout?: ClientPageLayout;
 }) {
 	const { studio, theme, view, search } = data;
+	const { Head } = layout;
 	return (
 		<Shell
 			studio={studio}
@@ -547,28 +602,35 @@ export function ReviewsPage({
 			chat={data.chat}
 			page="reviews"
 			artistsShown={data.hasArtists}
+			mainClassName={layout.mainClassName}
 		>
+			<Head
+				id="reviews-page-title"
+				label={studioCopy.reviews.pageLabel}
+				title={studioCopy.reviews.pageTitle}
+				line={studioCopy.reviews.intro}
+			/>
 			<section
-				className="client-page reviews-page"
+				className={`client-page reviews-page ${layout.bodyClassName}`}
 				aria-labelledby="reviews-page-title"
 			>
-				<h1 id="reviews-page-title" className="section-title">
-					{studioCopy.reviews.pageTitle}
-				</h1>
-				<p className="client-page-intro measure">{studioCopy.reviews.intro}</p>
 				{view.rating ? <RatingSummary rating={view.rating} /> : null}
 				{search.cursor !== undefined ? (
 					<p className="work-newest">
-						<a className="text-link" href={reviewsHref({})}>
+						<a className={layout.linkClassName} href={reviewsHref({})}>
 							{studioCopy.reviews.newest}
 						</a>
 					</p>
 				) : null}
-				<ReviewList reviews={view.reviews} studioName={studio.name} />
+				<ReviewList
+					reviews={view.reviews}
+					studioName={studio.name}
+					className={layout.listClassName}
+				/>
 				{view.nextCursor !== null ? (
 					<p className="flash-more-bar">
 						<a
-							className="action action-secondary"
+							className={layout.moreClassName}
 							href={reviewsHref({ cursor: view.nextCursor })}
 						>
 							{studioCopy.reviews.showMore}
@@ -576,24 +638,27 @@ export function ReviewsPage({
 					</p>
 				) : null}
 			</section>
-			<StudioAside studio={studio} />
+			{layout.aside ? <StudioAside studio={studio} /> : null}
 		</Shell>
 	);
 }
 
 /**
- * `/fresh-ink` (slice 3), in every theme's shell: the posts newest first in
- * the gallery's grid, each opening its viewer with its angles, 24 a page,
- * paged like `/reviews`, then the studio block.
+ * `/fresh-ink` (slice 3), in every theme's shell and composition: the posts
+ * newest first in the theme's own grid, each opening its viewer with its
+ * angles, 24 a page, paged like `/reviews`.
  */
 export function FreshInkPage({
 	data,
 	Shell = StencilShell,
+	layout = CLIENT_PAGE_LAYOUT,
 }: {
 	data: FreshInkPageData;
 	Shell?: Shell;
+	layout?: ClientPageLayout;
 }) {
 	const { studio, theme, view, search } = data;
+	const { Head, Posts } = layout;
 	return (
 		<Shell
 			studio={studio}
@@ -602,27 +667,30 @@ export function FreshInkPage({
 			chat={data.chat}
 			page="fresh-ink"
 			artistsShown={data.hasArtists}
+			mainClassName={layout.mainClassName}
 		>
+			<Head
+				id="fresh-ink-page-title"
+				label={studioCopy.freshInk.pageLabel}
+				title={studioCopy.freshInk.pageTitle}
+				line={studioCopy.freshInk.intro}
+			/>
 			<section
-				className="client-page fresh-ink-page"
+				className={`client-page fresh-ink-page ${layout.bodyClassName}`}
 				aria-labelledby="fresh-ink-page-title"
 			>
-				<h1 id="fresh-ink-page-title" className="section-title">
-					{studioCopy.freshInk.pageTitle}
-				</h1>
-				<p className="client-page-intro measure">{studioCopy.freshInk.intro}</p>
 				{search.cursor !== undefined ? (
 					<p className="work-newest">
-						<a className="text-link" href={freshInkHref({})}>
+						<a className={layout.linkClassName} href={freshInkHref({})}>
 							{studioCopy.freshInk.newest}
 						</a>
 					</p>
 				) : null}
-				<FreshInkGrid posts={view.posts} />
+				<Posts posts={view.posts} />
 				{view.nextCursor !== null ? (
 					<p className="flash-more-bar">
 						<a
-							className="action action-secondary"
+							className={layout.moreClassName}
 							href={freshInkHref({ cursor: view.nextCursor })}
 						>
 							{studioCopy.freshInk.showMore}
@@ -630,7 +698,7 @@ export function FreshInkPage({
 					</p>
 				) : null}
 			</section>
-			<StudioAside studio={studio} />
+			{layout.aside ? <StudioAside studio={studio} /> : null}
 		</Shell>
 	);
 }

@@ -463,7 +463,7 @@
   }
   .fresh-ink-intro, .client-page-intro { margin-block-end: 1.5rem; color: var(--ink-muted); }
   .fresh-ink-caption { color: var(--ink); }
-  .client-page > .section-title { margin-block-end: 0.75rem; }
+  .client-page-title { margin-block-end: 0.75rem; }
   .flash-design { display: grid; gap: 1.5rem; align-items: start; }
   .flash-design-picture { display: block; inline-size: 100%; max-inline-size: 36rem; block-size: auto; aspect-ratio: 1; object-fit: contain; background: var(--stencil-wash); }
   .flash-design-body { display: grid; gap: 1rem; justify-items: start; min-inline-size: 0; }

@@ -1,8 +1,15 @@
+import type { ComponentProps } from "react";
 import {
 	AllFreshInkLink,
 	FreshInkDialog,
 	FreshInkOpen,
 } from "../../components/fresh-ink.tsx";
+import {
+	type ClientPageHeadProps,
+	type ClientPageLayout,
+	FreshInkPage,
+	ReviewsPage,
+} from "../../components/pages.tsx";
 import {
 	AllReviewsLink,
 	RatingSummary,
@@ -44,7 +51,7 @@ export function IrezumiFreshInk({ view }: { view: FreshInkView }) {
 					<h2 id="fresh-ink-title" className="irz-section-title">
 						{studioCopy.freshInk.title}
 					</h2>
-					<AllFreshInkLink view={view} className="irz-link" />
+					<AllFreshInkLink view={view} className="irz-link" arrow={false} />
 				</div>
 				<p className="irz-kicker irz-fresh-intro">
 					{studioCopy.freshInk.intro}
@@ -56,7 +63,7 @@ export function IrezumiFreshInk({ view }: { view: FreshInkView }) {
 }
 
 /** The posts as Irezumi's hung pieces. */
-function IrezumiFreshInkPieces({
+export function IrezumiFreshInkPieces({
 	posts,
 }: {
 	posts: readonly FreshInkPostView[];
@@ -115,7 +122,7 @@ export function IrezumiReviews({
 					<h2 id="reviews-title" className="irz-section-title">
 						{studioCopy.reviews.title}
 					</h2>
-					<AllReviewsLink view={view} className="irz-link" />
+					<AllReviewsLink view={view} className="irz-link" arrow={false} />
 				</div>
 				{view.rating ? <RatingSummary rating={view.rating} /> : null}
 				<ReviewList
@@ -126,4 +133,48 @@ export function IrezumiReviews({
 			</div>
 		</section>
 	);
+}
+
+/** Irezumi's head of `/reviews` and `/fresh-ink`, as its gallery's: the kicker, the title, the line. */
+function IrezumiClientHead({ id, label, title, line }: ClientPageHeadProps) {
+	return (
+		<header className="irz-page-head">
+			<div className="irz-container">
+				<p className="irz-kicker">{label}</p>
+				<h1 id={id} className="irz-page-title">
+					{title}
+				</h1>
+				<p className="irz-page-line">{line}</p>
+			</div>
+		</header>
+	);
+}
+
+/**
+ * Irezumi's composition of `/reviews` and `/fresh-ink`: its own page head,
+ * the page's column, the reviews as its home section draws them (the
+ * section's classes on the body) and the posts in its own pieces, its plain
+ * links; no studio block, as its gallery has none.
+ */
+const IREZUMI_CLIENT_PAGES: ClientPageLayout = {
+	mainClassName: "irz-main",
+	Head: IrezumiClientHead,
+	bodyClassName: "irz-section irz-container irz-reviews irz-client-body",
+	listClassName: "client-review-list irz-review-list",
+	Posts: IrezumiFreshInkPieces,
+	linkClassName: "irz-link",
+	moreClassName: "action irz-action-quiet",
+	aside: false,
+};
+
+/** `/reviews` in Irezumi's idiom. */
+export function IrezumiReviewsPage(props: ComponentProps<typeof ReviewsPage>) {
+	return <ReviewsPage {...props} layout={IREZUMI_CLIENT_PAGES} />;
+}
+
+/** `/fresh-ink` in Irezumi's idiom. */
+export function IrezumiFreshInkPage(
+	props: ComponentProps<typeof FreshInkPage>,
+) {
+	return <FreshInkPage {...props} layout={IREZUMI_CLIENT_PAGES} />;
 }

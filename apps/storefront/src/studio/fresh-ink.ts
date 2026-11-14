@@ -44,16 +44,19 @@ export interface FreshInkPostView extends GalleryPhotoView {
 	/** "Shown by Sita R.". */
 	readonly shownBy: string;
 	/**
-	 * "Fresh ink from Sita R., tattoo by Ram K." (without an artist, "Fresh ink
-	 * from Sita R."): what a theme's piece title says, where its photo is
-	 * decoration inside the button the title names.
+	 * What a theme's piece title says, where its photo is decoration inside
+	 * the button the title names: the main photo's own description, else the
+	 * client's caption on one line, else "Fresh ink from Sita R., tattoo by Ram
+	 * K." ("Fresh ink from Sita R." without an artist), as `artworkTitle`
+	 * prefers the photo's own words; so two posts of one client and artist
+	 * are told apart by what they say.
 	 */
 	readonly title: string;
 	/** The client's caption, plain text with its line breaks, or null. */
 	readonly postCaption: string | null;
 	/** Where it is on the body, in the client's words, one line, or null. */
 	readonly placement: string | null;
-	/** The day it was published on the studio's page. */
+	/** The day it was published (the latest publication, for any surface). */
 	readonly date: DayView | null;
 }
 
@@ -110,9 +113,10 @@ export function freshInkView(
 		if (entry === null || entry.id === null) continue;
 		if (posts.some((post) => post.id === entry.id)) continue;
 		const artist = readArtistTag(own(item, "artist"));
-		const title = artist
+		const named = artist
 			? fill(studioCopy.freshInk.alt, { name, artist: artist.name })
 			: fill(studioCopy.freshInk.altNoArtist, { name });
+		const postCaption = readText(own(item, "caption"), MAX_CAPTION);
 		posts.push({
 			...entry,
 			// No page of its own: the viewer is the way in.
@@ -120,11 +124,11 @@ export function freshInkView(
 			artist,
 			// The client's words say what it is; nothing is claimed for them.
 			healed: false,
-			alt: entry.caption || entry.angles.length > 0 ? entry.alt : title,
-			title,
+			alt: entry.caption || entry.angles.length > 0 ? entry.alt : named,
+			title: entry.caption ?? cleanLine(postCaption) ?? named,
 			name,
 			shownBy: fill(studioCopy.freshInk.shownBy, { name }),
-			postCaption: readText(own(item, "caption"), MAX_CAPTION),
+			postCaption,
 			placement: readLine(own(item, "placement"), MAX_PLACEMENT),
 			date: dayView(own(item, "date")),
 		});

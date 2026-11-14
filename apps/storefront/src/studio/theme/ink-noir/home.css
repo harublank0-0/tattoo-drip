@@ -1252,3 +1252,15 @@
 		translate: none;
 	}
 }
+
+/*
+ * `/reviews` and `/fresh-ink` in Ink Noir (./home/fresh-ink.tsx,
+ * INK_NOIR_CLIENT_PAGES): the directory's head, then the column, the raised
+ * cards and portrait tiles of the home sections.
+ */
+.ink-client-body {
+	padding-block: clamp(2rem, 1.5rem + 2vw, 3rem) clamp(4rem, 3rem + 4vw, 6rem);
+}
+.ink-client-body .client-review-summary {
+	margin-block-end: 2rem;
+}

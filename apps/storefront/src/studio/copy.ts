@@ -236,14 +236,18 @@ export const studioCopy = {
 	reviews: {
 		title: "Reviews",
 		pageTitle: "Reviews",
+		/** The kicker over the page's title, in themes that have one. */
+		pageLabel: "From clients",
 		intro: "From clients who were tattooed here, newest first.",
 		all: "All reviews",
 		/** The average from 3 reviews (ruling 10). */
 		summary: "{average} from {count} reviews",
 		/** What a screen reader hears for the stars of a review. */
 		stars: "{n} out of 5",
-		/** And for the stars beside the average. */
-		averageStars: "Rated {average} out of 5",
+		/** The summary's second part, after the average (a screen reader hears " out of 5" between them). */
+		summaryFrom: "from {count} reviews",
+		/** Between the average and summaryFrom, for a screen reader only. */
+		outOfFive: " out of 5",
 		tattooBy: "Tattoo by {artist}",
 		reply: "Reply from {studio}",
 		showMore: "Show more",
@@ -259,6 +263,7 @@ export const studioCopy = {
 	freshInk: {
 		title: "Fresh ink",
 		pageTitle: "Fresh ink",
+		pageLabel: "Healed and shared",
 		intro: "Healed tattoos, shown by the clients who wear them.",
 		all: "All Fresh ink",
 		shownBy: "Shown by {name}",

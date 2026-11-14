@@ -1,8 +1,15 @@
+import type { ComponentProps } from "react";
 import {
 	AllFreshInkLink,
 	FreshInkDialog,
 	FreshInkOpen,
 } from "../../components/fresh-ink.tsx";
+import {
+	type ClientPageHeadProps,
+	type ClientPageLayout,
+	FreshInkPage,
+	ReviewsPage,
+} from "../../components/pages.tsx";
 import {
 	AllReviewsLink,
 	RatingSummary,
@@ -16,6 +23,7 @@ import {
 } from "../../fresh-ink.ts";
 import { HOME_REVIEWS_COUNT, type ReviewsView } from "../../reviews.ts";
 import { RibbonTitle, StarRow } from "./ornaments.tsx";
+import { PageHead } from "./page-head.tsx";
 import { pieceSizes } from "./sizes.ts";
 
 /**
@@ -45,7 +53,7 @@ export function FlashParlourFreshInk({ view }: { view: FreshInkView }) {
 					<RibbonTitle id="fresh-ink-title">
 						{studioCopy.freshInk.title}
 					</RibbonTitle>
-					<AllFreshInkLink view={view} className="fp-link" />
+					<AllFreshInkLink view={view} className="fp-link" arrow={false} />
 				</div>
 				<p className="fp-fresh-intro">{studioCopy.freshInk.intro}</p>
 				<FlashParlourFreshInkPieces posts={posts} />
@@ -54,7 +62,7 @@ export function FlashParlourFreshInk({ view }: { view: FreshInkView }) {
 	);
 }
 
-function FlashParlourFreshInkPieces({
+export function FlashParlourFreshInkPieces({
 	posts,
 }: {
 	posts: readonly FreshInkPostView[];
@@ -115,7 +123,7 @@ export function FlashParlourReviews({
 					<RibbonTitle id="reviews-title">
 						{studioCopy.reviews.title}
 					</RibbonTitle>
-					<AllReviewsLink view={view} className="fp-link" />
+					<AllReviewsLink view={view} className="fp-link" arrow={false} />
 				</div>
 				{view.rating ? <RatingSummary rating={view.rating} /> : null}
 				<ReviewList
@@ -127,4 +135,45 @@ export function FlashParlourReviews({
 			</div>
 		</section>
 	);
+}
+
+/** Flash Parlour's head of `/reviews` and `/fresh-ink`: its own page head (the kicker, the starred title, the line). */
+function FlashParlourClientHead({
+	id,
+	label,
+	title,
+	line,
+}: ClientPageHeadProps) {
+	return <PageHead label={label} title={title} line={line} titleId={id} />;
+}
+
+/**
+ * FlashParlour's composition of `/reviews` and `/fresh-ink`: its own page head,
+ * the page's column, the reviews as its home section draws them (the
+ * section's classes on the body) and the posts in its own pieces, its plain
+ * links; no studio block, as its gallery has none.
+ */
+const FLASH_PARLOUR_CLIENT_PAGES: ClientPageLayout = {
+	mainClassName: "fp-main",
+	Head: FlashParlourClientHead,
+	bodyClassName: "fp-section fp-container fp-reviews fp-client-body",
+	listClassName: "client-review-list fp-review-list",
+	Posts: FlashParlourFreshInkPieces,
+	linkClassName: "fp-link",
+	moreClassName: "action action-secondary",
+	aside: false,
+};
+
+/** `/reviews` in FlashParlour's idiom. */
+export function FlashParlourReviewsPage(
+	props: ComponentProps<typeof ReviewsPage>,
+) {
+	return <ReviewsPage {...props} layout={FLASH_PARLOUR_CLIENT_PAGES} />;
+}
+
+/** `/fresh-ink` in FlashParlour's idiom. */
+export function FlashParlourFreshInkPage(
+	props: ComponentProps<typeof FreshInkPage>,
+) {
+	return <FreshInkPage {...props} layout={FLASH_PARLOUR_CLIENT_PAGES} />;
 }

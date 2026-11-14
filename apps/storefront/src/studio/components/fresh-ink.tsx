@@ -135,11 +135,24 @@ export function FreshInkOpen({
 export function AllFreshInkLink({
 	view,
 	className = "text-link",
+	arrow = true,
 }: {
 	view: FreshInkView;
 	className?: string;
+	/**
+	 * Stencil & Ink's and Ink Noir's links end in an arrow; Irezumi's, Atelier's
+	 * and Flash Parlour's "All work" links are plain words, and so are these there.
+	 */
+	arrow?: boolean;
 }) {
 	if (view.nextCursor === null) return null;
+	if (!arrow) {
+		return (
+			<a className={className} href={freshInkHref({})}>
+				{studioCopy.freshInk.all}
+			</a>
+		);
+	}
 	return (
 		<a className={className} href={freshInkHref({})}>
 			<span>{studioCopy.freshInk.all}</span>

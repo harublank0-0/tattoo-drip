@@ -1,8 +1,15 @@
+import type { ComponentProps } from "react";
 import {
 	AllFreshInkLink,
 	FreshInkDialog,
 	FreshInkOpen,
 } from "../../components/fresh-ink.tsx";
+import {
+	type ClientPageHeadProps,
+	type ClientPageLayout,
+	FreshInkPage,
+	ReviewsPage,
+} from "../../components/pages.tsx";
 import {
 	AllReviewsLink,
 	RatingSummary,
@@ -45,7 +52,7 @@ export function AtelierFreshInk({ view }: { view: FreshInkView }) {
 						{studioCopy.freshInk.title}
 					</h2>
 					<p className="atl-fresh-intro">{studioCopy.freshInk.intro}</p>
-					<AllFreshInkLink view={view} className="atl-link" />
+					<AllFreshInkLink view={view} className="atl-link" arrow={false} />
 				</div>
 				<AtelierFreshInkPieces posts={posts} />
 			</div>
@@ -53,7 +60,7 @@ export function AtelierFreshInk({ view }: { view: FreshInkView }) {
 	);
 }
 
-function AtelierFreshInkPieces({
+export function AtelierFreshInkPieces({
 	posts,
 }: {
 	posts: readonly FreshInkPostView[];
@@ -126,10 +133,54 @@ export function AtelierReviews({
 				/>
 				{view.nextCursor !== null ? (
 					<p className="atl-reviews-all">
-						<AllReviewsLink view={view} className="atl-link" />
+						<AllReviewsLink view={view} className="atl-link" arrow={false} />
 					</p>
 				) : null}
 			</div>
 		</section>
 	);
+}
+
+/** Atelier's head of `/reviews` and `/fresh-ink`, as its gallery's: the kicker, the title, the line. */
+function AtelierClientHead({ id, label, title, line }: ClientPageHeadProps) {
+	return (
+		<header className="atl-page-head">
+			<div className="atl-container">
+				<p className="atl-kicker">{label}</p>
+				<h1 id={id} className="atl-page-title">
+					{title}
+				</h1>
+				<p className="atl-page-line">{line}</p>
+			</div>
+		</header>
+	);
+}
+
+/**
+ * Atelier's composition of `/reviews` and `/fresh-ink`: its own page head,
+ * the page's column, the reviews as its home section draws them (the
+ * section's classes on the body) and the posts in its own pieces, its plain
+ * links; no studio block, as its gallery has none.
+ */
+const ATELIER_CLIENT_PAGES: ClientPageLayout = {
+	mainClassName: "atl-main",
+	Head: AtelierClientHead,
+	bodyClassName: "atl-section atl-container atl-reviews atl-client-body",
+	listClassName: "client-review-list atl-review-list",
+	Posts: AtelierFreshInkPieces,
+	linkClassName: "atl-link",
+	moreClassName: "action action-secondary",
+	aside: false,
+};
+
+/** `/reviews` in Atelier's idiom. */
+export function AtelierReviewsPage(props: ComponentProps<typeof ReviewsPage>) {
+	return <ReviewsPage {...props} layout={ATELIER_CLIENT_PAGES} />;
+}
+
+/** `/fresh-ink` in Atelier's idiom. */
+export function AtelierFreshInkPage(
+	props: ComponentProps<typeof FreshInkPage>,
+) {
+	return <FreshInkPage {...props} layout={ATELIER_CLIENT_PAGES} />;
 }

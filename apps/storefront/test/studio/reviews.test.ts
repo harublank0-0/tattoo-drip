@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { clientPageCacheHeaders } from "../../src/studio/cache.ts";
 import { freshInkView } from "../../src/studio/fresh-ink.ts";
 import {
 	freshInkPageData,
@@ -184,7 +185,8 @@ describe("reviewsView: what the page keeps of the API's reviews", () => {
 			averageText: "4.7",
 			count: 12,
 			text: "4.7 from 12 reviews",
-			starsText: "Rated 4.7 out of 5",
+			fromText: "from 12 reviews",
+			stars: 4,
 		});
 		assert.equal(at({ average: 5, count: 3 })?.text, "5.0 from 3 reviews");
 	});
@@ -287,7 +289,19 @@ describe("the home page's Reviews and Fresh ink, in every theme", () => {
 			);
 			assert.match(html, /<h2 [^>]*id="reviews-title"/);
 			assert.match(html, /<span class="sr-only">5 out of 5<\/span>/);
-			assert.match(html, /4\.7 from 4 reviews/);
+			// "4.7 from 4 reviews" on the page, "4.7 out of 5 from 4 reviews" read aloud; the stars rounded down.
+			assert.match(
+				html,
+				/4\.7<span class="sr-only"> out of 5<\/span> from 4 reviews/,
+			);
+			assert.equal(
+				(
+					html
+						.match(/<p class="client-review-summary">.*?<\/p>/)?.[0]
+						.match(/data-on/g) ?? []
+				).length,
+				4,
+			);
 			assert.match(
 				html,
 				/Loved it &lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; more/,
@@ -397,7 +411,7 @@ describe("/reviews and /fresh-ink", () => {
 		);
 	});
 
-	test("the first page is the canonical; a later one is noindex; never review structured data", () => {
+	test("every page's canonical is the first, with no robots tag (as /gallery and /flash); never review structured data; a shorter cache", () => {
 		const first = reviewsPageData(STUDIO, [SITA], reviewsPage(3), {}, ORIGIN);
 		const later = reviewsPageData(
 			STUDIO,
@@ -415,9 +429,7 @@ describe("/reviews and /fresh-ink", () => {
 				(meta) => "name" in meta && meta.name === "robots",
 			);
 		assert.deepEqual(robots(first.seo), []);
-		assert.deepEqual(robots(later.seo), [
-			{ name: "robots", content: "noindex, follow" },
-		]);
+		assert.deepEqual(robots(later.seo), []);
 		const fresh = freshInkPageData(
 			STUDIO,
 			[SITA],
@@ -427,7 +439,17 @@ describe("/reviews and /fresh-ink", () => {
 			IMAGE_ORIGIN,
 		);
 		assert.equal(fresh?.seo.canonical, `${ORIGIN}/fresh-ink`);
-		assert.equal(fresh?.seo.noindex, true);
+		assert.ok(fresh && robots(fresh.seo).length === 0);
+		assert.deepEqual(clientPageCacheHeaders("success"), {
+			"Cache-Control":
+				"public, max-age=0, s-maxage=60, stale-while-revalidate=60",
+		});
+		assert.deepEqual(clientPageCacheHeaders("notFound"), {
+			"Cache-Control": "public, max-age=0, s-maxage=60",
+		});
+		assert.deepEqual(clientPageCacheHeaders("error"), {
+			"Cache-Control": "no-store",
+		});
 	});
 
 	for (const theme of THEME_KEYS) {
@@ -539,4 +561,120 @@ describe("freshInkView: what the page keeps of the API's Fresh ink", () => {
 			);
 		}
 	});
+});
+
+describe("the review fixes (slice 3 review)", () => {
+	test("a tile's title is the photo's description, else the client's caption on one line, else the names", () => {
+		const view = freshInkView(
+			{
+				data: [
+					apiPost(1, { alt: "Koi on the forearm" }),
+					apiPost(2, { caption: "Six weeks on,\nfully healed." }),
+					apiPost(3, { caption: null }),
+				],
+				nextCursor: null,
+			},
+			IMAGE_ORIGIN,
+		);
+		assert.deepEqual(
+			view.posts.map((post) => post.title),
+			[
+				"Koi on the forearm",
+				"Six weeks on, fully healed.",
+				"Fresh ink from Ram K., tattoo by Sita Rai",
+			],
+		);
+	});
+
+	test("Irezumi, Atelier and Flash Parlour's 'All' links are plain words; the others end in an arrow", () => {
+		for (const theme of THEME_KEYS) {
+			const html = home(
+				theme,
+				reviewsPage(7, { nextCursor: "n" }),
+				freshInkPage(7, "n"),
+			);
+			const links = [
+				...html.matchAll(
+					/<a [^>]*href="\/(?:reviews|fresh-ink)"[^>]*>(.*?)<\/a>/g,
+				),
+			].map((match) => match[1]);
+			assert.equal(links.length, 2, theme);
+			for (const inner of links) {
+				const plain = ["irezumi", "atelier", "flash-parlour"].includes(theme);
+				assert.equal(inner.includes("<svg"), !plain, `${theme}: ${inner}`);
+			}
+		}
+	});
+
+	const PAGE_IDIOMS: Record<
+		string,
+		{ head: RegExp; body: string; grid: string }
+	> = {
+		"stencil-and-ink": {
+			head: /<h1 id="reviews-page-title" class="section-title client-page-title">/,
+			body: "client-page-body",
+			grid: "work-grid fresh-ink-grid",
+		},
+		"ink-noir": {
+			head: /<header class="ink-dir-hero ink-client-hero">/,
+			body: "ink-reviews",
+			grid: "ink-fresh-grid",
+		},
+		irezumi: {
+			head: /<header class="irz-page-head">/,
+			body: "irz-reviews",
+			grid: "irz-pieces",
+		},
+		atelier: {
+			head: /<header class="atl-page-head">/,
+			body: "atl-reviews",
+			grid: "atl-pieces",
+		},
+		"flash-parlour": {
+			head: /<header class="fp-page-head">/,
+			body: "fp-reviews",
+			grid: "fp-pieces",
+		},
+	};
+
+	for (const theme of THEME_KEYS) {
+		test(`${theme}: /reviews and /fresh-ink are composed in the theme's own idiom`, () => {
+			const idiom = PAGE_IDIOMS[theme];
+			const studio = withStorefront({ ...DEFAULT_STOREFRONT, theme });
+			const reviews = reviewsPageData(
+				studio,
+				[SITA],
+				reviewsPage(3),
+				{},
+				ORIGIN,
+			);
+			assert.ok(reviews);
+			const html = renderToStaticMarkup(
+				createElement(ThemedReviewsPage, { data: reviews }),
+			);
+			assert.match(html, idiom.head);
+			assert.match(
+				html,
+				new RegExp(
+					`<section class="client-page reviews-page [^"]*\\b${idiom.body}\\b`,
+				),
+			);
+			const fresh = freshInkPageData(
+				studio,
+				[SITA],
+				freshInkPage(2),
+				{},
+				ORIGIN,
+				IMAGE_ORIGIN,
+			);
+			assert.ok(fresh);
+			const freshHtml = renderToStaticMarkup(
+				createElement(ThemedFreshInkPage, { data: fresh }),
+			);
+			assert.match(
+				freshHtml,
+				new RegExp(`<ul class="${idiom.grid}" role="list">`),
+			);
+		});
+	}
 });
