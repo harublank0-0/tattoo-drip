@@ -17,6 +17,7 @@
 
 import app from "@adonisjs/core/services/app";
 import SweepStuckVideosJob from "#modules/artists/jobs/sweep_stuck_videos_job";
+import SweepStuckDesignGenerationsJob from "#modules/design_lab/jobs/sweep_stuck_design_generations_job";
 import ReconcilePaymentsJob from "#modules/payments/jobs/reconcile_payments_job";
 import SweepExpiredQuotesJob from "#modules/projects/jobs/sweep_expired_quotes_job";
 import SweepStaleSubmittersJob from "#modules/reviews/jobs/sweep_stale_submitters_job";
@@ -35,6 +36,11 @@ if (app.getMode() === "run") {
 	await ReconcilePaymentsJob.schedule({})
 		.id(ReconcilePaymentsJob.scheduleId)
 		.cron(ReconcilePaymentsJob.cron)
+		.run();
+	// AI Design Lab: fails generations untouched for 30 minutes and releases their reservations.
+	await SweepStuckDesignGenerationsJob.schedule({})
+		.id(SweepStuckDesignGenerationsJob.scheduleId)
+		.cron(SweepStuckDesignGenerationsJob.cron)
 		.run();
 	// Reviews and Fresh ink: clears dispute records older than 90 days.
 	await SweepStaleSubmittersJob.schedule({})

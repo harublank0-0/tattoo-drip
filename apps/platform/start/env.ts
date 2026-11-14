@@ -13,6 +13,17 @@ import { Env } from "@adonisjs/core/env";
 import { checkAppOrigin } from "#services/app_origin";
 import { checkChallengeSecret } from "#services/challenge_secret";
 import {
+	checkBflApiUrl,
+	checkBflKey,
+	checkBflModel,
+	checkCreditsPerImage,
+	checkDesignLabProvider,
+	checkDesignLabSettings,
+	checkMaxVariations,
+	checkMonthlyLimit,
+	designLabProvider,
+} from "#services/design_lab_settings";
+import {
 	checkAdminEmails,
 	checkCredentialsKey,
 	checkPaybridgeKey,
@@ -130,6 +141,29 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	PAYMENT_CREDENTIALS_KEY: checkCredentialsKey,
 	// Accounts that may open /admin (billing, studio payment reviews).
 	PLATFORM_ADMIN_EMAILS: checkAdminEmails,
+
+	// AI Design Lab (docs/design-lab.md, #services/design_lab_settings): the
+	// image provider (off, preview or bfl), BFL's hosted FLUX API settings
+	// (server only: never in props, logs or responses) and each studio's
+	// monthly allowance.
+	DESIGN_LAB_PROVIDER: checkDesignLabProvider,
+	BFL_API_KEY: checkBflKey,
+	BFL_API_URL: checkBflApiUrl,
+	BFL_MODEL: checkBflModel,
+	DESIGN_LAB_MONTHLY_LIMIT: checkMonthlyLimit,
+	DESIGN_LAB_MAX_VARIATIONS: checkMaxVariations,
+	DESIGN_LAB_CREDITS_PER_IMAGE: checkCreditsPerImage,
+});
+
+checkDesignLabSettings({
+	provider: designLabProvider(
+		env.get("DESIGN_LAB_PROVIDER"),
+		env.get("NODE_ENV") === "production",
+	),
+	production: env.get("NODE_ENV") === "production",
+	apiKey: env.get("BFL_API_KEY") !== undefined,
+	model: env.get("BFL_MODEL") !== undefined,
+	apiUrl: env.get("BFL_API_URL"),
 });
 
 checkPaymentSettings({

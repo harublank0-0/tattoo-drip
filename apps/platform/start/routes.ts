@@ -734,6 +734,55 @@ router
 			.as("tenant.portfolio.bulk");
 
 		/**
+		 * AI Design Lab (docs/design-lab.md): every member's private concept
+		 * workspace. DesignLabService scopes each record (owners every design
+		 * project, an artist their own); every route is a 404 while
+		 * DESIGN_LAB_PROVIDER is off. Every Design Lab route goes in this group.
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", [controllers.DesignLab, "index"])
+					.as("tenant.design_lab.index");
+				router
+					.post("/", [controllers.DesignLab, "store"])
+					.as("tenant.design_lab.store");
+				router
+					.get(":id", [controllers.DesignLab, "show"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.show");
+				router
+					.put(":id", [controllers.DesignLab, "update"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.update");
+				router
+					.post(":id/generations", [controllers.DesignLab, "generate"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.generate");
+				router
+					.get(":id/status", [controllers.DesignLab, "status"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.status");
+				router
+					.post("generations/:id/retry", [controllers.DesignLab, "retry"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.retry");
+				router
+					.put("assets/:id", [controllers.DesignLab, "updateAsset"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.assets.update");
+				router
+					.post("assets/:id/select", [controllers.DesignLab, "selectAsset"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.assets.select");
+				router
+					.get("assets/:id/download", [controllers.DesignLab, "download"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.assets.download");
+			})
+			.prefix("/design-lab");
+
+		/**
 		 * Each member's own alerts (TAT-52): owners and artists; AlertService
 		 * scopes every read and write to the member. Every alerts route goes
 		 * in this group (a test checks).

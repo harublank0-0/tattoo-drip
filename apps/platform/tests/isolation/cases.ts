@@ -32,6 +32,7 @@ import Tenant from "#modules/tenancy/models/tenant";
 import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenantSlug from "#modules/tenancy/models/tenant_slug";
+import { designLabRows, generateForm } from "#tests/helpers/design_lab";
 import { testImages } from "#tests/helpers/images";
 import { billingRows, onlinePaymentRows } from "#tests/helpers/online_payments";
 import { paybridge } from "#tests/helpers/paybridge";
@@ -61,6 +62,9 @@ export type IsolationCase = {
 	 * Required for a pattern with an :id; the helper throws without it.
 	 */
 	resource?:
+		| "designProject"
+		| "designGeneration"
+		| "designAsset"
 		| "inventoryItem"
 		| "stockedInventoryItem"
 		| "lotInventoryItem"
@@ -152,6 +156,9 @@ const tenantRow = (target: Studio) =>
 	inTenant(target.tenant, async () =>
 		(await Tenant.findOrFail(target.tenant.id)).serialize(),
 	);
+
+// AI Design Lab's four tables of the targeted studio.
+const designLabState = (target: Studio) => designLabRows(target.tenant);
 
 const inventoryRows = (target: Studio) =>
 	inTenant(target.tenant, async () => ({
@@ -550,6 +557,90 @@ export const isolationCases: IsolationCase[] = [
 		actor: "owner",
 		ownStatus: 200,
 		snapshot: none,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/design-lab",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: designLabState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/design-lab",
+		actor: "owner",
+		body: () => ({ title: "Peony half sleeve" }),
+		ownStatus: 302,
+		snapshot: designLabState,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/design-lab/:id",
+		resource: "designProject",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: designLabState,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/design-lab/:id",
+		resource: "designProject",
+		actor: "owner",
+		body: () => ({ title: "Renamed design", notes: "Bolder lines" }),
+		ownStatus: 302,
+		snapshot: designLabState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/design-lab/:id/generations",
+		resource: "designProject",
+		actor: "owner",
+		body: () => generateForm(),
+		ownStatus: 302,
+		snapshot: designLabState,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/design-lab/:id/status",
+		resource: "designProject",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: designLabState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/design-lab/generations/:id/retry",
+		resource: "designGeneration",
+		actor: "owner",
+		body: () => ({ attempt: "1" }),
+		ownStatus: 302,
+		snapshot: designLabState,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/design-lab/assets/:id",
+		resource: "designAsset",
+		actor: "owner",
+		body: () => ({ title: "Koi, version two", notes: "Client liked the tail" }),
+		ownStatus: 302,
+		snapshot: designLabState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/design-lab/assets/:id/select",
+		resource: "designAsset",
+		actor: "owner",
+		body: () => ({ selected: "true" }),
+		ownStatus: 302,
+		snapshot: designLabState,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/design-lab/assets/:id/download",
+		resource: "designAsset",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: designLabState,
 	},
 	{
 		method: "GET",

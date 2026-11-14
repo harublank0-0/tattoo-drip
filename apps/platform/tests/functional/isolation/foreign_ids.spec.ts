@@ -24,7 +24,9 @@ test.group("Another studio's id is never in a page (TAT-16)", (group) => {
 			const response = await caseRequest(client, isolationCase, b, b, b.owner);
 
 			response.assertStatus(isolationCase.ownStatus);
-			const text = response.text();
+			// A binary answer (a Design Lab download) has no text: its headers,
+			// such as the attachment's filename, are what could name A.
+			const text = response.text() ?? JSON.stringify(response.headers());
 			assert.notInclude(text, a.tenant.id);
 			assert.notInclude(text, a.tenant.slug);
 		});

@@ -35,6 +35,19 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.transactions.export": OWNERS,
 	"tenant.transactions.sync": OWNERS,
 
+	// AI Design Lab (docs/design-lab.md): every member; DesignLabService
+	// gives an artist only the design projects they started.
+	"tenant.design_lab.index": MEMBERS,
+	"tenant.design_lab.store": MEMBERS,
+	"tenant.design_lab.show": MEMBERS,
+	"tenant.design_lab.update": MEMBERS,
+	"tenant.design_lab.generate": MEMBERS,
+	"tenant.design_lab.status": MEMBERS,
+	"tenant.design_lab.retry": MEMBERS,
+	"tenant.design_lab.assets.update": MEMBERS,
+	"tenant.design_lab.assets.select": MEMBERS,
+	"tenant.design_lab.assets.download": MEMBERS,
+
 	"tenant.inventory.index": MEMBERS,
 	"tenant.inventory.store": OWNERS,
 	"tenant.inventory.export": OWNERS,

@@ -67,6 +67,10 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	],
 	client_video_reservations: ["tenant_isolation:ALL"],
 	deposit_outcomes: ["tenant_isolation:ALL"],
+	design_assets: ["tenant_isolation:ALL"],
+	design_generations: ["tenant_isolation:ALL"],
+	design_projects: ["tenant_isolation:ALL"],
+	design_usage_records: ["tenant_isolation:ALL"],
 	flash_designs: ["tenant_isolation:ALL"],
 	gateway_accounts: ["tenant_isolation:ALL"],
 	gateway_checkouts: ["tenant_isolation:ALL"],
@@ -139,6 +143,11 @@ const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
 		args: "requested_key text",
 		reason:
 			"the id of the live studio whose payment connection has exactly this webhook path key, before its own secret checks the signature",
+	},
+	"public.stuck_design_generation_candidates": {
+		args: "",
+		reason:
+			"lists (tenant_id, generation_id) of Design Lab generations still queued or processing 30 minutes after their last change, for the stuck-generation sweep",
 	},
 	"public.client_post_tenant": {
 		args: "requested_id uuid",

@@ -12,6 +12,7 @@ export type NavKey =
 	| "clients"
 	| "artists"
 	| "inventory"
+	| "design_lab"
 	| "transactions"
 	| "portfolio"
 	| "reviews"
@@ -28,6 +29,7 @@ export type ShellNavItem = {
 		| "tenant.clients.index"
 		| "tenant.artists"
 		| "tenant.inventory.index"
+		| "tenant.design_lab.index"
 		| "tenant.transactions.index"
 		| "tenant.portfolio"
 		| "tenant.reviews.index"
@@ -63,13 +65,19 @@ const counted = (count: number | null, badgeLabel?: string) =>
  * Calendar, and for owners Reviews (while reviews are on), Clients, Artists, Portfolio,
  * Inventory, Transactions and Settings under More. An artist has Portfolio (their own work) as a fourth tab,
  * Reviews as a fifth while reviews are on, and Inventory under More when their owner grants
- * access. Nothing
+ * access. AI Design Lab is under More for every member while the server has it on
+ * (`tenant.designLab`). Nothing
  * is counted twice: the Inbox counts new requests, Today the projects that
  * need the member, and the bell (not an item) the alerts neither counts. The
  * server 404s the rest anyway.
  */
 export function navItems(
-	tenant: { slug: string; role: string; inventoryAccess?: boolean },
+	tenant: {
+		slug: string;
+		role: string;
+		inventoryAccess?: boolean;
+		designLab?: boolean;
+	},
 	counts: NavCounts,
 ): ShellNavItem[] {
 	const owner = tenant.role === "owner";
@@ -129,9 +137,19 @@ export function navItems(
 		route: "tenant.inventory.index",
 		place: "more",
 	};
+	// AI Design Lab: under More for every member, while the server has it on.
+	const designLab: ShellNavItem | null = tenant.designLab
+		? {
+				key: "design_lab",
+				label: "AI Design Lab",
+				route: "tenant.design_lab.index",
+				place: "more",
+			}
+		: null;
 	if (!owner) {
 		items.push(portfolio);
 		if (reviews) items.push(reviews);
+		if (designLab) items.push(designLab);
 		if (tenant.inventoryAccess) items.push(inventory);
 	}
 	if (owner) {
@@ -150,6 +168,7 @@ export function navItems(
 				place: "more",
 			},
 			portfolio,
+			...(designLab ? [designLab] : []),
 			inventory,
 			{
 				key: "transactions",

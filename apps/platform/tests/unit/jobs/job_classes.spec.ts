@@ -20,6 +20,10 @@ const ALLOWLIST = {
 		"Reviews and Fresh ink: reads only tenant ids from stale_submitter_tenants() and queues one ClearSubmittersJob (a TenantJob) per tenant; reads and writes no tenant table itself",
 	ReconcilePaymentsJob:
 		"reads only ids from gateway_checkouts_to_reconcile() and billing_tenants() and queues one TenantJob per row; reads and writes no tenant table itself",
+	RunDesignGenerationJob:
+		"AI Design Lab: one step of a generation waits on the image provider for up to 30 s a call, and a TenantJob holds one transaction for all of it; it opens none itself and reads and writes its row only in short withDbContext transactions scoped to the payload's tenantId (GenerationRunner.run)",
+	SweepStuckDesignGenerationsJob:
+		"AI Design Lab: reads only ids from stuck_design_generation_candidates() and queues one FailStuckDesignGenerationJob (a TenantJob) per row; reads and writes no tenant table itself",
 	SweepExpiredQuotesJob:
 		"reads only ids from expired_quote_candidates() and queues one ExpireQuoteJob (a TenantJob) per row; reads and writes no tenant table itself",
 };

@@ -3,6 +3,7 @@ import app from "@adonisjs/core/services/app";
 import type { NextFn } from "@adonisjs/core/types/http";
 import BaseInertiaMiddleware from "@adonisjs/inertia/inertia_middleware";
 import type User from "#models/user";
+import { designLabEnabled } from "#modules/design_lab/settings";
 import InquiryService from "#modules/inquiries/services/inquiry_service";
 import ImageService from "#modules/media/services/image_service";
 import { bellKinds } from "#modules/notifications/alerts";
@@ -161,6 +162,8 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 							...(membership.inventoryAccess
 								? { inventoryAccess: true as const }
 								: {}),
+							// AI Design Lab's nav item, only while it is on.
+							...(designLabEnabled() ? { designLab: true as const } : {}),
 							logoUrl,
 						}
 					: undefined,

@@ -19,7 +19,12 @@ type Counts = {
 };
 type NavModule = {
 	navItems(
-		tenant: { slug: string; role: string; inventoryAccess?: boolean },
+		tenant: {
+			slug: string;
+			role: string;
+			inventoryAccess?: boolean;
+			designLab?: boolean;
+		},
 		counts: Counts,
 	): Item[];
 	tabBarItems(items: Item[]): { tabs: Item[]; more: Item[] };
@@ -130,6 +135,23 @@ test.group("navItems", () => {
 		assert.deepEqual(
 			granted.more.map(({ key }) => key),
 			["inventory"],
+		);
+	});
+
+	test("AI Design Lab is under More for every member while the server has it on", ({
+		assert,
+	}) => {
+		const artistMore = tabBarItems(
+			navItems({ ...artist, designLab: true }, none),
+		).more.map(({ key }) => key);
+		assert.deepEqual(artistMore, ["design_lab"]);
+		const ownerMore = tabBarItems(
+			navItems({ slug: "ink", role: "owner", designLab: true }, none),
+		).more.map(({ key }) => key);
+		assert.include(ownerMore, "design_lab");
+		assert.notInclude(
+			navItems({ ...artist }, none).map(({ key }) => key),
+			"design_lab",
 		);
 	});
 

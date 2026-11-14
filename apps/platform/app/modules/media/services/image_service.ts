@@ -62,6 +62,10 @@ export const IMAGE_PURPOSES = {
 	// change of an approved post and a delete.
 	fresh_ink_photo: { visibility: "public", variants: VARIANT_WIDTHS },
 	fresh_ink_video: { visibility: "public", variants: VARIANT_WIDTHS },
+	// AI Design Lab (docs/design-lab.md): a generated concept, private to the
+	// studio, with a photo's copies; downloaded by its members through
+	// ImageService.read after the scoped load of its design asset.
+	design_concept: { visibility: "private", variants: VARIANT_WIDTHS },
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;
@@ -330,6 +334,25 @@ export default class ImageService {
 	): Promise<string> {
 		assertKeyOf(purpose, key, tenant);
 		return link(purpose, key);
+	}
+
+	/**
+	 * The stored image's own bytes and type, for a download served by the
+	 * app (AI Design Lab). The same access rule as `url()`: load the owning
+	 * record scoped to the tenant first; the key must be this tenant's for
+	 * this purpose.
+	 */
+	async read(
+		purpose: ImagePurpose,
+		key: string,
+		tenant: Pick<Tenant, "id">,
+	): Promise<{ bytes: Uint8Array; contentType: string }> {
+		assertKeyOf(purpose, key, tenant);
+		const bytes = await diskFor(purpose).getBytes(key);
+		return {
+			bytes,
+			contentType: key.endsWith(".png") ? "image/png" : "image/jpeg",
+		};
 	}
 
 	/**

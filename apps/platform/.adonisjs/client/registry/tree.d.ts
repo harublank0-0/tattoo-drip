@@ -268,6 +268,20 @@ export interface ApiDefinition {
     portfolio: typeof routes['tenant.portfolio'] & {
       bulk: typeof routes['tenant.portfolio.bulk']
     }
+    designLab: {
+      index: typeof routes['tenant.design_lab.index']
+      store: typeof routes['tenant.design_lab.store']
+      show: typeof routes['tenant.design_lab.show']
+      update: typeof routes['tenant.design_lab.update']
+      generate: typeof routes['tenant.design_lab.generate']
+      status: typeof routes['tenant.design_lab.status']
+      retry: typeof routes['tenant.design_lab.retry']
+      assets: {
+        update: typeof routes['tenant.design_lab.assets.update']
+        select: typeof routes['tenant.design_lab.assets.select']
+        download: typeof routes['tenant.design_lab.assets.download']
+      }
+    }
     alerts: {
       index: typeof routes['tenant.alerts.index']
       read: typeof routes['tenant.alerts.read']

@@ -1747,6 +1747,126 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/portfolio_controller').default['bulk']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.design_lab.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/design-lab'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['index']>>>
+    }
+  }
+  'tenant.design_lab.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/design-lab'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/design_lab/validators/design_lab').createDesignProjectValidator)>>
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/design_lab/validators/design_lab').createDesignProjectValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['store']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.design_lab.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/design-lab/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['show']>>>
+    }
+  }
+  'tenant.design_lab.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/design-lab/:id'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/design_lab/validators/design_lab').updateDesignProjectValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/design_lab/validators/design_lab').updateDesignProjectValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['update']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.design_lab.generate': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/design-lab/:id/generations'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/design_lab/validators/design_lab').generationValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/design_lab/validators/design_lab').generationValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['generate']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['generate']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.design_lab.status': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/design-lab/:id/status'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['status']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['status']>>>
+    }
+  }
+  'tenant.design_lab.retry': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/design-lab/generations/:id/retry'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/design_lab/validators/design_lab').retryGenerationValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/design_lab/validators/design_lab').retryGenerationValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['retry']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['retry']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.design_lab.assets.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/design-lab/assets/:id'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/design_lab/validators/design_lab').updateDesignAssetValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/design_lab/validators/design_lab').updateDesignAssetValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['updateAsset']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['updateAsset']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.design_lab.assets.select': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/design-lab/assets/:id/select'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/design_lab/validators/design_lab').selectDesignAssetValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/design_lab/validators/design_lab').selectDesignAssetValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['selectAsset']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['selectAsset']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.design_lab.assets.download': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/design-lab/assets/:id/download'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['download']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['download']>>>
+    }
+  }
   'tenant.alerts.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/alerts'
