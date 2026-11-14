@@ -55,8 +55,8 @@ import PublicReviewPageTransformer from "#transformers/public_review_page_transf
  * The client's review page (Reviews and Fresh ink, slice 1; the `Reviews`
  * operations of openapi.yaml): a review and a Fresh ink post through a
  * project's review link. The link's token arrives in the X-Review-Token
- * header (the reviewGuard middleware has checked the flag, its shape and the
- * rate limits); every link that doesn't work is the same 404, before
+ * header (the reviewGuard middleware has checked its shape and the rate
+ * limits); every link that doesn't work is the same 404, before
  * anything else is looked at, and an upload's body is read only after
  * that. Every answer is the page as it now is, never cached.
  */

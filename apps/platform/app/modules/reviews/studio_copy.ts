@@ -58,7 +58,6 @@ export const STUDIO_DONE = {
 
 /** Why "Ask for a review" can't make a link now. */
 export const LINK_RULE_MESSAGES: Record<ReviewLinkRuleReason, string> = {
-	disabled: "Reviews aren't available yet.",
 	not_done: "Ask for a review once the tattoo session is done.",
 };
 

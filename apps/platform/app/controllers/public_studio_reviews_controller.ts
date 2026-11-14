@@ -22,8 +22,7 @@ import PublicStudioReviewTransformer from "#transformers/public_studio_review_tr
  * Fresh ink, slice 3): a page of each, newest first, with the cursor of the
  * next page, and for reviews the studio's average and count from 3 reviews.
  * Only the query string is read; a refused parameter or cursor is the 422
- * validation_failed with that field. While REVIEWS_ENABLED is off both are
- * empty pages (PublicReviewService).
+ * validation_failed with that field.
  */
 @inject()
 export default class PublicStudioReviewsController {

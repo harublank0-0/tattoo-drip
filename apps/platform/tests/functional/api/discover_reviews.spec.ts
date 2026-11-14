@@ -8,7 +8,6 @@ import type TattooProject from "#modules/projects/models/tattoo_project";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient } from "#services/db_context";
-import env from "#start/env";
 import { assertApiError } from "#tests/helpers/api";
 import { reviewReady, seedReview, seedShownPost } from "#tests/helpers/reviews";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -20,7 +19,7 @@ import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
  * context (docs/discover/api.md, "Reviews and Fresh ink"). Every visibility
  * rule (the client's Discover consent, a takedown, a delete, the studio's
  * decision, publication, a reply taken down, unready videos, a hidden
- * artist, an unlisted or suspended studio and its return), the flag, the
+ * artist, an unlisted or suspended studio and its return), the
  * exact fields, paging, the 404s and 422s, and cross-tenant isolation.
  */
 
@@ -140,16 +139,6 @@ const discoverPost = (
 	inTenant(tenant, () =>
 		seedShownPost(tenant, of, { consentDiscover: true, ...over }),
 	);
-
-/** The flag off for `work`, back on after (as studio_page_reviews_http.spec.ts). */
-async function withReviewsOff<T>(work: () => Promise<T>): Promise<T> {
-	env.set("REVIEWS_ENABLED", false);
-	try {
-		return await work();
-	} finally {
-		env.set("REVIEWS_ENABLED", true);
-	}
-}
 
 test.group("Discover reviews (slice 4)", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
@@ -465,37 +454,6 @@ test.group("Discover reviews (slice 4)", (group) => {
 			404,
 			"not_found",
 		);
-	});
-
-	test("while reviews are switched off, every read is an empty page", async ({
-		client,
-		assert,
-	}) => {
-		const w = await world();
-		await discoverReview(w.needle.tenant, w.ready.project);
-		await discoverPost(w.needle.tenant, w.ready.project);
-		await withReviewsOff(async () => {
-			for (const url of [
-				"/api/v1/discover/studios/dr-black-needle/reviews",
-				`/api/v1/discover/studios/dr-black-needle/artists/${w.ready.artist.slug}/reviews`,
-			]) {
-				const response = await client.get(url);
-				response.assertStatus(200);
-				assert.deepEqual(response.body(), {
-					data: [],
-					nextCursor: null,
-					rating: null,
-				});
-			}
-			for (const url of [
-				"/api/v1/discover/fresh-ink",
-				"/api/v1/discover/studios/dr-black-needle/fresh-ink",
-			]) {
-				const response = await client.get(url);
-				response.assertStatus(200);
-				assert.deepEqual(response.body(), { data: [], nextCursor: null });
-			}
-		});
 	});
 
 	test("malformed cursors and limits are 422s; malformed slugs the router's 404", async ({

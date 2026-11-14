@@ -11,7 +11,6 @@ import {
 import AlertContentService from "#modules/notifications/services/alert_content_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import AlertService from "#modules/notifications/services/alert_service";
-import { reviewsEnabled } from "#modules/reviews/review_links";
 
 /**
  * Each member's own alerts (TAT-52), owners and artists. Every read and
@@ -65,7 +64,7 @@ export default class AlertsController {
 			membership.userId,
 			ctx.params.id,
 		);
-		const target = alertTarget(alert, membership.role, reviewsEnabled());
+		const target = alertTarget(alert, membership.role);
 		if (!target) {
 			return ctx.response
 				.redirect()
