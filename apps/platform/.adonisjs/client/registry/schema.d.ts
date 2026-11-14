@@ -731,10 +731,10 @@ export interface Registry {
     methods: ["PUT"]
     pattern: '/t/:tenant/settings/messages'
     types: {
-      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>|InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesWithoutReviewValidator)>>
       paramsTuple: [ParamValue]
       params: { tenant: ParamValue }
-      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>|InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesWithoutReviewValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
@@ -1271,10 +1271,10 @@ export interface Registry {
     methods: ["POST"]
     pattern: '/t/:tenant/inbox/:id/contacted'
     types: {
-      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/contact').inquiryContactValidator)>>
       paramsTuple: [ParamValue, ParamValue]
       params: { tenant: ParamValue; id: ParamValue }
-      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/contact').inquiryContactValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['contacted']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['contacted']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
@@ -1541,6 +1541,114 @@ export interface Registry {
       query: ExtractQuery<InferInput<(typeof import('#modules/payments/validators/payment').outcomeValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['outcome']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['outcome']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.projects.review_link.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/projects/:id/review-link'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/review_links_controller').default['store']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/review_links_controller').default['store']>>>
+    }
+  }
+  'tenant.projects.review_link.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/projects/:id/review-link'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/review_links_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/review_links_controller').default['destroy']>>>
+    }
+  }
+  'tenant.reviews.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/reviews'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['index']>>>
+    }
+  }
+  'tenant.reviews.posts.approve': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/reviews/posts/:id/approve'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['approve']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['approve']>>>
+    }
+  }
+  'tenant.reviews.posts.decline': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/reviews/posts/:id/decline'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['decline']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['decline']>>>
+    }
+  }
+  'tenant.reviews.posts.unpublish': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/reviews/posts/:id/unpublish'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['unpublish']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['unpublish']>>>
+    }
+  }
+  'tenant.reviews.reply.update': {
+    methods: ["PUT"]
+    pattern: '/t/:tenant/reviews/:id/reply'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/reviews/validators/studio').replyValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/reviews/validators/studio').replyValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['reply']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['reply']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.reviews.reply.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/reviews/:id/reply'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['deleteReply']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['deleteReply']>>>
+    }
+  }
+  'tenant.reviews.report.store': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/reviews/:id/report'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#modules/reviews/validators/studio').reportValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#modules/reviews/validators/studio').reportValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['report']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/reviews_controller').default['report']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'tenant.payments.verify': {

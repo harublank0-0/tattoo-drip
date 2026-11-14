@@ -20,10 +20,14 @@ import { useSidebarCollapsed } from "~/hooks/use-sidebar";
  * destinations comes from `navItems`; add new areas there.
  */
 export default function AppLayout({ children }: { children: ReactNode }) {
-	const { tenant, inboxCount, todayCount } = usePage().props;
+	const { tenant, inboxCount, todayCount, reviewsCount } = usePage().props;
 	const [collapsed, setCollapsed] = useSidebarCollapsed();
 	const items = tenant
-		? navItems(tenant, { inbox: inboxCount, today: todayCount })
+		? navItems(tenant, {
+				inbox: inboxCount,
+				today: todayCount,
+				reviews: reviewsCount,
+			})
 		: [];
 	const tabs = showTabBar(items);
 

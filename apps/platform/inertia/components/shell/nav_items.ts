@@ -14,6 +14,7 @@ export type NavKey =
 	| "inventory"
 	| "transactions"
 	| "portfolio"
+	| "reviews"
 	| "settings";
 
 export type ShellNavItem = {
@@ -29,6 +30,7 @@ export type ShellNavItem = {
 		| "tenant.inventory.index"
 		| "tenant.transactions.index"
 		| "tenant.portfolio"
+		| "tenant.reviews.index"
 		| "tenant.settings";
 	/** "bar": its own tab on the phone; "more": under More on the phone. The sidebar lists both. */
 	place: "bar" | "more";
@@ -40,8 +42,16 @@ export type ShellNavItem = {
 	also?: string[];
 };
 
-/** The shell's counts (TAT-107): new requests (owners) and the projects that need the member. */
-export type NavCounts = { inbox: number | null; today: number | null };
+/**
+ * The shell's counts (TAT-107): new requests (owners) and the projects that need the member; and
+ * the Fresh ink waiting for the member (Reviews and Fresh ink, slice 2), null while reviews are
+ * off, which also hides the Reviews item.
+ */
+export type NavCounts = {
+	inbox: number | null;
+	today: number | null;
+	reviews?: number | null;
+};
 
 const counted = (count: number | null, badgeLabel?: string) =>
 	count !== null && count > 0
@@ -50,9 +60,10 @@ const counted = (count: number | null, badgeLabel?: string) =>
 
 /**
  * What `tenant`'s member sees (TAT-107): Today, Inbox (owners), Projects and
- * Calendar, and for owners Clients, Artists, Portfolio, Inventory, Transactions and Settings under
- * More. An artist has Portfolio (their own work) as a fourth tab, and
- * Inventory under More when their owner grants access. Nothing
+ * Calendar, and for owners Reviews (while reviews are on), Clients, Artists, Portfolio,
+ * Inventory, Transactions and Settings under More. An artist has Portfolio (their own work) as a fourth tab,
+ * Reviews as a fifth while reviews are on, and Inventory under More when their owner grants
+ * access. Nothing
  * is counted twice: the Inbox counts new requests, Today the projects that
  * need the member, and the bell (not an item) the alerts neither counts. The
  * server 404s the rest anyway.
@@ -100,6 +111,18 @@ export function navItems(
 		route: "tenant.portfolio",
 		place: owner ? "more" : "bar",
 	};
+	// Reviews (slice 2): only while reviews are on. Under More for owners (their four tabs stay),
+	// a fifth tab for artists; its badge is the Fresh ink waiting for the member.
+	const reviews: ShellNavItem | null =
+		counts.reviews === null || counts.reviews === undefined
+			? null
+			: {
+					key: "reviews",
+					label: "Reviews",
+					route: "tenant.reviews.index",
+					place: owner ? "more" : "bar",
+					...counted(counts.reviews, "waiting"),
+				};
 	const inventory: ShellNavItem = {
 		key: "inventory",
 		label: "Inventory",
@@ -108,9 +131,11 @@ export function navItems(
 	};
 	if (!owner) {
 		items.push(portfolio);
+		if (reviews) items.push(reviews);
 		if (tenant.inventoryAccess) items.push(inventory);
 	}
 	if (owner) {
+		if (reviews) items.push(reviews);
 		items.push(
 			{
 				key: "clients",

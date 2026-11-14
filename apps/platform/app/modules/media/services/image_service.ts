@@ -55,6 +55,13 @@ export const IMAGE_PURPOSES = {
 	// takedown or a withdrawn consent (backend.md, Reviews and Fresh ink).
 	client_post_photo: { visibility: "private", variants: VARIANT_WIDTHS },
 	client_post_video: { visibility: "private", variants: VARIANT_WIDTHS },
+	// Slice 2: a published post's public copies, the same names under these
+	// folders on the public disk (copyTo, PostPublicationService). Made only
+	// for an approved post the client allowed a surface for; deleted on a
+	// decline, an unpublish, a takedown, a withdrawn consent, a client's
+	// change of an approved post and a delete.
+	fresh_ink_photo: { visibility: "public", variants: VARIANT_WIDTHS },
+	fresh_ink_video: { visibility: "public", variants: VARIANT_WIDTHS },
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;
@@ -101,6 +108,20 @@ export const STORED_CACHE_CONTROL = {
 
 const diskFor = (purpose: ImagePurpose) =>
 	drive.use(IMAGE_PURPOSES[purpose].visibility);
+
+/**
+ * The key a file stored under `from` has under `to`: the same tenant and
+ * name in `to`'s folder (`tenants/<id>/<to>/<name>`), so a published copy's
+ * key follows from its private original's and needs no column. Throws for a
+ * key that is not under `from`: a caller bug.
+ */
+export function keyUnder(key: string, from: string, to: string): string {
+	const match = /^tenants\/([0-9a-f-]{36})\/([a-z_]+)\/([^/]+)$/.exec(key);
+	if (!match || match[2] !== from || key.includes("..")) {
+		throw new Error(`A key under ${from} was expected`);
+	}
+	return `tenants/${match[1]}/${to}/${match[3]}`;
+}
 
 /**
  * Defence in depth for every URL: the key must be one this tenant stored for
@@ -367,6 +388,43 @@ export default class ImageService {
 			height,
 			variants: await this.variants(purpose, key, tenant),
 		};
+	}
+
+	/**
+	 * Copies a stored image and the copies its key names from `from`'s disk
+	 * to `to`'s, under the same names in `to`'s folder (`keyUnder`), and
+	 * returns the new key: a Fresh ink photo published (private to public).
+	 * The same access rule as `url()`. A failure removes what it wrote and
+	 * throws. Writing a file that is already there replaces it, so a retry
+	 * is safe.
+	 */
+	async copyTo(
+		from: ImagePurpose,
+		to: ImagePurpose,
+		key: string,
+		tenant: Pick<Tenant, "id">,
+	): Promise<string> {
+		assertKeyOf(from, key, tenant);
+		const files = [key, ...variantsOfKey(key).map((copy) => copy.key)];
+		const written: string[] = [];
+		try {
+			for (const file of files) {
+				const target = keyUnder(file, from, to);
+				written.push(target);
+				await diskFor(to).putStream(
+					target,
+					await diskFor(from).getStream(file),
+					{
+						contentType: file.endsWith(".png") ? "image/png" : "image/jpeg",
+						cacheControl: STORED_CACHE_CONTROL[IMAGE_PURPOSES[to].visibility],
+					},
+				);
+			}
+		} catch (error) {
+			await this.removeAll(to, written);
+			throw error;
+		}
+		return keyUnder(key, from, to);
 	}
 
 	/**

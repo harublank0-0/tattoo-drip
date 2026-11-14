@@ -1,5 +1,5 @@
 /**
- * The messages staff send clients with one tap (TAT-52): the six kinds,
+ * The messages staff send clients with one tap (TAT-52): the kinds,
  * their placeholders, the default texts and the one renderer, plus how a
  * contact was made. No imports, so any module can use it: projects and
  * payments render their messages with it, and the dashboard restates
@@ -7,7 +7,11 @@
  * (inertia/components/messages.ts; a unit test runs both on the same cases).
  */
 
-/** The six messages, in the order a project meets them. */
+/**
+ * The messages, in the order a project meets them: TAT-52's six, then the
+ * review request (Reviews and Fresh ink, slice 2), which the dashboard
+ * offers only while REVIEWS_ENABLED is on.
+ */
 export const MESSAGE_KINDS = [
 	"inquiry_received",
 	"quote",
@@ -15,6 +19,7 @@ export const MESSAGE_KINDS = [
 	"booking_confirmation",
 	"session_reminder",
 	"aftercare",
+	"review_request",
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
@@ -26,6 +31,7 @@ export const MESSAGE_LABELS: Record<MessageKind, string> = {
 	booking_confirmation: "Booking confirmation",
 	session_reminder: "Session reminder",
 	aftercare: "Aftercare",
+	review_request: "Review request",
 };
 
 /** Where the dashboard offers each message, as the settings page says it. */
@@ -37,6 +43,8 @@ export const MESSAGE_OFFERED: Record<MessageKind, string> = {
 	booking_confirmation: "Offered on a project with a session coming up.",
 	session_reminder: "Offered on a project with a session coming up.",
 	aftercare: "Offered once a tattoo or touch-up session is done.",
+	review_request:
+		"Offered with Ask for a review, once the tattoo work is done.",
 };
 
 /** Every placeholder a message can hold. */
@@ -52,6 +60,7 @@ export const PLACEHOLDERS = [
 	"deposit_link",
 	"session_time",
 	"studio_address",
+	"review_link",
 ] as const;
 export type Placeholder = (typeof PLACEHOLDERS)[number];
 
@@ -69,6 +78,7 @@ export const PLACEHOLDER_HELP: Record<Placeholder, string> = {
 	session_time: "the session's day and time",
 	studio_address:
 		"your address from the studio profile (empty if you have none)",
+	review_link: "the client's review page link",
 };
 
 /** The placeholders each message may use (spec ruling 16). */
@@ -97,6 +107,7 @@ export const KIND_PLACEHOLDERS: Record<MessageKind, readonly Placeholder[]> = {
 		"studio_address",
 	],
 	aftercare: ["client_name", "studio_name", "artist_name"],
+	review_request: ["client_name", "studio_name", "review_link"],
 };
 
 /**
@@ -118,6 +129,8 @@ export const DEFAULT_TEMPLATES: Record<MessageKind, string> = {
 		"Hi {client_name}, a reminder of your session at {studio_name} on {session_time} with {artist_name}. See you soon!",
 	aftercare:
 		"Hi {client_name}, thank you for your tattoo at {studio_name}! For the next two weeks: wash it gently with clean water and mild soap and pat it dry, put on a thin layer of aftercare cream, don't scratch or pick it, and keep it out of the sun, pools and the sea. Message us here if anything worries you. In about four weeks, send us a photo of the healed tattoo here.",
+	// The spec's words (Reviews and Fresh ink, ruling 3).
+	review_request: "How did it heal? Tell us and show it off: {review_link}",
 };
 
 /** A message's longest text, in characters (the column is varchar(1000)). */
@@ -213,6 +226,9 @@ export function templateProblem(
 	if (kind === "deposit_link" && !body.includes("{deposit_link}")) {
 		return "Keep {deposit_link}: it is the link the client pays on.";
 	}
+	if (kind === "review_request" && !body.includes("{review_link}")) {
+		return "Keep {review_link}: it is the link the client reviews on.";
+	}
 	return null;
 }
 
@@ -236,5 +252,6 @@ export function sampleValues(studio: {
 		deposit_link: "https://your-studio.example/deposit#example",
 		session_time: "Mon 2 Nov 2026, 15:45–17:45",
 		studio_address: studio.address ?? "",
+		review_link: "https://your-studio.example/review#example",
 	};
 }

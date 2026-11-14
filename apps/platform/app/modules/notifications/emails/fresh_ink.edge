@@ -1,0 +1,13 @@
+@email.layout({ title: 'Fresh ink to approve', preheader: "A client's Fresh ink post is waiting for your approval." })
+  <p style="margin: 0 0 16px;">Hi {{ recipientName || 'there' }},</p>
+  <p style="margin: 0 0 16px;">{{ intro }}</p>
+  @if(edited)
+    <p style="margin: 0 0 16px;">It is off your page until you approve it again.</p>
+  @else
+    <p style="margin: 0 0 16px;">Approve it to show it where the client allowed, or decline it.</p>
+  @end
+  @!email.button({ href: url, text: 'Open Reviews' })
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    You get these emails as a member of {{ studioName }} on Tattoo Drip.
+  </p>
+@end

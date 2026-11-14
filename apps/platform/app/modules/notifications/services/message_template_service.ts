@@ -16,7 +16,7 @@ type TenantRef = Pick<Tenant, "id">;
  * a default reaches every studio that never edited it.
  */
 export default class MessageTemplateService {
-	/** The studio's six texts: its own where it wrote one, else the default. One query. */
+	/** The studio's texts: its own where it wrote one, else the default. One query. */
 	async textsFor(tenant: TenantRef): Promise<Record<MessageKind, string>> {
 		const rows = await MessageTemplate.query().where("tenant_id", tenant.id);
 		const own = new Map(rows.map((row) => [row.kind, row.body]));
@@ -29,17 +29,20 @@ export default class MessageTemplateService {
 	}
 
 	/**
-	 * Saves the six texts (messageTemplatesValidator checked them), each
+	 * Saves the texts given (messageTemplatesValidator checked them), each
 	 * normalized: one equal to the default removes the studio's row, any
-	 * other is stored in place. One transaction.
+	 * other is stored in place; a kind left out keeps its row (the review
+	 * request while reviews are off). One transaction.
 	 */
 	async save(
 		tenant: TenantRef,
-		texts: Record<MessageKind, string>,
+		texts: Partial<Record<MessageKind, string>>,
 	): Promise<void> {
 		await withTransaction(async (trx) => {
 			for (const kind of MESSAGE_KINDS) {
-				const body = normalizeTemplate(texts[kind]);
+				const text = texts[kind];
+				if (text === undefined) continue;
+				const body = normalizeTemplate(text);
 				if (body === DEFAULT_TEMPLATES[kind]) {
 					await MessageTemplate.query({ client: trx })
 						.where("tenant_id", tenant.id)

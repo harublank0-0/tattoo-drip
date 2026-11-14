@@ -21,6 +21,12 @@ export function useContactRecording(
 	recordId: string,
 	url: string,
 	server: { contactedText: string; lastChannel: ContactChannelName | null },
+	/**
+	 * More props a contact can change, by what was tapped (the project page's `review`: only a
+	 * review request moves its link's "sent on", so only that tap asks for it, and a late answer
+	 * to another tap can't put an older link back).
+	 */
+	also: (via: ContactVia) => string[] = () => [],
 ) {
 	const [mark, setMark] = useState<ContactMark | null>(null);
 	const latest = useRef(0);
@@ -37,7 +43,7 @@ export function useContactRecording(
 			// contact line and the leading channel, which both pages read) plus the always-shared
 			// props, so it cannot put any other prop back to an older value.
 			async: true,
-			only: ["contactedText", "lastChannel"],
+			only: ["contactedText", "lastChannel", ...also(via)],
 			// Only the latest tap clears the mark: an earlier tap's answer must not drop it.
 			onFinish: () => {
 				if (latest.current === mine) setMark(null);

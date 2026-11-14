@@ -9,7 +9,8 @@ export type MessageKindName =
 	| "deposit_link"
 	| "booking_confirmation"
 	| "session_reminder"
-	| "aftercare";
+	| "aftercare"
+	| "review_request";
 
 export type ContactChannelName = "whatsapp" | "viber" | "call" | "copy";
 
@@ -51,6 +52,7 @@ export const MESSAGE_LABELS: Record<MessageKindName, string> = {
 	booking_confirmation: "Booking confirmation",
 	session_reminder: "Session reminder",
 	aftercare: "Aftercare",
+	review_request: "Review request",
 };
 
 /**

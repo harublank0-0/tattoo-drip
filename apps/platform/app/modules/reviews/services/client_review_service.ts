@@ -137,7 +137,11 @@ export default class ClientReviewService {
 		if (review) await scrub(review, trx);
 	}
 
-	/** Every review of the client, live or deleted, scrubbed (the privacy deletion, finding 8). */
+	/**
+	 * Every review of the client, live or deleted, scrubbed (the privacy
+	 * deletion, finding 8), the studio's report note with it (the report's
+	 * reason and dates stay).
+	 */
 	async eraseForClient(
 		trx: TransactionClientContract,
 		tenant: TenantRef,
@@ -150,6 +154,8 @@ export default class ClientReviewService {
 		for (const review of reviews) {
 			review.submitterDigest = null;
 			review.submitterRecordedAt = null;
+			// The studio's note may quote the client (slice 2); the reason stays.
+			review.reportNote = null;
 			await scrub(review, trx);
 		}
 	}

@@ -76,6 +76,56 @@ export const TAKEDOWN_SENTENCES: Record<TakedownReason, string> = {
 	other: "TattooDrip took this down. Contact us if you think it was a mistake.",
 };
 
+/** The studio's public reply to a review (ruling 6). */
+export const MAX_REPLY_LENGTH = 1000;
+/** The studio's note with a report to TattooDrip. */
+export const MAX_REPORT_NOTE_LENGTH = 500;
+/** An operator's takedown note (stored for operators only). */
+export const MAX_TAKEDOWN_NOTE_LENGTH = 500;
+
+/** What the dashboard calls each report reason. */
+export const REPORT_LABELS: Record<ReportReason, string> = {
+	hate: "Hate",
+	threats: "Threats",
+	personal_data: "Personal data",
+	off_topic: "Off-topic",
+	not_a_client: "Not a client",
+};
+
+/** The Reviews page's post filters: waiting, approved, and declined (declined or unpublished). */
+export const POST_FILTERS = ["waiting", "approved", "declined"] as const;
+export type PostFilter = (typeof POST_FILTERS)[number];
+/** The Reviews page's review filters. */
+export const REVIEW_FILTERS = ["all", "reported"] as const;
+export type ReviewFilter = (typeof REVIEW_FILTERS)[number];
+
+/** What TattooDrip can take down (ruling 12): a review, the studio's reply to it, or a post. */
+export const TAKEDOWN_KINDS = ["review", "reply", "post"] as const;
+export type TakedownKind = (typeof TAKEDOWN_KINDS)[number];
+
+/**
+ * Whether a post may have public copies of its photos and videos now (the
+ * publish rule): the studio approved it (ruling 7), the client allowed at
+ * least one surface (ruling 8), TattooDrip has not taken it down (ruling
+ * 12) and it is not deleted. The database checks the same
+ * (`client_posts_published`). Slice 3's public reads add the surface's own
+ * consent; Discover's views add the studio's listing (ruling 11).
+ */
+export function postPublishable(post: {
+	status: PostStatus;
+	consentStudioPage: boolean;
+	consentDiscover: boolean;
+	takenDownAt: unknown;
+	deletedAt: unknown;
+}): boolean {
+	return (
+		post.status === "approved" &&
+		(post.consentStudioPage || post.consentDiscover) &&
+		!post.takenDownAt &&
+		!post.deletedAt
+	);
+}
+
 /** Characters as PostgreSQL's char_length counts them: code points, not UTF-16 units. */
 export function charLength(text: string): number {
 	let count = 0;

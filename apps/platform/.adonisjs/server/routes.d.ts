@@ -132,6 +132,15 @@ export type ScannedRoutes = {
     'tenant.projects.payments.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.refunds.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.deposit_outcome.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.projects.review_link.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.projects.review_link.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.reviews.posts.approve': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.posts.decline': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.posts.unpublish': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.reply.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.reply.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.report.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.payments.verify': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.payments.reject': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.payments.reverse': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -242,6 +251,7 @@ export type ScannedRoutes = {
     'tenant.projects.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -322,6 +332,7 @@ export type ScannedRoutes = {
     'tenant.projects.create': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.projects.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -401,6 +412,11 @@ export type ScannedRoutes = {
     'tenant.projects.payments.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.refunds.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.deposit_outcome.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.projects.review_link.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.posts.approve': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.posts.decline': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.posts.unpublish': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.report.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.payments.verify': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.payments.reject': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.payments.reverse': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -455,6 +471,7 @@ export type ScannedRoutes = {
     'tenant.clients.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.notes.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.artist.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.reply.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'account.password.update': { paramsTuple?: []; params?: {} }
     'api.v1.review.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.post.order': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
@@ -473,6 +490,8 @@ export type ScannedRoutes = {
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.flash.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.projects.review_link.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.reviews.reply.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'api.v1.review.review.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.post.destroy': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.media.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'media': ParamValue} }

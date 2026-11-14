@@ -158,6 +158,8 @@ test.group(
 							status: "declined",
 							decided_at: new Date(),
 							submitted_at: new Date(),
+							waiting_round: 1,
+							waiting_since: new Date(),
 						}),
 				);
 			await decline();
@@ -558,9 +560,26 @@ test.group(
 			(await put(client, a)).assertStatus(200);
 			(await photo(client, a)).assertStatus(201);
 			(await put(client, b)).assertStatus(200);
+			// The studio reported one of the client's reviews with a note (slice 2).
+			await inTenant(a.tenant, () =>
+				ClientReview.query().where("id", a.clientReview.id).update({
+					reported_at: new Date(),
+					report_reason: "personal_data",
+					report_note: "It names the client's sister.",
+				}),
+			);
 			await inTenant(a.tenant, () =>
 				reviewServices().pages.forgetClient(a.tenant, a.pipeline.client.id),
 			);
+			const reported = await inTenant(a.tenant, () =>
+				ClientReview.withTrashed().where("id", a.clientReview.id).firstOrFail(),
+			);
+			assert.isNull(
+				reported.reportNote,
+				"the studio's note may quote the client",
+			);
+			assert.equal(reported.reportReason, "personal_data");
+			assert.isNotNull(reported.reportedAt);
 
 			const reviews = await inTenant(a.tenant, () =>
 				ClientReview.withTrashed().where("client_id", a.pipeline.client.id),
@@ -720,6 +739,8 @@ test.group("Review fixes: the order-only write (finding 13)", (group) => {
 				status: "approved",
 				decided_at: new Date(),
 				submitted_at: new Date(),
+				waiting_round: 1,
+				waiting_since: new Date(),
 			}),
 		);
 		const back = await reviewRequest(

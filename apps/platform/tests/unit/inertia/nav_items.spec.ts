@@ -12,7 +12,11 @@ type Item = {
 	badgeLabel?: string;
 	also?: string[];
 };
-type Counts = { inbox: number | null; today: number | null };
+type Counts = {
+	inbox: number | null;
+	today: number | null;
+	reviews?: number | null;
+};
 type NavModule = {
 	navItems(
 		tenant: { slug: string; role: string; inventoryAccess?: boolean },
@@ -34,6 +38,53 @@ const artist = { slug: "bnt", role: "artist" };
 const none: Counts = { inbox: null, today: null };
 
 test.group("navItems", () => {
+	test("Reviews (Reviews and Fresh ink, slice 2): only while reviews are on, under More for owners and a fifth tab for artists, counting the Fresh ink waiting", ({
+		assert,
+	}) => {
+		assert.notInclude(
+			navItems(owner, none).map(({ key }) => key),
+			"reviews",
+		);
+		const owned = navItems(owner, { ...none, reviews: 2 });
+		assert.deepInclude(owned, {
+			key: "reviews",
+			label: "Reviews",
+			route: "tenant.reviews.index",
+			place: "more",
+			badge: 2,
+			badgeLabel: "waiting",
+		});
+		assert.deepEqual(
+			owned.filter(({ place }) => place === "more").map(({ key }) => key),
+			[
+				"reviews",
+				"clients",
+				"artists",
+				"portfolio",
+				"inventory",
+				"transactions",
+				"settings",
+			],
+		);
+		const artists = navItems(artist, { ...none, reviews: 0 });
+		assert.deepEqual(
+			artists.map(({ key, place }) => [key, place]),
+			[
+				["today", "bar"],
+				["projects", "bar"],
+				["calendar", "bar"],
+				["portfolio", "bar"],
+				["reviews", "bar"],
+			],
+		);
+		assert.notProperty(
+			artists.find(({ key }) => key === "reviews"),
+			"badge",
+			"no badge for zero",
+		);
+		assert.deepEqual(rolesFor("tenant.reviews.index"), ["owner", "artist"]);
+	});
+
 	test("owners get Today, Inbox, Projects and Calendar, with Clients, Artists, Portfolio, Inventory, Transactions and Settings under More; artists get Today, Projects, Calendar and Portfolio", ({
 		assert,
 	}) => {

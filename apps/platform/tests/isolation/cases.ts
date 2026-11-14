@@ -35,6 +35,7 @@ import TenantSlug from "#modules/tenancy/models/tenant_slug";
 import { testImages } from "#tests/helpers/images";
 import { billingRows, onlinePaymentRows } from "#tests/helpers/online_payments";
 import { paybridge } from "#tests/helpers/paybridge";
+import { reviewRows } from "#tests/helpers/reviews";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 import { stagedFiles } from "#tests/helpers/videos";
 
@@ -89,7 +90,11 @@ export type IsolationCase = {
 		| "invitation"
 		| "artistMembership"
 		| "billingInvoice"
-		| "gatewayCheckout";
+		| "gatewayCheckout"
+		| "reviewProject"
+		| "clientReview"
+		| "waitingPost"
+		| "approvedPost";
 	/** Who sends the request. Every settings route is owner-only. */
 	actor: "owner" | "artist";
 	/** A valid body for writes, built for the studio sending it (it may prepare state first, such as a staged upload). */
@@ -140,6 +145,8 @@ const moneyState = async (target: Studio) => ({
 		(await Payment.query().orderBy("id")).map((row) => row.serialize()),
 	),
 });
+// The review tables of the targeted studio (Reviews and Fresh ink).
+const reviewSnapshot = (target: Studio) => reviewRows(target.tenant);
 
 const tenantRow = (target: Studio) =>
 	inTenant(target.tenant, async () =>
@@ -1214,6 +1221,83 @@ export const isolationCases: IsolationCase[] = [
 		ownStatus: 302,
 		// A new link replaces the nonce, hash and expiry: A's snapshot changes.
 		snapshot: depositLinkRows,
+	},
+	// "Ask for a review" (Reviews and Fresh ink, slice 2): the finish
+	// project's tattoo work is done and it has no link yet, so A's gets one;
+	// the review project's link is revoked.
+	{
+		method: "POST",
+		pattern: "/t/:tenant/projects/:id/review-link",
+		resource: "finishProject",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: reviewSnapshot,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/projects/:id/review-link",
+		resource: "reviewProject",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: reviewSnapshot,
+	},
+	// The Reviews page (slice 2).
+	{
+		method: "GET",
+		pattern: "/t/:tenant/reviews",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: none,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/reviews/posts/:id/approve",
+		resource: "waitingPost",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: reviewSnapshot,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/reviews/posts/:id/decline",
+		resource: "waitingPost",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: reviewSnapshot,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/reviews/posts/:id/unpublish",
+		resource: "approvedPost",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: reviewSnapshot,
+	},
+	{
+		method: "PUT",
+		pattern: "/t/:tenant/reviews/:id/reply",
+		resource: "clientReview",
+		actor: "owner",
+		body: () => ({ reply: "Thank you, see you for the next one!" }),
+		ownStatus: 302,
+		snapshot: reviewSnapshot,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/reviews/:id/reply",
+		resource: "clientReview",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: reviewSnapshot,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/reviews/:id/report",
+		resource: "clientReview",
+		actor: "owner",
+		body: () => ({ reason: "off_topic", note: "About another studio." }),
+		ownStatus: 302,
+		snapshot: reviewSnapshot,
 	},
 	{
 		method: "GET",

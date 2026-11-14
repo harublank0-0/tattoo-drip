@@ -7,6 +7,7 @@ import type {
 	MessageKindName,
 } from "~/components/messages";
 import type { PaymentsCardProps } from "~/components/payments";
+import type { ReviewPanelProps } from "~/components/reviews";
 
 /**
  * One quote version as the project page gets it. The amounts in the form's
@@ -215,6 +216,11 @@ export type ProjectPageProps = {
 	} | null;
 	/** The Payments card (TAT-66): owners get the screenshots and the forms, the assigned artist the list. */
 	payments: PaymentsCardProps;
+	/**
+	 * "Ask for a review" (Reviews and Fresh ink, slice 2): once the tattoo work is done, for
+	 * owners and the project's artist; null otherwise and while reviews are off.
+	 */
+	review: ReviewPanelProps | null;
 };
 
 /**

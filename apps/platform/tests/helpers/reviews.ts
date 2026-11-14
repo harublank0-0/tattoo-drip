@@ -24,6 +24,7 @@ import ReviewLink from "#modules/reviews/models/review_link";
 import { REVIEW_TOKEN_HEADER } from "#modules/reviews/review_links";
 import type { PostStatus } from "#modules/reviews/rules";
 import ClientPostService from "#modules/reviews/services/client_post_service";
+import PostPublicationService from "#modules/reviews/services/post_publication_service";
 import ReviewLinkService from "#modules/reviews/services/review_link_service";
 import ReviewPageService from "#modules/reviews/services/review_page_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -50,21 +51,36 @@ export function reviewServices(images: ImageService = new ImageService()) {
 	const base = depositServices(images);
 	const videos = new VideoService(images);
 	const links = new ReviewLinkService(base.projects, base.sessions);
-	const posts = new ClientPostService(images, videos, base.projects);
+	const publication = new PostPublicationService(images, videos);
+	const posts = new ClientPostService(
+		images,
+		videos,
+		base.projects,
+		publication,
+	);
 	const inquiries = new InquiryService(base.artists, base.projects);
-	const publication = new PublicationService(images, base.artists);
+	const discover = new PublicationService(images, base.artists);
 	const pages = new ReviewPageService(
 		links,
 		base.projects,
 		base.sessions,
 		base.artists,
 		inquiries,
-		publication,
+		discover,
 		posts,
 		images,
 		videos,
 	);
-	return { ...base, videos, links, posts, inquiries, publication, pages };
+	return {
+		...base,
+		videos,
+		links,
+		posts,
+		inquiries,
+		publication: discover,
+		postPublication: publication,
+		pages,
+	};
 }
 
 /**
@@ -168,6 +184,8 @@ export async function seedPost(
 		placement: null,
 		status: over.status ?? "waiting",
 		submittedAt: over.submitted ? DateTime.now() : null,
+		waitingRound: over.submitted ? 1 : 0,
+		waitingSince: over.submitted ? DateTime.now() : null,
 		decidedAt: over.status && over.status !== "waiting" ? DateTime.now() : null,
 		decidedBy: null,
 		shownName: "Sita R.",
@@ -185,6 +203,27 @@ export async function seedPost(
 		alt: null,
 	});
 	return { post, photo };
+}
+
+/** A live review of `project` (five stars, the studio page allowed). Call it in the tenant's context. */
+export async function seedReview(
+	tenant: TenantRef,
+	project: Pick<TattooProject, "id" | "clientId" | "artistId">,
+	over: Partial<{ rating: number; body: string; reply: string }> = {},
+) {
+	return ClientReview.create({
+		tenantId: tenant.id,
+		projectId: project.id,
+		clientId: project.clientId,
+		artistId: project.artistId as string,
+		rating: over.rating ?? 5,
+		body: over.body ?? "Healed beautifully, the lines are crisp and even.",
+		shownName: "Sita R.",
+		consentStudioPage: true,
+		consentDiscover: false,
+		reply: over.reply ?? null,
+		repliedAt: over.reply ? DateTime.now() : null,
+	});
 }
 
 /**

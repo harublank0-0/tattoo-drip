@@ -18,7 +18,11 @@ import InquiryService from "#modules/inquiries/services/inquiry_service";
 import ImageService from "#modules/media/services/image_service";
 import { ALERT_EXCERPT_LENGTH, excerpt } from "#modules/notifications/alerts";
 import { chatMessage, contactLinks } from "#modules/notifications/chat";
-import { MESSAGE_LABELS, renderMessage } from "#modules/notifications/messages";
+import {
+	firstName,
+	MESSAGE_LABELS,
+	renderMessage,
+} from "#modules/notifications/messages";
 import {
 	cardKinds,
 	cardValues,
@@ -94,6 +98,10 @@ import ProjectService, {
 import QuoteService from "#modules/projects/services/quote_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WaitingService from "#modules/projects/services/waiting_service";
+import { reviewsEnabled } from "#modules/reviews/review_links";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ReviewLinkService from "#modules/reviews/services/review_link_service";
+import { dayText, lastDayText } from "#modules/reviews/studio_copy";
 import type ProjectSession from "#modules/scheduling/models/project_session";
 import {
 	mayChangeSession,
@@ -139,6 +147,7 @@ export default class ProjectsController {
 		private templates: MessageTemplateService,
 		private waiting: WaitingService,
 		private flash: FlashService,
+		private reviewLinks: ReviewLinkService,
 	) {}
 
 	/**
@@ -520,6 +529,14 @@ export default class ProjectsController {
 						hint: schedulingHint(project.status, depositDue, current !== null),
 					}
 				: null;
+		// "Ask for a review" (Reviews and Fresh ink, slice 2): owners and the
+		// project's artist (the page is theirs: findFor above), once the tattoo
+		// work is done (ruling 3, the link service's own rule); nothing while
+		// REVIEWS_ENABLED is off.
+		const reviewProps =
+			reviewsEnabled() && (await this.reviewLinks.tattooDone(tenant, project))
+				? await this.reviewPanel(tenant, project, client, texts.review_request)
+				: null;
 		// Owners only, while the project waits for its deposit (TAT-65).
 		const depositProps =
 			membership.role === "owner" && project.status === "deposit_pending"
@@ -661,7 +678,54 @@ export default class ProjectsController {
 			clientId: membership.role === "owner" ? project.clientId : null,
 			deposit: depositProps,
 			payments: paymentsProps,
+			review: reviewProps,
 		});
+	}
+
+	/**
+	 * "Ask for a review" (slice 2): the project's live review link, rebuilt
+	 * from its nonce (made on, works until, sent on), or the last one's end;
+	 * the review request in the studio's own words, with the chat links when
+	 * the client has a phone; and whether links point at this machine.
+	 */
+	private async reviewPanel(
+		tenant: Tenant,
+		project: TattooProject,
+		client: Pick<Client, "name" | "phone"> | null,
+		template: string,
+	) {
+		const { live, latest } = await this.reviewLinks.stateFor(tenant, project);
+		const { timezone } = tenant;
+		const text = live
+			? renderMessage("review_request", template, {
+					client_name: firstName(client?.name ?? ""),
+					studio_name: tenant.name,
+					review_link: live.url,
+				})
+			: null;
+		let lastText: string | null = null;
+		if (!live && latest) {
+			lastText = latest.revokedAt
+				? `The last link was revoked on ${dayText(latest.revokedAt, timezone)}.`
+				: `The last link stopped working on ${dayText(latest.expiresAt, timezone)}.`;
+		}
+		return {
+			link: live
+				? {
+						url: live.url,
+						madeText: dayText(live.link.createdAt, timezone),
+						expiresText: lastDayText(live.link.expiresAt, timezone),
+						sentText: live.link.sentAt
+							? dayText(live.link.sentAt, timezone)
+							: null,
+					}
+				: null,
+			lastText,
+			text,
+			message: text && client?.phone ? chatMessage(text, client.phone) : null,
+			// Links that open on this machine reach no client: the card warns.
+			devHost: pointsAtThisMachine(storefrontTemplate()),
+		};
 	}
 
 	/**

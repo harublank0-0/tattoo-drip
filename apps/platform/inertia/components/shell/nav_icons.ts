@@ -10,6 +10,7 @@ import {
 	Package,
 	Receipt,
 	Settings,
+	Star,
 	Users,
 } from "lucide-react";
 import type { NavKey } from "~/components/shell/nav_items";
@@ -23,6 +24,7 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
 	clients: Contact,
 	artists: Users,
 	portfolio: Images,
+	reviews: Star,
 	inventory: Package,
 	transactions: Receipt,
 	settings: Settings,

@@ -14,6 +14,7 @@ import drive from "@adonisjs/drive/services/main";
 import { VideoDeleteError } from "#modules/media/errors";
 import ImageService, {
 	IMAGE_PURPOSES,
+	keyUnder,
 	PRIVATE_CACHE_CONTROL,
 	type ShownImage,
 	STORED_CACHE_CONTROL,
@@ -51,7 +52,11 @@ export const VIDEO_PURPOSE = "work_video";
  * and uses that purpose's disk (IMAGE_PURPOSES); the staging prefix is
  * shared, so the one lifecycle rule expires both.
  */
-export const VIDEO_PURPOSES = ["work_video", "client_post_video"] as const;
+export const VIDEO_PURPOSES = [
+	"work_video",
+	"client_post_video",
+	"fresh_ink_video",
+] as const;
 export type VideoPurpose = (typeof VIDEO_PURPOSES)[number];
 /** The private folder the browser uploads into, per tenant (never served). */
 const STAGING = "work_video_upload";
@@ -415,6 +420,42 @@ export default class VideoService {
 			}
 		}
 		if (failed.length > 0) throw new VideoDeleteError(failed);
+	}
+
+	/**
+	 * Copies a ready video's renditions and its poster (with the poster's
+	 * copies) from `from`'s disk to `to`'s, under the same names in `to`'s
+	 * folder (`keyUnder`): a Fresh ink video published. Returns the new keys.
+	 * A failure removes what it wrote and throws.
+	 */
+	async copyTo(
+		tenant: TenantRef,
+		posterKey: string,
+		keys: readonly string[],
+		from: VideoPurpose,
+		to: VideoPurpose,
+	): Promise<{ posterKey: string; keys: string[] }> {
+		const written: string[] = [];
+		let poster: string | null = null;
+		try {
+			for (const key of keys) {
+				assertVideoKeyOf(tenant, key, from);
+				const target = keyUnder(key, from, to);
+				written.push(target);
+				await diskOf(to).putStream(target, await diskOf(from).getStream(key), {
+					contentType: "video/mp4",
+					cacheControl: STORED_CACHE_CONTROL[visibilityOf(to)],
+				});
+			}
+			poster = await this.images.copyTo(from, to, posterKey, tenant);
+		} catch (error) {
+			await this.removeFiles(poster, written, to);
+			throw error;
+		}
+		return {
+			posterKey: poster,
+			keys: keys.map((key) => keyUnder(key, from, to)),
+		};
 	}
 
 	/** A ready video's poster as the public API shows it (`Image`). */

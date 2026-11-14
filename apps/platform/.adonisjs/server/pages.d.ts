@@ -41,6 +41,7 @@ declare module '@adonisjs/inertia/types' {
     'projects/index': ExtractProps<(typeof import('../../inertia/pages/projects/index.tsx'))['default']>
     'projects/new': ExtractProps<(typeof import('../../inertia/pages/projects/new.tsx'))['default']>
     'projects/show': ExtractProps<(typeof import('../../inertia/pages/projects/show.tsx'))['default']>
+    'reviews/index': ExtractProps<(typeof import('../../inertia/pages/reviews/index.tsx'))['default']>
     'settings/billing': ExtractProps<(typeof import('../../inertia/pages/settings/billing.tsx'))['default']>
     'settings/discover_preview': ExtractProps<(typeof import('../../inertia/pages/settings/discover_preview.tsx'))['default']>
     'settings/discover': ExtractProps<(typeof import('../../inertia/pages/settings/discover.tsx'))['default']>
