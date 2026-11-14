@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { MoreLink } from "#/components/directory/hub";
 import { ArtistResults } from "#/components/directory/results";
@@ -21,6 +21,7 @@ import {
 	StyleLinks,
 	workCaption,
 } from "#/components/profile/profile";
+import { FreshInkSection, ReviewsSection } from "#/components/profile/reviews";
 import { bookingLinks, safeSocialUrl } from "#/lib/booking";
 import { crumbs } from "#/lib/breadcrumbs";
 import {
@@ -59,9 +60,12 @@ export const Route = createFileRoute("/studios/$studioSlug/")({
 function StudioProfile() {
 	const { discover } = Route.useRouteContext();
 	const { studioSlug } = Route.useParams();
-	const studio = useSuspenseQuery(
-		studioProfileQueries(discover.client, studioSlug).studio,
-	).data;
+	const queries = studioProfileQueries(discover.client, studioSlug);
+	const studio = useSuspenseQuery(queries.studio).data;
+	// Optional (slice 4): the loader read them; a failure hides the section.
+	const reviews = useQuery(queries.reviews).data;
+	const freshInk = useQuery(queries.freshInk).data;
+	const subject = { kind: "studio" as const, slug: studioSlug };
 	const { request, site } = bookingLinks(studio);
 	const owner = possessive(studio.name);
 	const where = placeLine(studio.location, true);
@@ -183,6 +187,21 @@ function StudioProfile() {
 					}
 				/>
 			)}
+
+			<FreshInkSection
+				id="studio-fresh-ink-title"
+				subject={subject}
+				first={freshInk}
+				name={studio.name}
+			/>
+
+			<ReviewsSection
+				id="studio-reviews-title"
+				subject={subject}
+				first={reviews}
+				name={studio.name}
+				showArtist
+			/>
 
 			{studio.artists.length > 0 && (
 				<EditorialSection

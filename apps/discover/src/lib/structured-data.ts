@@ -1,5 +1,6 @@
 import type {
 	DiscoverArtistDetail,
+	DiscoverReviewsPage,
 	DiscoverStudioDetail,
 	DiscoverTattooDetail,
 } from "@tattoo-drip/sdk";
@@ -9,6 +10,7 @@ import type { Crumb } from "./breadcrumbs.ts";
 import type { PublicSettings } from "./config.ts";
 import { tattooProfile } from "./destinations.ts";
 import { tattooAlt } from "./home.ts";
+import { reviewsLd } from "./reviews.ts";
 import { paths } from "./routes.ts";
 import {
 	BRAND_IMAGE,
@@ -22,8 +24,9 @@ import {
 /**
  * Discover's structured data (D10; docs/discover/frontend.md, "Structured
  * data"): schema.org JSON-LD built only from what the page shows (the API's
- * public answer), never a rating, review, price, opening hour or any field
- * the page doesn't have. One script per page (`@graph`), rendered on the
+ * public answer), never a price, opening hour or any field the page doesn't
+ * have; ratings and reviews only on a studio's profile, from 3 reviews, as
+ * the page shows them (Reviews and Fresh ink, ruling 10: `reviewsLd`). One script per page (`@graph`), rendered on the
  * server through the head (`"script:ld+json"`, which the router serialises
  * with `<`, `>` and `&` escaped), and only on an indexable 200 page.
  */
@@ -118,10 +121,15 @@ function addressOf(location: DiscoverStudioDetail["location"]) {
 	};
 }
 
-/** A studio's profile: a TattooParlor (a LocalBusiness), at its Discover address. */
+/**
+ * A studio's profile: a TattooParlor (a LocalBusiness), at its Discover
+ * address; with its clients' `aggregateRating` and `review` only from 3
+ * reviews (the page's first page of them, as shown).
+ */
 export function studioLd(
 	settings: Settings,
 	studio: DiscoverStudioDetail,
+	reviews?: DiscoverReviewsPage,
 ): JsonLd {
 	const url = siteUrl(settings, paths.studio(studio.slug));
 	const images = [studio.cover?.url, studio.tattoos[0]?.image.url].filter(
@@ -136,6 +144,7 @@ export function studioLd(
 		logo: studio.logo?.url,
 		address: addressOf(studio.location),
 		sameAs: sameAs(studio.socialLinks),
+		...reviewsLd(settings, studio.slug, reviews),
 	});
 }
 

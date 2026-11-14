@@ -15,6 +15,8 @@ export const paths = {
 	artists: () => "/explore/artists",
 	/** The tattoo gallery (D09; `/explore/tattoos` is a 301 to it). */
 	tattoos: () => "/tattoos",
+	/** Reviews and Fresh ink (slice 4): clients' healed tattoos, newest first. */
+	freshInk: () => "/fresh-ink",
 	forStudios: () => "/for-studios",
 	pricing: () => "/pricing",
 	/** The country selector's form target (POST only; D06.5). */
@@ -53,6 +55,7 @@ export const ROUTE_FILES = [
 	paths.studios(),
 	paths.artists(),
 	paths.tattoos(),
+	paths.freshInk(),
 	paths.forStudios(),
 	paths.pricing(),
 	paths.countryPreference(),

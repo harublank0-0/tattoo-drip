@@ -50,6 +50,16 @@ import type { AddressInfo } from "node:net";
  * `/tattoos/:id` shows), by id, paged by the last id (`limit` 1–5000,
  * `scenario.sitemapPage` rows at most, a uuid cursor, else a 422).
  *
+ * Reviews and Fresh ink (slice 4): a profile's `reviews` and `fresh-ink`
+ * (`/studios/:slug/…`, `/studios/:slug/artists/:artist/…`,
+ * `/artists/:slug/…`) answer the profile's 404 rules; a studio has four
+ * reviews (ratings 5, 4, 5, 3: "4.3 from 4", the first with a reply and
+ * one whose shown name is right-to-left) and an artist two (below the
+ * threshold: no rating); every profile has two Fresh ink posts (a photo
+ * with a photo and a ready video angle) naming its first shown artist. The
+ * feed (`/fresh-ink`) is two posts per shown studio, honouring `country`,
+ * `city` and `style`. `limit` pages them like the lists.
+ *
  * Divergences from the real API: the cursor is base64url of
  * `["stub", sort, offset]` (an offset, not a keyset, so rows added while
  * paging would shift; the fixtures never change mid-test), and only the
@@ -72,7 +82,11 @@ export type Endpoint =
 	// D10's sitemap lists.
 	| "sitemap-studios"
 	| "sitemap-artists"
-	| "sitemap-tattoos";
+	| "sitemap-tattoos"
+	// Reviews and Fresh ink (slice 4): a profile's reviews and Fresh ink, and the feed.
+	| "profile-reviews"
+	| "profile-fresh-ink"
+	| "fresh-ink";
 
 /** The referral token the stub's booking links carry (shaped like the platform's; never verified here). */
 export const STUB_REF =
@@ -425,15 +439,25 @@ export async function stubApi(count = 1): Promise<StubApi> {
 					? segments[0]
 					: segments[0] === "studios" && segments.length === 2
 						? "studio"
-						: segments[0] === "studios" && segments[2] === "artists"
+						: segments[0] === "studios" &&
+								segments[2] === "artists" &&
+								segments.length <= 4
 							? segments.length === 3
 								? "studio-artists"
 								: "studio-artist"
 							: segments[0] === "artists" && segments.length === 2
 								? "independent"
-								: segments[0] === "tattoos" && segments.length === 2
-									? "tattoo"
-									: "unknown"
+								: (segments[0] === "studios" &&
+											(segments.length === 3 || segments.length === 5)) ||
+										(segments[0] === "artists" && segments.length === 3)
+									? segments.at(-1) === "reviews"
+										? "profile-reviews"
+										: segments.at(-1) === "fresh-ink"
+											? "profile-fresh-ink"
+											: "unknown"
+									: segments[0] === "tattoos" && segments.length === 2
+										? "tattoo"
+										: "unknown"
 		) as Endpoint;
 		response.setHeader("Content-Type", "application/json");
 		// For an ad hoc browser check against the stub (the real API allows DISCOVER_URL).
@@ -649,6 +673,72 @@ export async function stubApi(count = 1): Promise<StubApi> {
 				}),
 			);
 		}
+		if (endpoint === "profile-reviews" || endpoint === "profile-fresh-ink") {
+			const owner = stubProfileOwner(data, segments, hidden, current);
+			if (!owner) return missing();
+			if (endpoint === "profile-reviews")
+				return response.end(
+					JSON.stringify(
+						stubReviews(
+							owner.studio,
+							owner.artist,
+							segments.length === 3 && segments[0] === "studios",
+						),
+					),
+				);
+			return response.end(
+				JSON.stringify({
+					data: stubPosts(owner.studio, owner.artist, owner.place),
+					nextCursor: null,
+				}),
+			);
+		}
+		if (endpoint === "fresh-ink") {
+			const params = address.searchParams;
+			const country = params.get("country");
+			const city = params.get("city");
+			const style = params.get("style");
+			if (style !== null && !STYLES.some((each) => each.slug === style)) {
+				response.statusCode = 422;
+				return response.end(
+					JSON.stringify({
+						error: { code: "validation_failed", message: "Stub validation" },
+					}),
+				);
+			}
+			const posts = data.studios
+				.filter((studio) => !hidden.has(studio.slug))
+				.flatMap((studio) => {
+					const artist = profileArtists(data, studio)[0];
+					return artist
+						? stubPosts(
+								{ slug: studio.slug, name: studio.name, type: "studio" },
+								artist,
+								studio.location,
+							)
+						: [];
+				})
+				.filter(
+					(post) =>
+						(!country || post.location?.country === country.toUpperCase()) &&
+						(!city || post.location?.slug === city) &&
+						(!style || post.styles.some((each) => each.slug === style)),
+				);
+			let offset = 0;
+			const cursor = params.get("cursor");
+			if (cursor)
+				offset = Number(Buffer.from(cursor, "base64url").toString()) || 0;
+			const page = posts.slice(offset, offset + limit);
+			return response.end(
+				JSON.stringify({
+					data: page,
+					nextCursor:
+						offset + limit < posts.length
+							? Buffer.from(String(offset + limit)).toString("base64url")
+							: null,
+				}),
+			);
+		}
 		if (endpoint === "styles") {
 			response.end(JSON.stringify({ data: data.styles }));
 			return;
@@ -818,4 +908,152 @@ export async function stubApi(count = 1): Promise<StubApi> {
 			server.close();
 		},
 	};
+}
+
+type StubRef = { slug: string; name: string; type: string };
+type StubPlace = (typeof PLACES)[number] | null;
+
+/** The studio (and artist) a profile's reviews or Fresh ink path names, by the detail reads' 404 rules. */
+function stubProfileOwner(
+	data: Fixtures,
+	segments: string[],
+	hidden: Set<string>,
+	current: (slug: string | undefined) => string | undefined,
+): {
+	studio: StubRef;
+	artist: { id: string; slug: string; name: string } | undefined;
+	place: StubPlace;
+} | null {
+	const slug = current(segments[1]);
+	if (segments[0] === "artists") {
+		const artist = data.artists.find(
+			(each) =>
+				each.independent &&
+				each.studio.slug === slug &&
+				!hidden.has(each.studio.slug),
+		);
+		if (!artist) return null;
+		return {
+			studio: artist.studio as StubRef,
+			artist,
+			place: artist.location ?? null,
+		};
+	}
+	const studio = data.studios.find(
+		(each) => each.slug === slug && !hidden.has(each.slug),
+	);
+	if (!studio) return null;
+	const ref = { slug: studio.slug, name: studio.name, type: "studio" };
+	const artists = profileArtists(data, studio);
+	if (segments.length === 3)
+		return { studio: ref, artist: artists[0], place: studio.location };
+	const artist = artists.find(
+		(each) =>
+			each.slug === segments[3] && !hidden.has(`${studio.slug}/${each.slug}`),
+	);
+	return artist ? { studio: ref, artist, place: studio.location } : null;
+}
+
+/** A studio's four reviews (rating "4.3 from 4"), or an artist's two (no rating). */
+function stubReviews(
+	studio: StubRef,
+	artist: { id: string; slug: string; name: string } | undefined,
+	whole: boolean,
+) {
+	const by = artist ?? {
+		id: uuid(9, 0),
+		slug: "stub-artist",
+		name: "Stub Artist",
+	};
+	const ratings = whole ? [5, 4, 5, 3] : [5, 2];
+	return {
+		data: ratings.map((rating, index) => ({
+			id: uuid(7, index + (whole ? 0 : 50)),
+			rating,
+			body:
+				index === 1
+					? "Healed evenly.\n\nWould come back <b>again</b>."
+					: `Stub review ${index}: the lines healed crisp and clean.`,
+			shownName:
+				index === 2
+					? "\u0633\u0627\u0631\u0627 \u0645."
+					: `Stub Client ${index}`,
+			date: `2026-10-${String(10 - index).padStart(2, "0")}`,
+			artist: { id: by.id, slug: by.slug, name: by.name },
+			studio,
+			reply:
+				index === 0
+					? { body: "Thank you for coming in!", date: "2026-10-11" }
+					: null,
+		})),
+		nextCursor: null,
+		rating: whole ? { average: 4.3, count: 4 } : null,
+	};
+}
+
+/** Two Fresh ink posts of a profile: a photo with a photo and a ready video angle, then one photo. */
+function stubPosts(
+	studio: StubRef,
+	artist: { id: string; slug: string; name: string } | undefined,
+	place: StubPlace,
+) {
+	if (!artist) return [];
+	const origin = `http://${studio.slug}.localhost:3000`;
+	return [0, 1].map((index) => ({
+		id: uuid(8, Number(artist.id.slice(-6)) * 2 + index),
+		url: `http://media.test/fresh-${studio.slug}-${index}.jpg`,
+		width: 1200,
+		height: 1500,
+		alt: index === 0 ? null : "Koi on the forearm, healed",
+		variants: [
+			{
+				url: `http://media.test/fresh-${studio.slug}-${index}.640.jpg`,
+				width: 640,
+			},
+		],
+		angles:
+			index === 0
+				? [
+						{
+							kind: "photo",
+							url: `http://media.test/fresh-${studio.slug}-a.jpg`,
+							width: 1200,
+							height: 900,
+							alt: null,
+							variants: [],
+						},
+						{
+							kind: "video",
+							poster: {
+								url: `http://media.test/fresh-${studio.slug}-v.jpg`,
+								width: 1080,
+								height: 1920,
+								alt: null,
+								variants: [],
+							},
+							sources: [
+								{
+									url: `http://media.test/fresh-${studio.slug}-v.720x1280.mp4`,
+									type: "video/mp4",
+									width: 720,
+									height: 1280,
+								},
+							],
+							durationMs: 12000,
+							alt: null,
+						},
+					]
+				: [],
+		shownName:
+			index === 0 ? "Stub Client 0" : "\u0633\u0627\u0631\u0627 \u0645.",
+		caption: index === 0 ? "Six weeks healed <i>and</i> crisp." : null,
+		styles: [STYLES[index]],
+		placement: index === 0 ? "Left forearm" : null,
+		date: "2026-10-12",
+		artist: { id: artist.id, slug: artist.slug, name: artist.name },
+		studio,
+		location: place,
+		storefrontUrl: `${origin}/`,
+		bookingUrl: `${origin}/book?artist=${artist.slug}&ref=${STUB_REF}`,
+	}));
 }

@@ -2,6 +2,8 @@ import { Link } from "@tanstack/react-router";
 import type {
 	DiscoverArtistDetail,
 	DiscoverArtistSummary,
+	DiscoverFreshInkPage,
+	DiscoverReviewsPage,
 } from "@tattoo-drip/sdk";
 import { MoreLink } from "#/components/directory/hub";
 import { ArtistResults } from "#/components/directory/results";
@@ -23,9 +25,11 @@ import {
 	StyleLinks,
 	workCaption,
 } from "#/components/profile/profile";
+import { FreshInkSection, ReviewsSection } from "#/components/profile/reviews";
 import { bookingLinks, generalRequest, safeSocialUrl } from "#/lib/booking";
 import { crumbs } from "#/lib/breadcrumbs";
 import { nearbyLinks, placeLine, possessive } from "#/lib/profiles";
+import type { ReviewSubject } from "#/lib/reviews";
 import { paths } from "#/lib/routes";
 
 /**
@@ -40,10 +44,18 @@ export function ArtistProfile({
 	artist,
 	colleagues,
 	markets,
+	subject,
+	reviews,
+	freshInk,
 }: {
 	artist: DiscoverArtistDetail;
 	colleagues?: readonly DiscoverArtistSummary[];
 	markets: readonly string[];
+	/** Whose reviews and Fresh ink (slice 4): the profile's own address. */
+	subject: ReviewSubject;
+	/** Optional reads: undefined (failed) or empty hides the section. */
+	reviews?: DiscoverReviewsPage;
+	freshInk?: DiscoverFreshInkPage;
 }) {
 	const { request, site } = bookingLinks(artist, artist.slug);
 	const studioPath = paths.studio(artist.studio.slug);
@@ -189,6 +201,21 @@ export function ArtistProfile({
 					}
 				/>
 			)}
+
+			<FreshInkSection
+				id="artist-fresh-ink-title"
+				subject={subject}
+				first={freshInk}
+				name={artist.name}
+			/>
+
+			<ReviewsSection
+				id="artist-reviews-title"
+				subject={subject}
+				first={reviews}
+				name={artist.name}
+				showArtist={false}
+			/>
 
 			{!artist.independent && others.length > 0 && (
 				<EditorialSection labelledBy="artist-studio-title" className="lg:py-20">

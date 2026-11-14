@@ -11,6 +11,7 @@ import { crumbs } from "./breadcrumbs.ts";
 import type { PublicSettings } from "./config.ts";
 import type { DiscoverContext } from "./context.ts";
 import { countryName } from "./country.ts";
+import { profileReviewQueries } from "./reviews.ts";
 import { paths } from "./routes.ts";
 import { fitTitle } from "./seo.ts";
 import {
@@ -49,8 +50,16 @@ export function readArtistSlug(value: unknown): string | undefined {
 /** The most other artists an artist's page shows from their studio. */
 export const MORE_ARTISTS = 4;
 
+/**
+ * Each profile's reads: the detail (required) and, since Reviews and Fresh
+ * ink (slice 4), its first page of reviews and of Fresh ink (optional: a
+ * failure or an empty page hides the section).
+ */
 export function studioProfileQueries(client: DiscoverClient, slug: string) {
-	return { studio: discoverQueries.studio(client, slug) };
+	return {
+		studio: discoverQueries.studio(client, slug),
+		...profileReviewQueries(client, { kind: "studio", slug }),
+	};
 }
 
 export function studioArtistQueries(
@@ -61,11 +70,24 @@ export function studioArtistQueries(
 	return {
 		artist: discoverQueries.studioArtist(client, studioSlug, artistSlug),
 		colleagues: discoverQueries.studioArtists(client, studioSlug),
+		...profileReviewQueries(client, {
+			kind: "studioArtist",
+			studio: studioSlug,
+			artist: artistSlug,
+		}),
 	};
 }
 
 export function independentQueries(client: DiscoverClient, slug: string) {
-	return { artist: discoverQueries.independentArtist(client, slug) };
+	return {
+		artist: discoverQueries.independentArtist(client, slug),
+		...profileReviewQueries(client, { kind: "independent", slug }),
+	};
+}
+
+/** An optional read: its failure is undefined (the section stays hidden). */
+function optional<T>(read: Promise<T>): Promise<T | undefined> {
+	return read.catch((): undefined => undefined);
 }
 
 /**
@@ -243,8 +265,12 @@ export async function loadStudioProfile(
 	const slug = readTenantSlug(param);
 	if (!slug) throw notFound();
 	const { queryClient, discover } = context;
+	const queries = studioProfileQueries(discover.client, slug);
+	// Started now, beside the studio; awaited after it (its 404 never waits).
+	const reviews = optional(queryClient.ensureQueryData(queries.reviews));
+	const freshInk = optional(queryClient.ensureQueryData(queries.freshInk));
 	const studio = await queryClient
-		.ensureQueryData(studioProfileQueries(discover.client, slug).studio)
+		.ensureQueryData(queries.studio)
 		.catch(async (error: unknown) => {
 			// An independent artist's business is not a studio (blueprint H):
 			// its slug here is a 301 to their profile, when the API shows them.
@@ -268,10 +294,12 @@ export async function loadStudioProfile(
 	if (studio.slug !== slug)
 		throw redirect({ href: paths.studio(studio.slug), statusCode: 301 });
 	const { settings } = discover;
+	const [reviewsPage] = await Promise.all([reviews, freshInk]);
 	return {
 		seo: studioSeo(studio),
 		structured: [
-			studioLd(settings, studio),
+			// The rating and reviews only from 3 (reviewsLd), as the page shows them.
+			studioLd(settings, studio, reviewsPage),
 			breadcrumbLd(
 				settings,
 				crumbs.studio(studio.name),
@@ -298,13 +326,13 @@ export async function loadStudioArtistProfile(
 	const queries = studioArtistQueries(discover.client, studioSlug, artistSlug);
 	// Both start now; only the artist is awaited first, so a slow optional
 	// read never delays the page's answer (or its 404).
-	const colleagues = queryClient
-		.ensureQueryData(queries.colleagues)
-		.catch((): undefined => undefined);
+	const colleagues = optional(queryClient.ensureQueryData(queries.colleagues));
+	const reviews = optional(queryClient.ensureQueryData(queries.reviews));
+	const freshInk = optional(queryClient.ensureQueryData(queries.freshInk));
 	const artist = await queryClient
 		.ensureQueryData(queries.artist)
 		.catch(rethrowMissing);
-	await colleagues;
+	await Promise.all([colleagues, reviews, freshInk]);
 	if (artist.studio.slug !== studioSlug || artist.slug !== artistSlug)
 		throw redirect({
 			href: paths.studioArtist(artist.studio.slug, artist.slug),
@@ -321,9 +349,13 @@ export async function loadIndependentProfile(
 	const slug = readTenantSlug(param);
 	if (!slug) throw notFound();
 	const { queryClient, discover } = context;
+	const queries = independentQueries(discover.client, slug);
+	const reviews = optional(queryClient.ensureQueryData(queries.reviews));
+	const freshInk = optional(queryClient.ensureQueryData(queries.freshInk));
 	const artist = await queryClient
-		.ensureQueryData(independentQueries(discover.client, slug).artist)
+		.ensureQueryData(queries.artist)
 		.catch(rethrowMissing);
+	await Promise.all([reviews, freshInk]);
 	if (artist.studio.slug !== slug)
 		throw redirect({
 			href: paths.independentArtist(artist.studio.slug),

@@ -41,6 +41,18 @@ function linkNamed(page: string, label: RegExp): string | undefined {
 const reads = (api: StubApi) =>
 	api.requests.map((url) => url.replace("/api/v1/discover", ""));
 
+/**
+ * A profile's reads since Reviews and Fresh ink (slice 4): its detail, and
+ * its first page of reviews and of Fresh ink (optional, in parallel), sorted.
+ */
+const withReviews = (path: string, ...more: string[]) =>
+	[
+		path,
+		`${path}/fresh-ink?limit=8`,
+		`${path}/reviews?limit=6`,
+		...more,
+	].sort();
+
 /** Words for data the API never publishes: none may reach a profile's HTML. */
 const PRIVATE_KEYS = [
 	"contactPhone",
@@ -85,8 +97,8 @@ describe("D08 profiles on the built server", { skip }, () => {
 		assert.equal(response.headers.get("cache-control"), "private, no-store");
 		assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow");
 		const page = await html(response);
-		// One read, by the address's slug, with no country.
-		assert.deepEqual(reads(api), ["/studios/stub-studio-1"]);
+		// Its reads, by the address's slug, with no country.
+		assert.deepEqual(reads(api).sort(), withReviews("/studios/stub-studio-1"));
 		// One h1, the breadcrumbs, the place from the API.
 		assert.equal(page.match(/<h1[\s>]/g)?.length, 1);
 		assert.match(page, /<h1[^>]*>Stub Studio 1<\/h1>/);
@@ -189,10 +201,13 @@ describe("D08 profiles on the built server", { skip }, () => {
 		);
 		assert.equal(response.status, 200);
 		const page = await html(response);
-		assert.deepEqual(reads(api).sort(), [
-			"/studios/stub-studio-1/artists",
-			"/studios/stub-studio-1/artists/crew-1-a",
-		]);
+		assert.deepEqual(
+			reads(api).sort(),
+			withReviews(
+				"/studios/stub-studio-1/artists/crew-1-a",
+				"/studios/stub-studio-1/artists",
+			),
+		);
 		assert.match(page, /<h1[^>]*>Stub Crew 1A<\/h1>/);
 		assert.match(
 			page,
@@ -265,7 +280,7 @@ describe("D08 profiles on the built server", { skip }, () => {
 		const response = await discover.get("/artists/stub-solo-3");
 		assert.equal(response.status, 200);
 		const page = await html(response);
-		assert.deepEqual(reads(api), ["/artists/stub-solo-3"]);
+		assert.deepEqual(reads(api).sort(), withReviews("/artists/stub-solo-3"));
 		assert.match(page, /<h1[^>]*>Stub Artist 3<\/h1>/);
 		assert.match(page, /Independent tattoo artist/);
 		assert.match(text(page), /Works independently · New Delhi, India/);
@@ -295,7 +310,7 @@ describe("D08 profiles on the built server", { skip }, () => {
 		});
 		assert.equal(response.status, 200);
 		const page = await html(response);
-		assert.deepEqual(reads(api), ["/studios/stub-studio-3"]);
+		assert.deepEqual(reads(api).sort(), withReviews("/studios/stub-studio-3"));
 		assert.match(page, /New Delhi, India/);
 		// No link on the profile carries a country it didn't ask for.
 		for (const href of hrefs(page).filter((each) =>

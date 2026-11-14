@@ -17,6 +17,8 @@ export const crumbs = {
 		{ label: kind === "studios" ? "Studios" : "Find artists" },
 	],
 	gallery: (): Crumb[] => [HOME, { label: "Tattoo inspiration" }],
+	/** Reviews and Fresh ink (slice 4): the feed. */
+	freshInk: (): Crumb[] => [HOME, { label: "Fresh ink" }],
 	style: (name: string): Crumb[] => [HOME, { label: name }],
 	country: (code: string): Crumb[] => [HOME, { label: countryName(code) }],
 	city: (code: string, place: { name: string }): Crumb[] => [
