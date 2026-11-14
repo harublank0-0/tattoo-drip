@@ -65,10 +65,9 @@ function takedownText(reason: string | null): string {
  * approve, decline or unpublish, and the published reviews to reply to or
  * report to TattooDrip. Owners see every one, an artist those of projects
  * assigned to their own profile (StudioReviewService, ProjectService's
- * findFor rule); anything else is a 404. Behind REVIEWS_ENABLED (the
- * `reviewsOn` middleware). There is no route that edits or hides a review
- * or edits a post (rulings 6 and 7): only the reply, the report and the
- * decision.
+ * findFor rule); anything else is a 404. There is no route that edits or
+ * hides a review or edits a post (rulings 6 and 7): only the reply, the
+ * report and the decision.
  */
 @inject()
 export default class ReviewsController {

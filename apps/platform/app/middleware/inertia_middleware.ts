@@ -8,7 +8,6 @@ import ImageService from "#modules/media/services/image_service";
 import { bellKinds } from "#modules/notifications/alerts";
 import AlertService from "#modules/notifications/services/alert_service";
 import WaitingService from "#modules/projects/services/waiting_service";
-import { reviewsEnabled } from "#modules/reviews/review_links";
 import StudioReviewService from "#modules/reviews/services/studio_review_service";
 import {
 	INVITATION_LINK_FLASH,
@@ -97,9 +96,9 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 
 		// The Reviews badge (Reviews and Fresh ink, slice 2): the Fresh ink
 		// posts waiting for this member (owners every one, an artist their
-		// projects'). Null while REVIEWS_ENABLED is off: no Reviews item.
+		// projects'). Null off tenant pages.
 		const reviewsCount =
-			tenant && membership && auth?.user && reviewsEnabled()
+			tenant && membership && auth?.user
 				? await ensureDbContext(
 						{ userId: auth.user.id, tenantId: tenant.id },
 						async () =>
@@ -120,7 +119,7 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 							(await ctx.containerResolver.make(AlertService)).unreadCount(
 								tenant,
 								membership.userId,
-								bellKinds(membership.role, reviewsEnabled()),
+								bellKinds(membership.role),
 							),
 					)
 				: null;
@@ -181,7 +180,7 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 			todayCount: ctx.inertia.always(todayCount),
 			/** The member's unread alerts here that no tab counts (TAT-52, TAT-107); null unless on a tenant page. */
 			alertCount: ctx.inertia.always(alertCount),
-			/** Fresh ink waiting for this member (Reviews' badge); null off tenant pages and while reviews are off. */
+			/** Fresh ink waiting for this member (Reviews' badge); null off tenant pages. */
 			reviewsCount: ctx.inertia.always(reviewsCount),
 		};
 	}

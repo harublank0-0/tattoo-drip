@@ -9,7 +9,6 @@ import ReviewLink from "#modules/reviews/models/review_link";
 import { REVIEW_LIMITS } from "#modules/reviews/review_limits";
 import { TAKEDOWN_SENTENCES } from "#modules/reviews/rules";
 import BotChallenge from "#services/bot_challenge";
-import env from "#start/env";
 import { assertApiError } from "#tests/helpers/api";
 import { enableChallenge, siteverify, verdict } from "#tests/helpers/challenge";
 import { testImages } from "#tests/helpers/images";
@@ -171,36 +170,6 @@ test.group("Review page: reading it through the link", (group) => {
 			await client.get(`/api/v1/tenants/${at(a)}/review/${a.reviewToken}`),
 			404,
 			"not_found",
-		);
-	});
-
-	test("with the flag off every route is the 404, before anything is counted", async ({
-		client,
-		assert,
-	}) => {
-		const { a } = await twoStudios();
-		env.set("REVIEWS_ENABLED", false);
-		try {
-			const before = await reviewRows(a.tenant);
-			assertApiError(
-				await reviewRequest(client, "GET", at(a), "", a.reviewToken),
-				404,
-				"not_found",
-			);
-			assertApiError(
-				await reviewRequest(client, "PUT", at(a), "", a.reviewToken).json(
-					reviewBody(),
-				),
-				404,
-				"not_found",
-			);
-			assertApiError(await sendPhoto(client, a), 404, "not_found");
-			assert.deepEqual(await reviewRows(a.tenant), before);
-		} finally {
-			env.set("REVIEWS_ENABLED", true);
-		}
-		(await reviewRequest(client, "GET", at(a), "", a.reviewToken)).assertStatus(
-			200,
 		);
 	});
 

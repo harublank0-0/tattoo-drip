@@ -547,7 +547,8 @@ describe("the built Discover server, indexing on", { skip }, () => {
 			await (await discover.get("/robots.txt")).text(),
 			/Sitemap: http:\/\/localhost:3100\/sitemap\.xml/,
 		);
-		// D10: the sitemap index; its static child lists the static indexable pages.
+		// D10: the sitemap index; its static child lists the static indexable
+		// pages, and the Fresh ink feed while the default country's has a post.
 		const index = await discover.get("/sitemap.xml");
 		assert.equal(index.status, 200);
 		assert.match(await index.text(), /<sitemapindex /);
@@ -562,6 +563,7 @@ describe("the built Discover server, indexing on", { skip }, () => {
 			`${SITE}/explore/studios`,
 			`${SITE}/explore/artists`,
 			`${SITE}/tattoos`,
+			`${SITE}/fresh-ink`,
 		]);
 	});
 });

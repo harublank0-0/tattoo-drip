@@ -20,9 +20,8 @@ import type { JsonLd } from "./structured-data.ts";
  * in, and the reviews' structured data. Pure but for the query options.
  *
  * The API shows only what the studio and the client both allowed (the
- * client's Discover consent, a listed studio, a shown artist; ruling 11)
- * and answers empty pages while reviews are switched off on the platform,
- * so an empty page renders nothing: no heading, no "no reviews yet".
+ * client's Discover consent, a listed studio, a shown artist; ruling 11),
+ * and an empty page renders nothing: no heading, no "no reviews yet".
  */
 
 /** The reviews a profile shows at first, then "Show more reviews" (a page each). */

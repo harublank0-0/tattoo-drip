@@ -118,7 +118,7 @@ export function createDiscoverClient(options: DiscoverClientOptions) {
 			/**
 			 * A page of a listed studio's reviews on Discover, newest first
 			 * (Reviews and Fresh ink): `{ data, nextCursor, rating }`, `rating`
-			 * null below 3 reviews. Empty while reviews are off on the platform.
+			 * null below 3 reviews.
 			 */
 			reviews: (
 				slug: string,
@@ -210,7 +210,7 @@ export function createDiscoverClient(options: DiscoverClientOptions) {
 			/**
 			 * A page of Discover's Fresh ink feed (clients' healed tattoos),
 			 * newest published first, filtered by `country`, `city` and
-			 * `style`. Empty while reviews are off on the platform.
+			 * `style`.
 			 */
 			list: (query?: DiscoverFreshInkQuery, call?: RequestOptions) =>
 				request<DiscoverFreshInkPage>(

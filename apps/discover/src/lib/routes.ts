@@ -109,6 +109,7 @@ export const PRIMARY_NAV: InternalLink[] = [
 	{ kind: "internal", label: "Explore studios", to: paths.studios() },
 	{ kind: "internal", label: "Find artists", to: paths.artists() },
 	{ kind: "internal", label: "Tattoo inspiration", to: paths.tattoos() },
+	{ kind: "internal", label: "Fresh ink", to: paths.freshInk() },
 ];
 
 /** The business links: For studios, Pricing, then Studio OS's sign-in and sign-up. */

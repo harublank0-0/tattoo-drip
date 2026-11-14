@@ -26,7 +26,6 @@ import {
 import ImageService from "#modules/media/services/image_service";
 import VideoService from "#modules/media/services/video_service";
 import { storefrontTemplate } from "#modules/payments/deposit_links";
-import { reviewsEnabled } from "#modules/reviews/review_links";
 import {
 	PUBLIC_PHOTO_PURPOSE,
 	PUBLIC_VIDEO_PURPOSE,
@@ -53,8 +52,7 @@ import { bookingPageUrl, studioPageUrl } from "#services/storefront_url";
  * a published and approved post, no takedown or delete, a listed studio, a
  * shown artist, a reply not taken down, ready videos only, public keys
  * only), so nothing here repeats a rule; every answer field is written out
- * from the views' columns. While REVIEWS_ENABLED is off every read is an
- * empty page without a query.
+ * from the views' columns.
  */
 
 /** Whose reviews or Fresh ink: a studio, an artist at a studio, or an independent artist's profile. */
@@ -153,17 +151,6 @@ type MediaRow = {
 	video_duration_ms: number | null;
 };
 
-/** The empty answers while reviews are switched off on the platform. */
-const NO_REVIEWS: DiscoverReviewsPage = {
-	items: [],
-	nextCursor: null,
-	rating: null,
-};
-const NO_POSTS: DiscoverPage<DiscoverFreshInkPost> = {
-	items: [],
-	nextCursor: null,
-};
-
 @inject()
 export default class DiscoverReviewService {
 	constructor(private images: ImageService) {}
@@ -182,7 +169,6 @@ export default class DiscoverReviewService {
 		subject: DiscoverSubject,
 		query: DiscoverPageQuery,
 	): Promise<DiscoverReviewsPage | null> {
-		if (!reviewsEnabled()) return NO_REVIEWS;
 		return readDiscovery(async (client) => {
 			const owner = await resolve(client, subject);
 			if (!owner) return null;
@@ -241,7 +227,6 @@ export default class DiscoverReviewService {
 		subject: DiscoverSubject | null,
 		query: DiscoverFreshInkQuery,
 	): Promise<DiscoverPage<DiscoverFreshInkPost> | null> {
-		if (!reviewsEnabled()) return NO_POSTS;
 		return readDiscovery(async (client) => {
 			const bindings: unknown[] = [];
 			let where = "true";

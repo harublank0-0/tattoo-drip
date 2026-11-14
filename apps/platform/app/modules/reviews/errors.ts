@@ -4,12 +4,12 @@
  */
 
 /** Why a review link can't be made for a project now. */
-export type ReviewLinkRuleReason = "disabled" | "not_done";
+export type ReviewLinkRuleReason = "not_done";
 
 /**
- * A review link asked for while reviews are off (the feature flag), or for
- * a project whose tattoo work isn't done (ruling 3: in progress, in its
- * healing check or completed, with a completed tattoo session).
+ * A review link asked for a project whose tattoo work isn't done (ruling 3:
+ * in progress, in its healing check or completed, with a completed tattoo
+ * session).
  */
 export class ReviewLinkRuleError extends Error {
 	constructor(readonly reason: ReviewLinkRuleReason) {

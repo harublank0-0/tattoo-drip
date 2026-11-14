@@ -5,7 +5,6 @@ import { DateTime } from "luxon";
 import { ReviewLinkRuleError } from "#modules/reviews/errors";
 import ReviewLink from "#modules/reviews/models/review_link";
 import { hashReviewToken, REVIEW_TOKEN } from "#modules/reviews/review_links";
-import env from "#start/env";
 import { makeProject, makeSession } from "#tests/helpers/pipeline";
 import {
 	OWNER_MEMBER,
@@ -22,7 +21,6 @@ import {
 
 test.group("ReviewLinkService", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
-	group.each.teardown(() => env.set("REVIEWS_ENABLED", true));
 
 	test("makes one link per project, shows the same one again, and keeps only its digest", async ({
 		assert,
@@ -88,24 +86,6 @@ test.group("ReviewLinkService", (group) => {
 			links.linkFor(tenant, OWNER_MEMBER(owner.id), healing.project.id),
 		);
 		assert.isTrue(made.created);
-	});
-
-	test("refused while reviews are off (the feature flag)", async ({
-		assert,
-	}) => {
-		const { owner, tenant } = await studioWithOwner("rl-flag", "RL Flag");
-		const { links } = reviewServices();
-		const { project } = await inTenant(tenant, () => reviewReady(tenant));
-		env.set("REVIEWS_ENABLED", false);
-
-		const refusal = await inTenant(tenant, () =>
-			links
-				.linkFor(tenant, OWNER_MEMBER(owner.id), project.id)
-				.catch((error) => error),
-		);
-		assert.instanceOf(refusal, ReviewLinkRuleError);
-		assert.equal(refusal.reason, "disabled");
-		assert.lengthOf(await inTenant(tenant, () => ReviewLink.query()), 0);
 	});
 
 	test("the project's own artist may ask; another artist and another studio get the 404", async ({

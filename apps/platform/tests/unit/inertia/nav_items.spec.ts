@@ -15,7 +15,7 @@ type Item = {
 type Counts = {
 	inbox: number | null;
 	today: number | null;
-	reviews?: number | null;
+	reviews: number | null;
 };
 type NavModule = {
 	navItems(
@@ -35,16 +35,12 @@ const { isCurrentPath, navItems, showTabBar, tabBarItems } =
 
 const owner = { slug: "bnt", role: "owner" };
 const artist = { slug: "bnt", role: "artist" };
-const none: Counts = { inbox: null, today: null };
+const none: Counts = { inbox: null, today: null, reviews: null };
 
 test.group("navItems", () => {
-	test("Reviews (Reviews and Fresh ink, slice 2): only while reviews are on, under More for owners and a fifth tab for artists, counting the Fresh ink waiting", ({
+	test("Reviews (Reviews and Fresh ink, slice 2): under More for owners and a fifth tab for artists, counting the Fresh ink waiting", ({
 		assert,
 	}) => {
-		assert.notInclude(
-			navItems(owner, none).map(({ key }) => key),
-			"reviews",
-		);
 		const owned = navItems(owner, { ...none, reviews: 2 });
 		assert.deepInclude(owned, {
 			key: "reviews",
@@ -85,7 +81,7 @@ test.group("navItems", () => {
 		assert.deepEqual(rolesFor("tenant.reviews.index"), ["owner", "artist"]);
 	});
 
-	test("owners get Today, Inbox, Projects and Calendar, with Clients, Artists, Portfolio, Inventory, Transactions and Settings under More; artists get Today, Projects, Calendar and Portfolio", ({
+	test("owners get Today, Inbox, Projects and Calendar, with Reviews, Clients, Artists, Portfolio, Inventory, Transactions and Settings under More; artists get Today, Projects, Calendar, Portfolio and Reviews", ({
 		assert,
 	}) => {
 		assert.deepEqual(
@@ -95,6 +91,7 @@ test.group("navItems", () => {
 				["inbox", "bar"],
 				["projects", "bar"],
 				["calendar", "bar"],
+				["reviews", "more"],
 				["clients", "more"],
 				["artists", "more"],
 				["portfolio", "more"],
@@ -110,6 +107,7 @@ test.group("navItems", () => {
 				["projects", "bar"],
 				["calendar", "bar"],
 				["portfolio", "bar"],
+				["reviews", "bar"],
 			],
 		);
 		assert.deepEqual(
@@ -139,7 +137,7 @@ test.group("navItems", () => {
 		for (const role of ["owner", "artist"] as const) {
 			for (const item of navItems(
 				{ slug: "bnt", role },
-				{ inbox: 3, today: 2 },
+				{ inbox: 3, today: 2, reviews: 1 },
 			)) {
 				assert.include(
 					rolesFor(item.route) ?? [],
@@ -154,7 +152,7 @@ test.group("navItems", () => {
 		assert,
 	}) => {
 		const inbox = (count: number | null) =>
-			navItems(owner, { inbox: count, today: 0 }).find(
+			navItems(owner, { inbox: count, today: 0, reviews: 0 }).find(
 				({ key }) => key === "inbox",
 			);
 
@@ -163,7 +161,7 @@ test.group("navItems", () => {
 		assert.notProperty(inbox(0), "badge");
 		assert.notProperty(inbox(null), "badge");
 		assert.isUndefined(
-			navItems(artist, { inbox: 5, today: 0 }).find(
+			navItems(artist, { inbox: 5, today: 0, reviews: 0 }).find(
 				({ key }) => key === "inbox",
 			),
 		);
@@ -173,9 +171,10 @@ test.group("navItems", () => {
 		assert,
 	}) => {
 		const today = (role: string, count: number | null) =>
-			navItems({ slug: "bnt", role }, { inbox: 0, today: count }).find(
-				({ key }) => key === "today",
-			);
+			navItems(
+				{ slug: "bnt", role },
+				{ inbox: 0, today: count, reviews: 0 },
+			).find(({ key }) => key === "today");
 
 		for (const role of ["owner", "artist"]) {
 			assert.deepEqual(today(role, 3), {
@@ -195,7 +194,7 @@ test.group("navItems", () => {
 		assert,
 	}) => {
 		for (const tenant of [owner, artist]) {
-			const withBadge = navItems(tenant, { inbox: 4, today: 5 })
+			const withBadge = navItems(tenant, { inbox: 4, today: 5, reviews: 0 })
 				.filter((item) => "badge" in item)
 				.map(({ key }) => key);
 			assert.deepEqual(
@@ -235,6 +234,7 @@ test.group("navItems", () => {
 		assert.deepEqual(
 			owners.more.map(({ key }) => key),
 			[
+				"reviews",
 				"clients",
 				"artists",
 				"portfolio",
@@ -246,7 +246,7 @@ test.group("navItems", () => {
 		const artists = tabBarItems(navItems(artist, none));
 		assert.deepEqual(
 			artists.tabs.map(({ key }) => key),
-			["today", "projects", "calendar", "portfolio"],
+			["today", "projects", "calendar", "portfolio", "reviews"],
 		);
 		assert.deepEqual(artists.more, []);
 	});

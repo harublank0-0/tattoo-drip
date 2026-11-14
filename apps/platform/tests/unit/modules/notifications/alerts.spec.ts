@@ -154,14 +154,11 @@ test.group("new-inquiry alerts", () => {
 		assert.isNull(
 			alertTarget({ kind: "new_inquiry", inquiryId: null }, "owner"),
 		);
-		// Fresh ink opens Reviews, for any role, while reviews are on; off, the list.
+		// Fresh ink opens Reviews, for any role.
 		for (const role of ["owner", "artist"]) {
 			assert.deepEqual(
 				alertTarget({ kind: "fresh_ink", inquiryId: null }, role),
 				{ route: "tenant.reviews.index" },
-			);
-			assert.isNull(
-				alertTarget({ kind: "fresh_ink", inquiryId: null }, role, false),
 			);
 		}
 	});
@@ -488,13 +485,6 @@ test.group("bellKinds (TAT-107)", () => {
 		assert,
 	}) => {
 		assert.deepEqual(bellKinds("artist"), ["new_inquiry", "deposit_proof"]);
-	});
-
-	test("with reviews off there is no Reviews tab: Fresh ink counts on the bell again", ({
-		assert,
-	}) => {
-		assert.deepEqual(bellKinds("owner", false), ["fresh_ink"]);
-		assert.deepEqual(bellKinds("artist", false), [...ALERT_KINDS]);
 	});
 
 	test("an unknown role counts everything, with no prototype lookup", ({

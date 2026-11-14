@@ -12,7 +12,6 @@ import PublicReviewService from "#modules/reviews/services/public_review_service
 import { CURSOR_MESSAGE } from "#modules/storefront/validators/work";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenantModel from "#modules/tenancy/models/tenant";
-import env from "#start/env";
 import {
 	assertApiError,
 	assertApiHeaders,
@@ -36,8 +35,8 @@ import { inTenant, studioWithOwner, twoStudios } from "#tests/helpers/tenants";
  * the documented fields, every visibility rule (the client's consent, a
  * takedown, the client's delete, the studio's decision, publication, a reply
  * taken down, a video that is not ready, a hidden artist), the 3-review
- * threshold for the average (ruling 10), newest first with a cursor, the
- * flag, a deleted studio and the other studio's rows.
+ * threshold for the average (ruling 10), newest first with a cursor, a
+ * deleted studio and the other studio's rows.
  */
 
 /** Shorter than the other reads (60 s stale): a takedown leaves shared caches within 2 minutes. */
@@ -125,16 +124,6 @@ async function anotherProject(s: Ready) {
 		project.merge({ artistId: s.artist.id }).save(),
 	);
 	return project;
-}
-
-/** The flag off for `work`, back on after (an exported value would win over .env.test). */
-async function withReviewsOff<T>(work: () => Promise<T>): Promise<T> {
-	env.set("REVIEWS_ENABLED", false);
-	try {
-		return await work();
-	} finally {
-		env.set("REVIEWS_ENABLED", true);
-	}
 }
 
 test.group("GET /api/v1/tenants/:tenant/reviews (listReviews)", (group) => {
@@ -377,10 +366,7 @@ test.group("GET /api/v1/tenants/:tenant/reviews (listReviews)", (group) => {
 		);
 	});
 
-	test("while reviews are off it is an empty page with no rating, and a deleted studio is the 404", async ({
-		client,
-		assert,
-	}) => {
+	test("a deleted studio's reviews are the 404", async ({ client, assert }) => {
 		const s = await studio("sp-reviews-f");
 		const projects = [
 			s.project,
@@ -389,16 +375,6 @@ test.group("GET /api/v1/tenants/:tenant/reviews (listReviews)", (group) => {
 		];
 		await inTenant(s.tenant, async () => {
 			for (const project of projects) await seedReview(s.tenant, project);
-		});
-		await withReviewsOff(async () => {
-			const off = await client.get(reviewsUrl(s.tenant.slug));
-			off.assertStatus(200);
-			assert.deepEqual(off.body(), {
-				data: [],
-				nextCursor: null,
-				rating: null,
-			});
-			assert.equal(off.header("cache-control"), CACHED);
 		});
 		const on = (await client.get(reviewsUrl(s.tenant.slug))).body() as {
 			data: unknown[];
@@ -417,7 +393,7 @@ test.group("GET /api/v1/tenants/:tenant/reviews (listReviews)", (group) => {
 		);
 	});
 
-	test("while reviews are off getStudio's sections leave out Fresh ink and Reviews, so the page makes no read for them", async ({
+	test("getStudio's sections carry Fresh ink and Reviews", async ({
 		client,
 		assert,
 	}) => {
@@ -437,15 +413,6 @@ test.group("GET /api/v1/tenants/:tenant/reviews (listReviews)", (group) => {
 			"info",
 			"inquiry",
 		]);
-		await withReviewsOff(async () => {
-			assert.deepEqual(await sections(), [
-				"work",
-				"artists",
-				"flash",
-				"info",
-				"inquiry",
-			]);
-		});
 	});
 
 	test("never lists the other studio's reviews, through the route or from the other studio's context", async ({
@@ -663,19 +630,6 @@ test.group("GET /api/v1/tenants/:tenant/fresh-ink (listFreshInk)", (group) => {
 			422,
 			"validation_failed",
 		);
-	});
-
-	test("while reviews are off it is an empty page", async ({
-		client,
-		assert,
-	}) => {
-		const s = await studio("sp-fresh-e");
-		await inTenant(s.tenant, () => seedShownPost(s.tenant, s.project));
-		await withReviewsOff(async () => {
-			const off = await client.get(freshInkUrl(s.tenant.slug));
-			off.assertStatus(200);
-			assert.deepEqual(off.body(), { data: [], nextCursor: null });
-		});
 	});
 
 	test("a post approved through the dashboard is listed with the public copy publishing made", async ({

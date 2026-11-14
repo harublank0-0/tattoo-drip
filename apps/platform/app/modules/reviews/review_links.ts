@@ -70,12 +70,3 @@ export function reviewPageUrl(
 	const { origin } = new URL(template.replaceAll("{tenant}", slug));
 	return `${origin}/review#${token}`;
 }
-
-/**
- * The feature flag (spec ruling 12): reviews stay off until the client
- * content terms are reviewed. Off, every public review route is a 404 and
- * no link can be made. Read on every call, so a test can turn it on and off.
- */
-export function reviewsEnabled(): boolean {
-	return env.get("REVIEWS_ENABLED") === true;
-}

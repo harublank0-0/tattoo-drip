@@ -3,16 +3,13 @@ import type { HttpContext } from "@adonisjs/core/http";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService from "#modules/media/services/image_service";
-import { reviewsEnabled } from "#modules/reviews/review_links";
 import {
 	CLAIMED_FLASH_CHOICES,
 	claimedFlashOf,
 	FONTS,
 	logoTileOf,
 	lookOf,
-	REVIEW_SECTIONS,
 	SECTION_KEYS,
-	sectionsShown,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
@@ -55,15 +52,14 @@ export default class PageLookController {
 				accent: look.accent,
 				accentDark: look.accentDark,
 				font: look.font,
-				sections: sectionsShown(look.sections, reviewsEnabled()),
+				sections: look.sections,
 				// Not part of the served look (the flash reads apply it): the form's own.
 				claimedFlash: claimedFlashOf(tenant),
 			},
 			claimedFlashChoices: [...CLAIMED_FLASH_CHOICES],
 			themes: THEMES,
 			fonts: FONTS,
-			// Reviews and Fresh ink's sections only while the feature is on.
-			sectionKeys: sectionsShown(SECTION_KEYS, reviewsEnabled()),
+			sectionKeys: [...SECTION_KEYS],
 			// Where an empty colour box starts its swatch.
 			swatches: { light: THEME_ACCENT, dark: THEME_ACCENT_DARK },
 			// The logo's 640 px copy for the preview, never the key or the columns.
@@ -114,13 +110,7 @@ export default class PageLookController {
 		const { tenant } = tenantContext(ctx);
 		const input = await ctx.request.validateUsing(updateLookValidator);
 
-		// While reviews are off the form neither lists nor sends their
-		// sections: the stored list keeps them where they were.
-		await this.tenancy.updateLook(
-			tenant,
-			input,
-			reviewsEnabled() ? [] : REVIEW_SECTIONS,
-		);
+		await this.tenancy.updateLook(tenant, input);
 
 		ctx.session.flash("success", LOOK_SAVED_MESSAGE);
 		return ctx.response
