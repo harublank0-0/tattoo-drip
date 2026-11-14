@@ -11,7 +11,7 @@ import type { Field, Problem } from "./view-model.ts";
 /** A read's failure as the page shows it. */
 export type LoadProblem = "dead" | "limited" | "failed";
 
-/** A 404 at any time is the dead link (unknown, revoked, expired, or reviews off). */
+/** A 404 at any time is the dead link (unknown, revoked or expired). */
 export function isGone(error: unknown): boolean {
 	return isTattooApiError(error) && error.status === 404;
 }

@@ -91,8 +91,8 @@ export function ReviewLoading() {
 }
 
 /**
- * A link that doesn't work (unknown, revoked, expired, or reviews off: the
- * API's one 404), a rate limit, or a read that failed. A dead link never
+ * A link that doesn't work (unknown, revoked or expired: the API's one
+ * 404), a rate limit, or a read that failed. A dead link never
  * shows what was posted, only how to reach the studio (ruling 4).
  */
 export function ReviewProblem({

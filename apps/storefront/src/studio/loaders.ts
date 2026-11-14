@@ -169,8 +169,8 @@ export interface StudioPageData {
 	/**
 	 * The newest Fresh ink posts for the Fresh ink section (Reviews and Fresh
 	 * ink, slice 3), at most HOME_FRESH_INK_COUNT. Empty when there are none,
-	 * reviews are off, the page hides the section or the read failed, which
-	 * leaves the section out.
+	 * the page hides the section or the read failed, which leaves the section
+	 * out.
 	 */
 	readonly freshInk: FreshInkView;
 	/**
@@ -1250,8 +1250,8 @@ export function freshInkPageData(
 
 /**
  * `/reviews` (slice 3): the studio, its artists and a page of reviews, read
- * together. A cursor the API refuses, a page with nothing on it, reviews off
- * and a studio that hides the section are the not-found page: nothing links
+ * together. A cursor the API refuses, a page with nothing on it and a
+ * studio that hides the section are the not-found page: nothing links
  * there then.
  */
 export async function loadReviewsPage(

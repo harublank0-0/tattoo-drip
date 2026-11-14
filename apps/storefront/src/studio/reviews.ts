@@ -83,7 +83,7 @@ export interface ReviewsView {
 	readonly rating: RatingView | null;
 }
 
-/** What an older API, a failed read, the flag off or a garbled answer comes to. */
+/** What an older API, a failed read or a garbled answer comes to. */
 export const EMPTY_REVIEWS: ReviewsView = Object.freeze({
 	reviews: [],
 	nextCursor: null,

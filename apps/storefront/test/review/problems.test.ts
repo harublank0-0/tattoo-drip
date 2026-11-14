@@ -15,7 +15,7 @@ const error = (
 		...(fields ? { fields } : {}),
 	});
 
-test("a 404 at any time is the dead link (unknown, revoked, expired, or reviews off)", () => {
+test("a 404 at any time is the dead link (unknown, revoked or expired)", () => {
 	assert.equal(loadProblemOf(error(404, "not_found")), "dead");
 	assert.equal(loadProblemOf(error(429, "rate_limited")), "limited");
 	assert.equal(loadProblemOf(error(503, "service_busy")), "failed");
