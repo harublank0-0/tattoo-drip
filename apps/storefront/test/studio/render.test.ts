@@ -106,7 +106,9 @@ const groupLinks = (html: string, id: string) =>
 					`<ul class="links" aria-labelledby="${id}">([\\s\\S]*?)</ul>`,
 				),
 			)?.[1] ?? ""
-		).matchAll(/<a [^>]*>([^<]*)<\/a>/g),
+		).matchAll(
+			/<a [^>]*>(?:<svg[^>]*aria-hidden="true"[^>]*><path[^>]*><\/path><\/svg>)?([^<]*)<\/a>/g,
+		),
 		(match) => match[1],
 	);
 /** The step titles in one "How booking works" block. */
@@ -1854,7 +1856,7 @@ describe("an artist's styles and links", () => {
 		assert.ok(links);
 		assert.match(
 			links,
-			/<a class="link-chip" href="https:\/\/instagram\.com\/sita\.ink" rel="noopener noreferrer">Instagram<\/a>/,
+			/<a class="link-chip" href="https:\/\/instagram\.com\/sita\.ink" rel="noopener noreferrer"><svg[^>]*aria-hidden="true"[^>]*><path[^>]*><\/path><\/svg>Instagram<\/a>/,
 		);
 		assert.equal(count(links, /<li>/g), 1);
 		// The card's one-line version is not repeated on the artist's own page.
@@ -1888,7 +1890,7 @@ describe("an artist's styles and links", () => {
 		assert.deepEqual(
 			Array.from(
 				(html.match(ARTIST_LINKS)?.[1] ?? "").matchAll(
-					/<a [^>]*>([^<]*)<\/a>/g,
+					/<a [^>]*><svg[^>]*aria-hidden="true"[^>]*><path[^>]*><\/path><\/svg>([^<]*)<\/a>/g,
 				),
 				(m) => m[1],
 			),
@@ -2094,11 +2096,11 @@ describe("the header and the chat button (TAT-127)", () => {
 		]);
 		assert.match(
 			button,
-			/<a class="action action-secondary" href="[^"]*" rel="noopener noreferrer">WhatsApp<\/a>/,
+			/<a class="action action-secondary" href="[^"]*" rel="noopener noreferrer"><svg[^>]*aria-hidden="true"[^>]*><path[^>]*><\/path><\/svg>WhatsApp<\/a>/,
 		);
 		assert.match(
 			button,
-			/<a class="action action-secondary" href="viber:\/\/chat\?number=%2B9779812345678">Viber<\/a>/,
+			/<a class="action action-secondary" href="viber:\/\/chat\?number=%2B9779812345678"><svg[^>]*aria-hidden="true"[^>]*><path[^>]*><\/path><\/svg>Viber<\/a>/,
 		);
 		// After the footer, the last thing on the page.
 		assert.ok(html.indexOf("</footer>") < html.indexOf("<aside"));

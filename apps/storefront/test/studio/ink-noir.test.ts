@@ -622,7 +622,7 @@ describe("Ink Noir's pages", () => {
 		);
 		assert.match(
 			footer,
-			/<a href="https:\/\/instagram\.com\/blackneedle" rel="noopener noreferrer"><span>Instagram<\/span><\/a>/,
+			/<a href="https:\/\/instagram\.com\/blackneedle" rel="noopener noreferrer"><svg[^>]*aria-hidden="true"[^>]*><path[^>]*><\/path><\/svg><span>Instagram<\/span><\/a>/,
 		);
 		assert.match(
 			footer,

@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import type { ReactNode } from "react";
 import type { BookingContext } from "../../booking/booking.ts";
 import type { ChallengeTheme } from "../../intake/challenge.ts";
@@ -211,6 +212,7 @@ function InquiryFallback({
 						href={whatsapp}
 						rel={linkRel(whatsapp)}
 					>
+						<SocialIcon platform="whatsapp" />
 						Message on WhatsApp
 					</a>
 				) : null}
@@ -230,6 +232,7 @@ function InquiryFallback({
 						href={instagram}
 						rel={linkRel(instagram)}
 					>
+						<SocialIcon platform="instagram" />
 						Message on Instagram
 					</a>
 				) : null}

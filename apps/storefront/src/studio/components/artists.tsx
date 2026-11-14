@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { Fill } from "../../intake/components/fill.tsx";
 import { studioCopy } from "../copy.ts";
 import { isAllowedHref, linkRel } from "../links.ts";
@@ -129,6 +130,7 @@ function ArtistLinks({ links }: { links: ArtistView["links"] }) {
 			{allowed.map((link) => (
 				<li key={`${link.kind}:${link.href}`}>
 					<a className="link-chip" href={link.href} rel={linkRel(link.href)}>
+						<SocialIcon platform={link.kind} className="social-link-icon" />
 						{link.label}
 					</a>
 				</li>

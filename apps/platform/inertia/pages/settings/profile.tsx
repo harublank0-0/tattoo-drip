@@ -1,4 +1,5 @@
 import { Form } from "@adonisjs/inertia/react";
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import CoverPhotoForm from "~/components/cover_photo_form";
 import type { CoverProps } from "~/components/photos";
 import Section from "~/components/section";
@@ -40,21 +41,25 @@ type Profile = {
 
 const SOCIAL_LINKS = [
 	{
+		platform: "instagram",
 		name: "instagramUrl",
 		label: "Instagram",
 		placeholder: "https://instagram.com/yourstudio",
 	},
 	{
+		platform: "facebook",
 		name: "facebookUrl",
 		label: "Facebook",
 		placeholder: "https://facebook.com/yourstudio",
 	},
 	{
+		platform: "tiktok",
 		name: "tiktokUrl",
 		label: "TikTok",
 		placeholder: "https://tiktok.com/@yourstudio",
 	},
 	{
+		platform: "website",
 		name: "websiteUrl",
 		label: "Website",
 		placeholder: "https://yourstudio.com",
@@ -209,7 +214,13 @@ export default function StudioProfile({
 							<FieldGroup>
 								{SOCIAL_LINKS.map((link) => (
 									<Field key={link.name} data-invalid={!!errors[link.name]}>
-										<FieldLabel htmlFor={link.name}>{link.label}</FieldLabel>
+										<FieldLabel htmlFor={link.name}>
+											<SocialIcon
+												platform={link.platform}
+												className="size-4 shrink-0"
+											/>
+											{link.label}
+										</FieldLabel>
 										<Input
 											id={link.name}
 											name={link.name}
