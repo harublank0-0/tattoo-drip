@@ -252,6 +252,46 @@ describe("tattooQueries.services, work and availability", () => {
 		assert.deepEqual(design.calls, [`${base}/flash/${id}`]);
 	});
 
+	test("the studio's reviews and Fresh ink have keys under the tenant and load through the SDK", async () => {
+		const reviewsPage = { data: [], nextCursor: null, rating: null };
+		const freshPage = { data: [], nextCursor: null };
+		const reviews = clientAnswering(200, reviewsPage);
+		const fresh = clientAnswering(200, freshPage);
+		const queryClient = noRetries();
+		const base = `https://api.example.com/api/v1/tenants/${TENANT}`;
+
+		assert.deepEqual(tattooQueries.studioReviews(reviews.client).queryKey, [
+			...tattooKeys.tenant(TENANT),
+			"studio-reviews",
+			{},
+		]);
+		assert.deepEqual(
+			tattooQueries.freshInk(fresh.client, { limit: 6 }).queryKey,
+			[...tattooKeys.tenant(TENANT), "fresh-ink", { limit: 6 }],
+		);
+		// Never the client page's key: that one holds a link's token.
+		assert.notDeepEqual(
+			tattooQueries.studioReviews(reviews.client).queryKey.slice(0, 4),
+			tattooKeys.review(TENANT, "token").slice(0, 4),
+		);
+		assert.equal(
+			tattooQueries.studioReviews(reviews.client).staleTime,
+			undefined,
+		);
+		assert.deepEqual(
+			await queryClient.fetchQuery(
+				tattooQueries.studioReviews(reviews.client, { limit: 6 }),
+			),
+			reviewsPage,
+		);
+		assert.deepEqual(reviews.calls, [`${base}/reviews?limit=6`]);
+		assert.deepEqual(
+			await queryClient.fetchQuery(tattooQueries.freshInk(fresh.client)),
+			freshPage,
+		);
+		assert.deepEqual(fresh.calls, [`${base}/fresh-ink`]);
+	});
+
 	test("one QueryClient never serves one tenant's data for another", async () => {
 		const a = clientAnswering(
 			200,

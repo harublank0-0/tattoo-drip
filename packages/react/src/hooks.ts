@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
 	ListAvailabilityQuery,
 	ListFlashQuery,
+	ListFreshInkQuery,
+	ListReviewsQuery,
 	ListServicesQuery,
 	ListWorkQuery,
 } from "@tattoo-drip/sdk";
@@ -42,6 +44,16 @@ export function useFlash(query?: ListFlashQuery) {
 /** One shown flash design by id (`client.flash.get`). */
 export function useFlashDesign(id: string) {
 	return useQuery(tattooQueries.flashDesign(useTattooClient(), id));
+}
+
+/** A page of the studio's client reviews, with the average from 3 (`client.studioReviews.list`). */
+export function useStudioReviews(query?: ListReviewsQuery) {
+	return useQuery(tattooQueries.studioReviews(useTattooClient(), query));
+}
+
+/** A page of the studio's Fresh ink (`client.freshInk.list`). */
+export function useFreshInk(query?: ListFreshInkQuery) {
+	return useQuery(tattooQueries.freshInk(useTattooClient(), query));
 }
 
 /** Pass `null` until both an artist and a service are chosen. */

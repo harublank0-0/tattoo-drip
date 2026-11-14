@@ -9,6 +9,8 @@ import {
 	isTattooApiError,
 	type ListAvailabilityQuery,
 	type ListFlashQuery,
+	type ListFreshInkQuery,
+	type ListReviewsQuery,
 	type ListServicesQuery,
 	type ListWorkQuery,
 	type SubmitDepositProofInput,
@@ -120,6 +122,10 @@ export const tattooKeys = {
 		[...tattooKeys.tenant(tenant), "flash-design"] as const,
 	flashDesign: (tenant: string, id: string) =>
 		[...tattooKeys.flashDesigns(tenant), id] as const,
+	studioReviews: (tenant: string, query?: ListReviewsQuery) =>
+		[...tattooKeys.tenant(tenant), "studio-reviews", query ?? {}] as const,
+	freshInk: (tenant: string, query?: ListFreshInkQuery) =>
+		[...tattooKeys.tenant(tenant), "fresh-ink", query ?? {}] as const,
 	availability: (tenant: string, query: ListAvailabilityQuery | null) =>
 		[...tattooKeys.tenant(tenant), "availability", query] as const,
 	deposit: (tenant: string, token: string) =>
@@ -137,7 +143,7 @@ export const tattooKeys = {
  * one fetch: TanStack Query 5.104's replacement for `ensureQueryData`).
  * Each forwards TanStack Query's `signal`, so a query nobody needs any more
  * cancels its request.
- * `studio`, `artists`, `artist`, `work`, `workPhoto`, `flash` and `flashDesign` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
+ * `studio`, `artists`, `artist`, `work`, `workPhoto`, `flash`, `flashDesign`, `studioReviews` and `freshInk` set no `staleTime` or `retry`: the app's defaults decide (TAT-44).
  */
 export const tattooQueries = {
 	studio: (client: TattooClient) =>
@@ -179,6 +185,16 @@ export const tattooQueries = {
 		queryOptions({
 			queryKey: tattooKeys.flashDesign(client.tenant, id),
 			queryFn: ({ signal }) => client.flash.get(id, { signal }),
+		}),
+	studioReviews: (client: TattooClient, query?: ListReviewsQuery) =>
+		queryOptions({
+			queryKey: tattooKeys.studioReviews(client.tenant, query),
+			queryFn: ({ signal }) => client.studioReviews.list(query, { signal }),
+		}),
+	freshInk: (client: TattooClient, query?: ListFreshInkQuery) =>
+		queryOptions({
+			queryKey: tattooKeys.freshInk(client.tenant, query),
+			queryFn: ({ signal }) => client.freshInk.list(query, { signal }),
 		}),
 	availability: (client: TattooClient, query: ListAvailabilityQuery | null) =>
 		queryOptions({
