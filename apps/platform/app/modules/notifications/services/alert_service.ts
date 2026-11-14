@@ -9,12 +9,15 @@ import {
 	type AlertKind,
 	dashboardUrl,
 	excerpt,
+	freshInkIntro,
 	inquiryIntro,
 	inquiryRecipients,
 	paymentsCardPath,
 	proofIntro,
+	reviewsPath,
 } from "#modules/notifications/alerts";
 import DepositProofMail from "#modules/notifications/emails/deposit_proof_mail";
+import FreshInkMail from "#modules/notifications/emails/fresh_ink_mail";
 import NewInquiryMail from "#modules/notifications/emails/new_inquiry_mail";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -50,6 +53,18 @@ export type DepositProof = {
 	projectId: string;
 	artistId: string | null;
 	clientName: string;
+};
+
+/**
+ * What a Fresh ink alert needs (FreshInkAlertJob gathers it): the post, its
+ * round in the studio's queue, the project's artist profile and the name the
+ * client chose to show (never their full name, phone or email).
+ */
+export type FreshInk = {
+	postId: string;
+	round: number;
+	artistId: string | null;
+	shownName: string;
 };
 
 /**
@@ -191,6 +206,63 @@ export default class AlertService {
 		});
 	}
 
+	/**
+	 * Alerts the studio's owners, and the member linked to the project's live
+	 * artist profile, that a Fresh ink post waits for approval
+	 * (FreshInkAlertJob, Reviews and Fresh ink slice 2): the deposit proof's
+	 * rule. Each member gets one alert and one email per post per round
+	 * (unique (user_id, post_id, post_round) and `on conflict do nothing`), so
+	 * a client's change of an approved post alerts again and a rerun adds
+	 * nothing. The email names the client only by the name they chose to show
+	 * and links to the Reviews page. Returns the users alerted by this call.
+	 */
+	async freshInk(
+		tenant: TenantRef,
+		post: FreshInk,
+		options: AlertOptions = {},
+	): Promise<string[]> {
+		const studio = await this.tenancy.find(tenant.id);
+		if (!studio) return [];
+		const members = await this.tenancy.members(tenant);
+		const artist = post.artistId
+			? (await this.artists.list(tenant)).find(({ id }) => id === post.artistId)
+			: undefined;
+		const recipients = inquiryRecipients(members, artist?.userId ?? null);
+		const emails = options.emails ?? env.get("ALERT_EMAILS") !== false;
+		const url = dashboardUrl(env.get("APP_URL"), reviewsPath(studio.slug));
+
+		return withTransaction(async (trx) => {
+			const inserted = await insertAlerts(
+				trx,
+				tenant,
+				{ kind: "fresh_ink", postId: post.postId, round: post.round },
+				recipients.map(({ userId }) => userId),
+			);
+			const alerted = recipients.filter(({ userId }) => inserted.has(userId));
+			if (emails) {
+				for (const recipient of alerted) {
+					await sendMailInTransaction(
+						new FreshInkMail({
+							to: recipient.email,
+							recipientName: recipient.fullName,
+							studioName: studio.name,
+							intro: freshInkIntro({
+								shownName: post.shownName,
+								studioName: studio.name,
+								edited: post.round > 1,
+								yourProject: recipient.askedForYou,
+							}),
+							edited: post.round > 1,
+							url,
+						}),
+						trx,
+					);
+				}
+			}
+			return alerted.map(({ userId }) => userId);
+		});
+	}
+
 	/** The member's alerts in this studio, newest first, 25 a page. */
 	async list(
 		tenant: TenantRef,
@@ -262,10 +334,11 @@ export default class AlertService {
 	}
 }
 
-/** What one alert row names: an inquiry, or a payment and its project (TAT-88). */
+/** What one alert row names: an inquiry, a payment and its project (TAT-88), or a post and its round (slice 2). */
 type AlertSubject =
 	| { kind: "new_inquiry"; inquiryId: string }
-	| { kind: "deposit_proof"; projectId: string; paymentId: string };
+	| { kind: "deposit_proof"; projectId: string; paymentId: string }
+	| { kind: "fresh_ink"; postId: string; round: number };
 
 /** Inserts one alert per user about `subject`, skipping those that exist; returns the users inserted now. */
 async function insertAlerts(
@@ -279,10 +352,15 @@ async function insertAlerts(
 	const { columns, ids } =
 		subject.kind === "new_inquiry"
 			? { columns: ["inquiry_id"], ids: [subject.inquiryId] }
-			: {
-					columns: ["project_id", "payment_id"],
-					ids: [subject.projectId, subject.paymentId],
-				};
+			: subject.kind === "deposit_proof"
+				? {
+						columns: ["project_id", "payment_id"],
+						ids: [subject.projectId, subject.paymentId],
+					}
+				: {
+						columns: ["post_id", "post_round"],
+						ids: [subject.postId, subject.round],
+					};
 	const row = `(?, ?, ?, ${ids.map(() => "?").join(", ")}, now())`;
 	const { rows } = await trx.rawQuery(
 		`insert into staff_alerts (tenant_id, user_id, kind, ${columns.join(", ")}, created_at)

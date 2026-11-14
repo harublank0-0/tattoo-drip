@@ -41,7 +41,7 @@ export const REVIEW_MESSAGES = {
  * Text the database can hold and a page can show plainly: no NUL and no
  * control character but a line break or a tab (plain text, ruling 5).
  */
-const plainText = vine.createRule(
+export const plainText = vine.createRule(
 	(value: unknown, _options: undefined, field: FieldContext) => {
 		if (typeof value !== "string") return;
 		// biome-ignore lint/suspicious/noControlCharactersInRegex: refusing control characters is the point.
@@ -80,7 +80,7 @@ const shownName = vine.createRule(
 );
 
 /** A length in characters as PostgreSQL counts them (code points), so any script counts as people see it. */
-const characters = vine.createRule(
+export const characters = vine.createRule(
 	(
 		value: unknown,
 		options: { min: number; max: number; short: string; long: string },

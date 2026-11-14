@@ -26,6 +26,7 @@ import {
 	ReviewPageNotFoundError,
 	ReviewTakenDownError,
 } from "#modules/reviews/errors";
+import FreshInkAlertJob from "#modules/reviews/jobs/fresh_ink_alert_job";
 import ProcessClientPostVideoJob from "#modules/reviews/jobs/process_client_post_video_job";
 import ClientPost from "#modules/reviews/models/client_post";
 import ClientPostMedia from "#modules/reviews/models/client_post_media";
@@ -38,6 +39,8 @@ import {
 	orderWithout,
 	postContentEditable,
 } from "#modules/reviews/rules";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PostPublicationService from "#modules/reviews/services/post_publication_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import {
 	afterCommit,
@@ -110,6 +113,7 @@ export default class ClientPostService {
 		private images: ImageService,
 		private videos: VideoService,
 		private projects: ProjectService,
+		private publication: PostPublicationService,
 	) {}
 
 	/**
@@ -216,7 +220,7 @@ export default class ClientPostService {
 				},
 				{ client: trx },
 			);
-			await contentChanged(post);
+			await this.contentChanged(trx, tenant, post, media);
 		});
 	}
 
@@ -350,7 +354,7 @@ export default class ClientPostService {
 					}),
 					trx,
 				);
-				await contentChanged(post);
+				await this.contentChanged(trx, tenant, post, media);
 			});
 		} catch (error) {
 			if (isUniqueViolation(error, "client_post_media_video_staging_key")) {
@@ -382,10 +386,15 @@ export default class ClientPostService {
 			if (!postContentEditable(post)) throw new ReviewLockedError();
 			const order = orderWithout(media, mediaId);
 			if (!order) throw new PostNeedsPhotoError();
+			// Slice 2: an approved post goes back to the studio's queue; its
+			// public copies go first, the removed item's included.
+			if (post.publishedAt) {
+				await this.publication.withdraw(tenant, post, media);
+			}
 			await this.deleteFiles(tenant, [target]);
 			await target.delete();
 			await reposition(trx, tenant, post, order);
-			await contentChanged(post);
+			await this.contentChanged(trx, tenant, post, media);
 		});
 	}
 
@@ -407,7 +416,7 @@ export default class ClientPostService {
 			if (asked[0].kind !== "photo") throw new PostNeedsPhotoError();
 			if (asked.every((item, index) => item.id === media[index].id)) return;
 			await reposition(trx, tenant, post, asked);
-			await contentChanged(post);
+			await this.contentChanged(trx, tenant, post, media);
 		});
 	}
 
@@ -453,8 +462,9 @@ export default class ClientPostService {
 		post.styles = [...input.styles];
 		if (post.submittedAt === null) {
 			post.submittedAt = DateTime.now();
+			await this.enterQueue(trx, tenant, post);
 		} else if (changed && post.status === "approved") {
-			backToQueue(post);
+			await this.backToQueue(trx, tenant, post, media);
 		}
 		if (submitter) {
 			post.submitterDigest = submitter.digest;
@@ -464,23 +474,25 @@ export default class ClientPostService {
 		return "saved";
 	}
 
-	/** The shown name and the consents on the project's live post, if any (ruling 8: always the client's to change). */
+	/**
+	 * The shown name and the consents on the project's live post, if any
+	 * (ruling 8: always the client's to change). Slice 2: the public copies
+	 * follow at once (PostPublicationService.sync): a withdrawn last surface
+	 * deletes them, a first surface on an approved post makes them. Never a
+	 * deleted post (finding 6): its scrubbed name stays scrubbed.
+	 */
 	async applyShared(
 		trx: TransactionClientContract,
 		ctx: ReviewContext,
 		shared: SharedChoices,
 	): Promise<void> {
-		// Never a deleted post (finding 6): its scrubbed name stays scrubbed.
-		await ClientPost.query({ client: trx })
-			.where("tenant_id", ctx.tenant.id)
-			.where("project_id", ctx.project.id)
-			.whereNull("deleted_at")
-			.update({
-				shown_name: shared.shownName,
-				consent_studio_page: shared.consentStudioPage,
-				consent_discover: shared.consentDiscover,
-				updated_at: new Date(),
-			});
+		const post = await this.livePost(trx, ctx);
+		if (!post) return;
+		post.shownName = shared.shownName;
+		post.consentStudioPage = shared.consentStudioPage;
+		post.consentDiscover = shared.consentDiscover;
+		post.updatedAt = DateTime.now();
+		await this.publication.sync(ctx.tenant, post);
 	}
 
 	/**
@@ -536,6 +548,10 @@ export default class ClientPostService {
 		post: ClientPost,
 	): Promise<void> {
 		const media = await this.mediaOf(tenant, post, trx);
+		// The public copies first (slice 2), whatever `published_at` says (a
+		// copy left by an earlier failure goes too; a missing one counts as
+		// deleted), then the private files.
+		await this.publication.withdraw(tenant, post, media);
 		await this.deleteFiles(tenant, media);
 		await ClientPostMedia.query({ client: trx })
 			.where("tenant_id", tenant.id)
@@ -658,6 +674,62 @@ export default class ClientPostService {
 			}),
 		);
 		await this.videos.deleteStaged(tenant, staged);
+	}
+
+	/**
+	 * A change of the post's content (ruling 7): an approved post needs the
+	 * studio's approval again (`backToQueue`), and any change moves
+	 * `updated_at`. `media` is what the post held before the change.
+	 */
+	private async contentChanged(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		post: ClientPost,
+		media: readonly ClientPostMedia[],
+	): Promise<void> {
+		if (post.status === "approved") {
+			await this.backToQueue(trx, tenant, post, media);
+		}
+		post.updatedAt = DateTime.now();
+		await post.save();
+	}
+
+	/**
+	 * The submit hands a draft to the studio: its first round in the queue,
+	 * and the staff alert (FreshInkAlertJob, in this transaction, so it
+	 * exists exactly when the submit does). Not saved here.
+	 */
+	private async enterQueue(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		post: ClientPost,
+	): Promise<void> {
+		post.waitingRound = 1;
+		post.waitingSince = DateTime.now();
+		await queueAlert(trx, tenant, post);
+	}
+
+	/**
+	 * A client's change of an approved post sends it back to the studio
+	 * (ruling 7): its public copies are deleted first (they must not stay
+	 * while it waits), the decision is cleared, and a new round alerts the
+	 * staff again. Not saved here.
+	 */
+	private async backToQueue(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		post: ClientPost,
+		media: readonly ClientPostMedia[],
+	): Promise<void> {
+		if (post.publishedAt) {
+			await this.publication.withdraw(tenant, post, media);
+		}
+		post.status = "waiting";
+		post.decidedAt = null;
+		post.decidedBy = null;
+		post.waitingRound += 1;
+		post.waitingSince = DateTime.now();
+		await queueAlert(trx, tenant, post);
 	}
 
 	/** The project's live post under its lock, or null. */
@@ -847,17 +919,20 @@ async function reposition(
 	);
 }
 
-/** A change of an approved post's content needs the studio's approval again (ruling 7); any change moves `updated_at`. */
-async function contentChanged(post: ClientPost): Promise<void> {
-	if (post.status === "approved") backToQueue(post);
-	post.updatedAt = DateTime.now();
-	await post.save();
-}
-
-function backToQueue(post: ClientPost) {
-	post.status = "waiting";
-	post.decidedAt = null;
-	post.decidedBy = null;
+/** Queues the staff alert for the post's current round (once per post per round). */
+async function queueAlert(
+	trx: TransactionClientContract,
+	tenant: TenantRef,
+	post: ClientPost,
+): Promise<void> {
+	await dispatchInTransaction(
+		FreshInkAlertJob.dispatch({
+			tenantId: tenant.id,
+			postId: post.id,
+			round: post.waitingRound,
+		}),
+		trx,
+	);
 }
 
 function blankAsNull(value: string | null | undefined): string | null {

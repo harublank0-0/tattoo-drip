@@ -91,6 +91,16 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
  * pinned search_path and no EXECUTE for PUBLIC (database/README.md).
  */
 const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
+	"public.client_post_tenant": {
+		args: "requested_id uuid",
+		reason:
+			"the id of the live tenant holding the Fresh ink post whose id is exactly the argument, for the operator's takedown commands (Reviews and Fresh ink, slice 2)",
+	},
+	"public.client_review_tenant": {
+		args: "requested_id uuid",
+		reason:
+			"the id of the live tenant holding the review whose id is exactly the argument, for the operator's takedown commands (Reviews and Fresh ink, slice 2)",
+	},
 	"public.expired_quote_candidates": {
 		args: "",
 		reason:
@@ -100,6 +110,11 @@ const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
 		args: "requested_hash text",
 		reason:
 			"the id of the live tenant holding the invitation whose token hash is exactly the argument, for the invitation page (TAT-33)",
+	},
+	"public.open_review_reports": {
+		args: "",
+		reason:
+			"lists (tenant_id, review_id) of live reviews reported by their studio and not decided, for the operator's report list (Reviews and Fresh ink, slice 2)",
 	},
 	"public.stale_submitter_tenants": {
 		args: "",

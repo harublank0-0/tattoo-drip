@@ -240,3 +240,40 @@ test.group("The aftercare default (TAT-111)", () => {
 		assert.isNull(templateProblem("aftercare", DEFAULT_TEMPLATES.aftercare));
 	});
 });
+
+test.group("The review request (Reviews and Fresh ink, slice 2)", () => {
+	test("the spec's words with the link; a studio's own text must keep the link", ({
+		assert,
+	}) => {
+		assert.equal(
+			renderMessage("review_request", DEFAULT_TEMPLATES.review_request, {
+				client_name: "Sita",
+				studio_name: "Black Needle",
+				review_link: "https://black-needle.example/review#token",
+			}),
+			"How did it heal? Tell us and show it off: https://black-needle.example/review#token",
+		);
+		assert.deepEqual(KIND_PLACEHOLDERS.review_request, [
+			"client_name",
+			"studio_name",
+			"review_link",
+		]);
+		assert.equal(
+			templateProblem(
+				"review_request",
+				"Tell us how it healed, {client_name}!",
+			),
+			"Keep {review_link}: it is the link the client reviews on.",
+		);
+		assert.isNull(
+			templateProblem(
+				"review_request",
+				"Hi {client_name}, how did it heal? {review_link}",
+			),
+		);
+		assert.match(
+			templateProblem("review_request", "{deposit_link} {review_link}") ?? "",
+			/can't be used here/,
+		);
+	});
+});

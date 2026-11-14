@@ -20,6 +20,9 @@ import {
 	moveValidator,
 	notesValidator,
 } from "#modules/projects/validators/project";
+import { reviewsEnabled } from "#modules/reviews/review_links";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import ReviewLinkService from "#modules/reviews/services/review_link_service";
 
 /** What each manual move tells the user when it's done. */
 const MOVE_DONE: Record<ManualMove, string> = {
@@ -46,7 +49,10 @@ const RULE_MESSAGES: Record<ProjectRuleReason, string> = {
  */
 @inject()
 export default class ProjectChangesController {
-	constructor(private projects: ProjectService) {}
+	constructor(
+		private projects: ProjectService,
+		private reviewLinks: ReviewLinkService,
+	) {}
 
 	async move(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
@@ -98,6 +104,10 @@ export default class ProjectChangesController {
 		);
 		const via = toContactVia(await ctx.request.validateUsing(contactValidator));
 		await this.projects.markContacted(tenant, membership, project, via);
+		// "Ask for a review" sent (slice 2): the link's "sent on".
+		if (via.kind === "review_request" && reviewsEnabled()) {
+			await this.reviewLinks.markSent(tenant, membership, project.id);
+		}
 		ctx.session.flash("success", "Marked as contacted.");
 		return backTo(ctx, tenant, project);
 	}

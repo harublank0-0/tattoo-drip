@@ -217,6 +217,25 @@ export interface ApiDefinition {
       depositOutcome: {
         store: typeof routes['tenant.projects.deposit_outcome.store']
       }
+      reviewLink: {
+        store: typeof routes['tenant.projects.review_link.store']
+        destroy: typeof routes['tenant.projects.review_link.destroy']
+      }
+    }
+    reviews: {
+      index: typeof routes['tenant.reviews.index']
+      posts: {
+        approve: typeof routes['tenant.reviews.posts.approve']
+        decline: typeof routes['tenant.reviews.posts.decline']
+        unpublish: typeof routes['tenant.reviews.posts.unpublish']
+      }
+      reply: {
+        update: typeof routes['tenant.reviews.reply.update']
+        destroy: typeof routes['tenant.reviews.reply.destroy']
+      }
+      report: {
+        store: typeof routes['tenant.reviews.report.store']
+      }
     }
     payments: {
       verify: typeof routes['tenant.payments.verify']

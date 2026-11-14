@@ -31,7 +31,7 @@ import {
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import MessageTemplateService from "#modules/notifications/services/message_template_service";
 import {
-	contactValidator,
+	inquiryContactValidator,
 	toContactVia,
 } from "#modules/notifications/validators/contact";
 import { daysAgoText, lastContactText } from "#modules/projects/contact";
@@ -292,7 +292,9 @@ export default class InquiriesController {
 	async contacted(ctx: HttpContext) {
 		const { tenant } = tenantContext(ctx);
 		const inquiry = await this.inquiries.findFor(tenant, ctx.params.id);
-		const via = toContactVia(await ctx.request.validateUsing(contactValidator));
+		const via = toContactVia(
+			await ctx.request.validateUsing(inquiryContactValidator),
+		);
 		await this.inquiries.markContacted(tenant, inquiry, via);
 		ctx.session.flash("success", "Marked as contacted.");
 		return ctx.response

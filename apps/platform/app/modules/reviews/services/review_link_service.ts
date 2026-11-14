@@ -68,7 +68,7 @@ export default class ReviewLinkService {
 	 * assigned to), else E_ROW_NOT_FOUND. Refused with ReviewLinkRuleError
 	 * while reviews are off (`disabled`) and until the tattoo work is done
 	 * (`not_done`: in progress, healing check or completed, with a completed
-	 * tattoo session). Under the project's row lock, so two clicks make one
+	 * tattoo session). Under the project's row lock (ProjectService.lockFor, which re-checks an artist's assignment), so two clicks make one
 	 * link; an expired link is retired (revoked) when its successor is made.
 	 */
 	async linkFor(
@@ -79,8 +79,10 @@ export default class ReviewLinkService {
 		if (!reviewsEnabled()) throw new ReviewLinkRuleError("disabled");
 		const project = await this.projects.findFor(tenant, member, projectId);
 		return withTransaction(async (trx) => {
-			const live = await this.projects.lockLive(trx, tenant, project.id);
-			if (!live || !(await this.tattooDone(tenant, live))) {
+			// The project's lock, re-checking under it that an artist still has
+			// the project (ProjectService.lockFor), as every project write does.
+			const live = await this.projects.lockFor(trx, tenant, member, project.id);
+			if (!(await this.tattooDone(tenant, live))) {
 				throw new ReviewLinkRuleError("not_done");
 			}
 			const current = await ReviewLink.query({ client: trx })
@@ -139,12 +141,68 @@ export default class ReviewLinkService {
 		projectId: string,
 	): Promise<boolean> {
 		const project = await this.projects.findFor(tenant, member, projectId);
-		const changed = await ReviewLink.query()
+		return withTransaction(async (trx) => {
+			await this.projects.lockFor(trx, tenant, member, project.id);
+			const changed = await ReviewLink.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("project_id", project.id)
+				.whereNull("revoked_at")
+				.update({ revoked_at: new Date() });
+			return Number(changed[0] ?? 0) > 0;
+		});
+	}
+
+	/**
+	 * What the project page's "Ask for a review" shows (slice 2): the live
+	 * link with its token and URL while it works, else null, and the latest
+	 * link made for the project (revoked or expired included) for "the last
+	 * link was revoked". The caller loaded the project for the member
+	 * (ProjectService.findFor).
+	 */
+	async stateFor(
+		tenant: Pick<Tenant, "id" | "slug">,
+		project: Pick<TattooProject, "id">,
+	): Promise<{
+		live: { link: ReviewLink; token: string; url: string } | null;
+		latest: ReviewLink | null;
+	}> {
+		const latest = await ReviewLink.query()
 			.where("tenant_id", tenant.id)
 			.where("project_id", project.id)
-			.whereNull("revoked_at")
-			.update({ revoked_at: new Date() });
-		return Number(changed[0] ?? 0) > 0;
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc")
+			.first();
+		const token = latest ? liveToken(latest) : null;
+		return {
+			live:
+				latest && token
+					? { link: latest, token, url: reviewPageUrl(tenant.slug, token) }
+					: null,
+			latest,
+		};
+	}
+
+	/**
+	 * Records that the studio sent the project's live link (a chat link or a
+	 * copied message of "Ask for a review", slice 2): `sent_at` now. Nothing
+	 * when the project has no live link. `member` must be able to open the
+	 * project.
+	 */
+	async markSent(
+		tenant: TenantRef,
+		member: Member,
+		projectId: string,
+	): Promise<void> {
+		const project = await this.projects.findFor(tenant, member, projectId);
+		await withTransaction(async (trx) => {
+			await this.projects.lockFor(trx, tenant, member, project.id);
+			await ReviewLink.query({ client: trx })
+				.where("tenant_id", tenant.id)
+				.where("project_id", project.id)
+				.whereNull("revoked_at")
+				.where("expires_at", ">", new Date())
+				.update({ sent_at: new Date() });
+		});
 	}
 
 	/**

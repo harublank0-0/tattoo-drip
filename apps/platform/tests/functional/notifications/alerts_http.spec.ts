@@ -742,6 +742,8 @@ test.group("Alerts: who may read an inquiry's words (TAT-102)", (group) => {
 			inquiryId: alert.inquiryId,
 			projectId: alert.projectId,
 			paymentId: alert.paymentId,
+			postId: alert.postId,
+			postRound: alert.postRound,
 		}));
 		for (const role of ["owner", "artist"] as const) {
 			const found = await inTenant(tenant, () =>

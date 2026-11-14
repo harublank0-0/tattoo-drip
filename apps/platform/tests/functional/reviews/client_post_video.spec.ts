@@ -256,7 +256,9 @@ test.group("Review page: Fresh ink videos", (group) => {
 			422,
 			"validation_failed",
 		);
-		const rows = await inTenant(b.tenant, () => ClientPostMedia.query());
+		const rows = await inTenant(b.tenant, () =>
+			ClientPostMedia.query().where("post_id", b.clientPost.id),
+		);
 		assert.lengthOf(rows, 1, "B's post is as it was");
 	});
 });

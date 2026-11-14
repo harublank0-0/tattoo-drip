@@ -25,8 +25,8 @@ type MessageSetting = {
 };
 
 /**
- * Settings, Messages (TAT-52): the six chat messages staff send with one
- * tap. One form, so each error shows under its own box; each preview
+ * Settings, Messages (TAT-52): the chat messages staff send with one
+ * tap (the review request only while reviews are on). One form, so each error shows under its own box; each preview
  * follows its box as it is typed.
  */
 export default function Messages({

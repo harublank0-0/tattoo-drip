@@ -105,6 +105,8 @@ function MoreMenu({
 	const isCurrent = (item: ShellNavItem) =>
 		isCurrentPath(url, hrefOf(item), { also: item.also });
 	const open = items.some(isCurrent);
+	// A count under More (Reviews' waiting Fresh ink) shows on the tab too, so it isn't hidden.
+	const counted = items.reduce((sum, item) => sum + (item.badge ?? 0), 0);
 
 	return (
 		<DropdownMenu>
@@ -114,7 +116,16 @@ function MoreMenu({
 					aria-current={open ? "true" : undefined}
 					className={`${TAB} data-[state=open]:text-foreground aria-[current=true]:font-semibold aria-[current=true]:text-foreground aria-[current=true]:before:opacity-100`}
 				>
-					<MoreIcon className="size-5" aria-hidden="true" />
+					<span className="relative">
+						<MoreIcon className="size-5" aria-hidden="true" />
+						{counted > 0 ? (
+							<NavBadge
+								count={counted}
+								label="waiting"
+								className="absolute -top-1.5 left-3"
+							/>
+						) : null}
+					</span>
 					More
 				</button>
 			</DropdownMenuTrigger>
@@ -135,6 +146,13 @@ function MoreMenu({
 							>
 								<Icon aria-hidden="true" />
 								{item.label}
+								{item.badge ? (
+									<NavBadge
+										count={item.badge}
+										label={item.badgeLabel}
+										className="ml-auto"
+									/>
+								) : null}
 							</Link>
 						</DropdownMenuItem>
 					);

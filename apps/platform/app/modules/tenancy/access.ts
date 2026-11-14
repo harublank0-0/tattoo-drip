@@ -169,6 +169,23 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.projects.payments.store": OWNERS,
 	"tenant.projects.refunds.store": OWNERS,
 	"tenant.projects.deposit_outcome.store": OWNERS,
+	// "Ask for a review" (Reviews and Fresh ink, ruling 3): owners and the
+	// project's artist (ReviewLinkService.linkFor and revoke, through
+	// ProjectService.findFor).
+	"tenant.projects.review_link.store": MEMBERS,
+	"tenant.projects.review_link.destroy": MEMBERS,
+
+	// The Reviews page (Reviews and Fresh ink, slice 2): an artist sees and
+	// decides on only the posts and reviews of projects assigned to their own
+	// live artist profile (StudioReviewService through
+	// ProjectService.visibleIds, re-checked under the lock by lockFor).
+	"tenant.reviews.index": MEMBERS,
+	"tenant.reviews.posts.approve": MEMBERS,
+	"tenant.reviews.posts.decline": MEMBERS,
+	"tenant.reviews.posts.unpublish": MEMBERS,
+	"tenant.reviews.reply.update": MEMBERS,
+	"tenant.reviews.reply.destroy": MEMBERS,
+	"tenant.reviews.report.store": MEMBERS,
 
 	// Decisions on one payment.
 	"tenant.payments.verify": OWNERS,

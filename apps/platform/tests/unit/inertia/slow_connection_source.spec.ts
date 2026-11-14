@@ -128,7 +128,11 @@ test.group(
 			// read the contact line and the leading channel from these two props.
 			const source = await read("hooks/use-contact-recording.ts");
 			assert.include(source, "async: true,");
-			assert.include(source, 'only: ["contactedText", "lastChannel"],');
+			// A page may name more props a contact changes (the project page's `review`, slice 2).
+			assert.include(
+				source,
+				'only: ["contactedText", "lastChannel", ...also(via)],',
+			);
 		});
 
 		test("the project and inquiry pages record every contact through the hook, scoped to their own id", async ({

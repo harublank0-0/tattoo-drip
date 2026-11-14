@@ -243,6 +243,7 @@ export class ClientPostSchema extends BaseModel {
 		"id",
 		"placement",
 		"projectId",
+		"publishedAt",
 		"reportReason",
 		"reportedAt",
 		"shownName",
@@ -256,6 +257,8 @@ export class ClientPostSchema extends BaseModel {
 		"takenDownAt",
 		"tenantId",
 		"updatedAt",
+		"waitingRound",
+		"waitingSince",
 	] as const;
 	$columns = ClientPostSchema.$columns;
 	@column()
@@ -282,6 +285,8 @@ export class ClientPostSchema extends BaseModel {
 	declare placement: string | null;
 	@column()
 	declare projectId: string;
+	@column.dateTime()
+	declare publishedAt: DateTime | null;
 	@column()
 	declare reportReason: string | null;
 	@column.dateTime()
@@ -308,6 +313,10 @@ export class ClientPostSchema extends BaseModel {
 	declare tenantId: string;
 	@column.dateTime({ autoCreate: true, autoUpdate: true })
 	declare updatedAt: DateTime | null;
+	@column()
+	declare waitingRound: number;
+	@column.dateTime()
+	declare waitingSince: DateTime | null;
 }
 
 export class ClientReviewSchema extends BaseModel {
@@ -324,8 +333,14 @@ export class ClientReviewSchema extends BaseModel {
 		"rating",
 		"repliedAt",
 		"reply",
+		"replyTakedownNote",
+		"replyTakedownReason",
+		"replyTakenDownAt",
+		"reportNote",
 		"reportReason",
+		"reportResolvedAt",
 		"reportedAt",
+		"reportedBy",
 		"shownName",
 		"submitterDigest",
 		"submitterRecordedAt",
@@ -361,9 +376,21 @@ export class ClientReviewSchema extends BaseModel {
 	@column()
 	declare reply: string | null;
 	@column()
+	declare replyTakedownNote: string | null;
+	@column()
+	declare replyTakedownReason: string | null;
+	@column.dateTime()
+	declare replyTakenDownAt: DateTime | null;
+	@column()
+	declare reportNote: string | null;
+	@column()
 	declare reportReason: string | null;
 	@column.dateTime()
+	declare reportResolvedAt: DateTime | null;
+	@column.dateTime()
 	declare reportedAt: DateTime | null;
+	@column()
+	declare reportedBy: string | null;
 	@column()
 	declare shownName: string;
 	@column()
@@ -1182,6 +1209,7 @@ export class ReviewLinkSchema extends BaseModel {
 		"id",
 		"projectId",
 		"revokedAt",
+		"sentAt",
 		"tenantId",
 		"tokenHash",
 		"tokenNonce",
@@ -1199,6 +1227,8 @@ export class ReviewLinkSchema extends BaseModel {
 	declare projectId: string;
 	@column.dateTime()
 	declare revokedAt: DateTime | null;
+	@column.dateTime()
+	declare sentAt: DateTime | null;
 	@column()
 	declare tenantId: string;
 	@column()
@@ -1214,6 +1244,8 @@ export class StaffAlertSchema extends BaseModel {
 		"inquiryId",
 		"kind",
 		"paymentId",
+		"postId",
+		"postRound",
 		"projectId",
 		"readAt",
 		"tenantId",
@@ -1230,6 +1262,10 @@ export class StaffAlertSchema extends BaseModel {
 	declare kind: string;
 	@column()
 	declare paymentId: string | null;
+	@column()
+	declare postId: string | null;
+	@column()
+	declare postRound: number | null;
 	@column()
 	declare projectId: string | null;
 	@column.dateTime()
