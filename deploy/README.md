@@ -394,6 +394,17 @@ Done if you followed the chat setup. In **R2 Object Storage**, the buckets:
 
 On `tattoo-drip-public`, under its settings, connect the custom domain `media.tattoodrip.app` and wait for its status to say active. Leave the `r2.dev` public address off, and give the other two buckets no public access and no custom domain.
 
+On `tattoo-drip-private`, under its settings, add two things before the first deploy. Reviews and Fresh ink is live on every deploy, so both are required ([deploy.md](../apps/platform/docs/deploy.md#r2-and-video-uploads), "R2 and video uploads"):
+
+- **Object lifecycle rules:** prefix `work_video_upload/`, delete objects 1 day after upload. Studios' video angles and clients' Fresh ink videos are both staged there, and a client can start an upload and never finish it.
+- **CORS policy:** the browser uploads videos straight to this bucket, from the dashboard and from the studio pages:
+
+  ```json
+  [{ "AllowedOrigins": ["https://tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
+  ```
+
+  The wildcard for the studio pages is unverified on R2 until the first deploy: then send a client's video from a review page and check that it uploads.
+
 ### 3.3 The token for the photos
 
 In **R2 Object Storage**, open **Manage API tokens** (under the account details or API menu) and create a token:
