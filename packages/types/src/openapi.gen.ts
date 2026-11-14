@@ -621,6 +621,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tenants/{tenant}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The studio's client reviews, newest first, a page at a time
+         * @description What the studio's own page shows of its clients' reviews (Reviews
+         *     and Fresh ink, slice 3): every review a client wrote through the
+         *     studio's review link and allowed on the studio's page, that the
+         *     client has not deleted and TattooDrip has not taken down, newest
+         *     first. Never "best first". Each comes with the studio's reply
+         *     unless TattooDrip took the reply down. `rating` is the studio's
+         *     average and count from those same reviews, and only once there are
+         *     at least 3 of them; below that it is null: list the reviews without
+         *     an average. Never mark these reviews up as `AggregateRating` or
+         *     `Review` structured data on the studio's own site (self-serving
+         *     reviews are not eligible for review rich results). While reviews
+         *     are switched off on the platform the answer is an empty page with a
+         *     null `rating`, never an error. Cacheable. Under an old studio slug
+         *     it answers like under the current one.
+         */
+        get: operations["listReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant}/fresh-ink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The studio's Fresh ink, newest first, a page at a time
+         * @description Healed tattoos the studio's clients posted (Reviews and Fresh ink,
+         *     slice 3): every post the studio approved and the client allowed on
+         *     the studio's page, that is published and that TattooDrip has not
+         *     taken down, newest published first. One entry per post, shaped like
+         *     a gallery tattoo: its main photo, with its other photos and ready
+         *     videos in `angles`. Only the public copies are served; a video still
+         *     processing or one that failed is never listed. While reviews are
+         *     switched off on the platform the answer is an empty page, never an
+         *     error. Cacheable. Under an old studio slug it answers like under the
+         *     current one.
+         */
+        get: operations["listFreshInk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tenants/{tenant}/availability": {
         parameters: {
             query?: never;
@@ -1319,13 +1397,17 @@ export interface components {
              *     list), `flash` (a few of the newest flash designs, shown only
              *     when there are some), `info` (Good to know: hours, closed days
              *     and what clients ask, shown only when the studio filled something
-             *     in) or
+             *     in), `fresh_ink` (a few of the newest Fresh ink posts:
+             *     clients' healed tattoos, shown only when there are some, from
+             *     `listFreshInk`), `reviews` (the newest client reviews and, from 3
+             *     reviews, the average, shown only when there are some, from
+             *     `listReviews`) or
              *     `inquiry` (the "Got an idea?" invitation to the request page,
              *     always listed). More will come: treat an unknown value as one to
              *     leave out.
              * @enum {string}
              */
-            type: "work" | "artists" | "flash" | "info" | "inquiry";
+            type: "work" | "artists" | "flash" | "fresh_ink" | "reviews" | "info" | "inquiry";
         };
         /**
          * @description How the studio page looks (TAT-56): the owner's choices, as checked
@@ -1947,6 +2029,134 @@ export interface components {
                 /** @example Sita Rai */
                 name: string;
             }[];
+        };
+        /**
+         * @description A client's review of the studio, as its own page shows it
+         *     (`listReviews`). Every property is always there. All text is plain
+         *     text: render it as text, never as markup, and keep its line breaks.
+         *     Never the client's full name, phone, email or any id of theirs.
+         */
+        StudioReview: {
+            /**
+             * Format: uuid
+             * @description The review's own id (a key for lists). The page's `nextCursor` already carries it.
+             */
+            id: string;
+            /** @description Whole stars. Say it in words too, such as "4 out of 5". */
+            rating: number;
+            /** @description The client's own words. */
+            body: string;
+            /**
+             * @description The name the client chose to show: by default their first name
+             *     and the initial of their last ("Sita R.").
+             * @example Sita R.
+             */
+            shownName: string;
+            /**
+             * Format: date
+             * @description The day the client wrote it, in the studio's timezone.
+             */
+            date: string;
+            /**
+             * @description The artist who made the tattoo, while the studio shows that
+             *     artist on its page; null otherwise. Their page is
+             *     `getArtist(slug)`.
+             */
+            artist: {
+                /** @example sita-rai */
+                slug: string;
+                /** @example Sita Rai */
+                name: string;
+            } | null;
+            /** @description The studio's public reply, or null when it has none or TattooDrip took it down. */
+            reply: {
+                body: string;
+                /**
+                 * Format: date
+                 * @description The day the studio last wrote it, in the studio's timezone.
+                 */
+                date: string;
+            } | null;
+        };
+        /**
+         * @description The studio's average rating and how many reviews it comes from
+         *     (`listReviews`): only from 3 reviews shown on its page. Show it as
+         *     "4.7 from 12 reviews".
+         */
+        ReviewRating: {
+            /**
+             * @description The mean of the ratings, rounded to one decimal.
+             * @example 4.7
+             */
+            average: number;
+            count: number;
+        };
+        /**
+         * @description A healed tattoo a client of the studio posted and the studio
+         *     approved (`listFreshInk`), shaped like a gallery tattoo: its main
+         *     photo (`url`, `width`, `height`, `alt`, `variants`), always a photo,
+         *     and its other photos and ready videos in `angles`, as `GalleryPhoto`
+         *     has them. Every property is always there. All text is plain text:
+         *     render it as text, never as markup. Never the client's full name,
+         *     phone, email or any id of theirs.
+         */
+        FreshInkPost: {
+            /**
+             * Format: uuid
+             * @description The post's own id (a key for lists). The page's `nextCursor` already carries it.
+             */
+            id: string;
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
+            /**
+             * @description A description of the main photo, one line of plain text, or
+             *     null: then build one, such as "Tattoo by Sita Rai, photo 1 of 3".
+             */
+            alt: string | null;
+            /**
+             * @description Smaller copies, narrowest first, each narrower than `width`
+             *     (320, 640 and 1280 px, those below the photo's own width). Build
+             *     `srcset` from these and `url` at `width`.
+             */
+            variants: components["schemas"]["ImageVariant"][];
+            /**
+             * @description The post's other photos and videos, in the client's order, after
+             *     the main photo: [] for a post of one photo. As a `GalleryPhoto`'s
+             *     `angles`: a `PhotoAngle` or a `VideoAngle` (only ready videos,
+             *     with their posters). Skip an item whose `kind` you do not know.
+             */
+            angles: (components["schemas"]["PhotoAngle"] | components["schemas"]["VideoAngle"])[];
+            /**
+             * @description The name the client chose to show ("Sita R.").
+             * @example Sita R.
+             */
+            shownName: string;
+            /** @description The client's caption, or null. */
+            caption: string | null;
+            /** @description The post's styles from the platform's list, in the list's order; [] when none. */
+            styles: components["schemas"]["TattooStyle"][];
+            /** @description Where it is on the body, in the client's words, or null. */
+            placement: string | null;
+            /**
+             * @description The artist who made the tattoo, while the studio shows that
+             *     artist on its page; null otherwise.
+             */
+            artist: {
+                /** @example sita-rai */
+                slug: string;
+                /** @example Sita Rai */
+                name: string;
+            } | null;
+            /**
+             * Format: date
+             * @description The day it was published on the studio's page, in the studio's timezone.
+             */
+            date: string;
         };
         Slot: {
             /** Format: date-time */
@@ -3222,6 +3432,97 @@ export interface operations {
             };
             304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listReviews: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of reviews */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["StudioReview"][];
+                        /** @description Pass it as `cursor` for the next page; null on the last. */
+                        nextCursor: string | null;
+                        /**
+                         * @description The studio's average and count, the same on every
+                         *     page; null below 3 reviews.
+                         */
+                        rating: components["schemas"]["ReviewRating"] | null;
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listFreshInk: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of Fresh ink posts */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["FreshInkPost"][];
+                        /** @description Pass it as `cursor` for the next page; null on the last. */
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };

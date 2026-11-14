@@ -46,6 +46,9 @@ export type ReviewMedia = Schemas["ReviewMedia"];
 export type ReviewSubmission = Schemas["ReviewSubmission"];
 export type ReviewVideoSignInput = Schemas["ReviewVideoSignInput"];
 export type ReviewVideoUpload = Schemas["ReviewVideoUpload"];
+export type StudioReview = Schemas["StudioReview"];
+export type ReviewRating = Schemas["ReviewRating"];
+export type FreshInkPost = Schemas["FreshInkPost"];
 
 export type ListServicesQuery = NonNullable<
 	operations["listServices"]["parameters"]["query"]
@@ -56,12 +59,22 @@ export type ListWorkQuery = NonNullable<
 export type ListFlashQuery = NonNullable<
 	operations["listFlash"]["parameters"]["query"]
 >;
+export type ListReviewsQuery = NonNullable<
+	operations["listReviews"]["parameters"]["query"]
+>;
+export type ListFreshInkQuery = NonNullable<
+	operations["listFreshInk"]["parameters"]["query"]
+>;
 export type ListAvailabilityQuery =
 	operations["listAvailability"]["parameters"]["query"];
 export type WorkPage =
 	operations["listWork"]["responses"][200]["content"]["application/json"];
 export type FlashPage =
 	operations["listFlash"]["responses"][200]["content"]["application/json"];
+export type ReviewsPage =
+	operations["listReviews"]["responses"][200]["content"]["application/json"];
+export type FreshInkPage =
+	operations["listFreshInk"]["responses"][200]["content"]["application/json"];
 
 // Discover (D03): cross-studio public reads, under no studio.
 export type DiscoverLocation = Schemas["DiscoverLocation"];

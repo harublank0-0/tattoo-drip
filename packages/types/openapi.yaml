@@ -58,8 +58,10 @@ tags:
       The client's review page (Reviews and Fresh ink, slice 1): a review and
       a Fresh ink post through the private link a studio sends after a
       project. Behind a feature flag until the client content terms are
-      reviewed: while it is off every operation here is a 404. The link's
-      token travels in the `X-Review-Token` header, never in a URL.
+      reviewed: while it is off every review page operation is a 404. The
+      link's token travels in the `X-Review-Token` header, never in a URL.
+      And what the studio's own page shows of them (slice 3): `listReviews`
+      and `listFreshInk`, which answer an empty page while the flag is off.
 
 paths:
   /styles:
@@ -868,6 +870,119 @@ paths:
                   data: { $ref: "#/components/schemas/FlashDesign" }
         "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/reviews:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    get:
+      operationId: listReviews
+      tags: [Reviews]
+      summary: The studio's client reviews, newest first, a page at a time
+      description: |
+        What the studio's own page shows of its clients' reviews (Reviews
+        and Fresh ink, slice 3): every review a client wrote through the
+        studio's review link and allowed on the studio's page, that the
+        client has not deleted and TattooDrip has not taken down, newest
+        first. Never "best first". Each comes with the studio's reply
+        unless TattooDrip took the reply down. `rating` is the studio's
+        average and count from those same reviews, and only once there are
+        at least 3 of them; below that it is null: list the reviews without
+        an average. Never mark these reviews up as `AggregateRating` or
+        `Review` structured data on the studio's own site (self-serving
+        reviews are not eligible for review rich results). While reviews
+        are switched off on the platform the answer is an empty page with a
+        null `rating`, never an error. Cacheable. Under an old studio slug
+        it answers like under the current one.
+      parameters:
+        - name: cursor
+          in: query
+          description: The previous page's `nextCursor`, as sent
+          schema: { type: string, maxLength: 200, pattern: "^[A-Za-z0-9_-]+$" }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
+      responses:
+        "200":
+          description: A page of reviews
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor, rating]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    maxItems: 48
+                    items: { $ref: "#/components/schemas/StudioReview" }
+                  nextCursor:
+                    type: [string, "null"]
+                    description: Pass it as `cursor` for the next page; null on the last.
+                  rating:
+                    description: |
+                      The studio's average and count, the same on every
+                      page; null below 3 reviews.
+                    oneOf: [{ $ref: "#/components/schemas/ReviewRating" }, { type: "null" }]
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /tenants/{tenant}/fresh-ink:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+    get:
+      operationId: listFreshInk
+      tags: [Reviews]
+      summary: The studio's Fresh ink, newest first, a page at a time
+      description: |
+        Healed tattoos the studio's clients posted (Reviews and Fresh ink,
+        slice 3): every post the studio approved and the client allowed on
+        the studio's page, that is published and that TattooDrip has not
+        taken down, newest published first. One entry per post, shaped like
+        a gallery tattoo: its main photo, with its other photos and ready
+        videos in `angles`. Only the public copies are served; a video still
+        processing or one that failed is never listed. While reviews are
+        switched off on the platform the answer is an empty page, never an
+        error. Cacheable. Under an old studio slug it answers like under the
+        current one.
+      parameters:
+        - name: cursor
+          in: query
+          description: The previous page's `nextCursor`, as sent
+          schema: { type: string, maxLength: 200, pattern: "^[A-Za-z0-9_-]+$" }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
+      responses:
+        "200":
+          description: A page of Fresh ink posts
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, nextCursor]
+                additionalProperties: false
+                properties:
+                  data:
+                    type: array
+                    maxItems: 48
+                    items: { $ref: "#/components/schemas/FreshInkPost" }
+                  nextCursor:
+                    type: [string, "null"]
+                    description: Pass it as `cursor` for the next page; null on the last.
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
@@ -1798,12 +1913,16 @@ components:
             list), `flash` (a few of the newest flash designs, shown only
             when there are some), `info` (Good to know: hours, closed days
             and what clients ask, shown only when the studio filled something
-            in) or
+            in), `fresh_ink` (a few of the newest Fresh ink posts:
+            clients' healed tattoos, shown only when there are some, from
+            `listFreshInk`), `reviews` (the newest client reviews and, from 3
+            reviews, the average, shown only when there are some, from
+            `listReviews`) or
             `inquiry` (the "Got an idea?" invitation to the request page,
             always listed). More will come: treat an unknown value as one to
             leave out.
           type: string
-          enum: [work, artists, flash, info, inquiry]
+          enum: [work, artists, flash, fresh_ink, reviews, info, inquiry]
 
     StorefrontConfiguration:
       description: |
@@ -1872,7 +1991,7 @@ components:
             "Got an idea?" invitation to the request page) is always listed.
           type: array
           minItems: 1
-          maxItems: 5
+          maxItems: 7
           items: { $ref: "#/components/schemas/StorefrontSection" }
 
     Studio:
@@ -2600,6 +2719,176 @@ components:
             properties:
               slug: { type: string, examples: [sita-rai] }
               name: { type: string, maxLength: 120, examples: [Sita Rai] }
+
+    StudioReview:
+      type: object
+      description: |
+        A client's review of the studio, as its own page shows it
+        (`listReviews`). Every property is always there. All text is plain
+        text: render it as text, never as markup, and keep its line breaks.
+        Never the client's full name, phone, email or any id of theirs.
+      required: [id, rating, body, shownName, date, artist, reply]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The review's own id (a key for lists). The page's `nextCursor` already carries it.
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Whole stars. Say it in words too, such as "4 out of 5".
+        body:
+          type: string
+          minLength: 20
+          maxLength: 2000
+          description: The client's own words.
+        shownName:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: |
+            The name the client chose to show: by default their first name
+            and the initial of their last ("Sita R.").
+          examples: [Sita R.]
+        date:
+          type: string
+          format: date
+          description: The day the client wrote it, in the studio's timezone.
+        artist:
+          description: |
+            The artist who made the tattoo, while the studio shows that
+            artist on its page; null otherwise. Their page is
+            `getArtist(slug)`.
+          oneOf:
+            - type: object
+              required: [slug, name]
+              additionalProperties: false
+              properties:
+                slug: { type: string, examples: [sita-rai] }
+                name: { type: string, maxLength: 120, examples: [Sita Rai] }
+            - type: "null"
+        reply:
+          description: The studio's public reply, or null when it has none or TattooDrip took it down.
+          oneOf:
+            - type: object
+              required: [body, date]
+              additionalProperties: false
+              properties:
+                body: { type: string, minLength: 1, maxLength: 1000 }
+                date:
+                  type: string
+                  format: date
+                  description: The day the studio last wrote it, in the studio's timezone.
+            - type: "null"
+
+    ReviewRating:
+      type: object
+      description: |
+        The studio's average rating and how many reviews it comes from
+        (`listReviews`): only from 3 reviews shown on its page. Show it as
+        "4.7 from 12 reviews".
+      required: [average, count]
+      additionalProperties: false
+      properties:
+        average:
+          type: number
+          minimum: 1
+          maximum: 5
+          description: The mean of the ratings, rounded to one decimal.
+          examples: [4.7]
+        count: { type: integer, minimum: 3 }
+
+    FreshInkPost:
+      type: object
+      description: |
+        A healed tattoo a client of the studio posted and the studio
+        approved (`listFreshInk`), shaped like a gallery tattoo: its main
+        photo (`url`, `width`, `height`, `alt`, `variants`), always a photo,
+        and its other photos and ready videos in `angles`, as `GalleryPhoto`
+        has them. Every property is always there. All text is plain text:
+        render it as text, never as markup. Never the client's full name,
+        phone, email or any id of theirs.
+      required: [id, url, width, height, alt, variants, angles, shownName, caption, styles, placement, artist, date]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The post's own id (a key for lists). The page's `nextCursor` already carries it.
+        url:
+          type: string
+          format: uri
+          description: Public and absolute.
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        alt:
+          type: [string, "null"]
+          maxLength: 200
+          description: |
+            A description of the main photo, one line of plain text, or
+            null: then build one, such as "Tattoo by Sita Rai, photo 1 of 3".
+        variants:
+          type: array
+          maxItems: 8
+          description: |
+            Smaller copies, narrowest first, each narrower than `width`
+            (320, 640 and 1280 px, those below the photo's own width). Build
+            `srcset` from these and `url` at `width`.
+          items: { $ref: "#/components/schemas/ImageVariant" }
+        angles:
+          type: array
+          maxItems: 7
+          description: |
+            The post's other photos and videos, in the client's order, after
+            the main photo: [] for a post of one photo. As a `GalleryPhoto`'s
+            `angles`: a `PhotoAngle` or a `VideoAngle` (only ready videos,
+            with their posters). Skip an item whose `kind` you do not know.
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/PhotoAngle"
+              - $ref: "#/components/schemas/VideoAngle"
+            discriminator:
+              propertyName: kind
+              mapping:
+                photo: "#/components/schemas/PhotoAngle"
+                video: "#/components/schemas/VideoAngle"
+        shownName:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: The name the client chose to show ("Sita R.").
+          examples: [Sita R.]
+        caption:
+          type: [string, "null"]
+          maxLength: 280
+          description: The client's caption, or null.
+        styles:
+          type: array
+          maxItems: 3
+          description: The post's styles from the platform's list, in the list's order; [] when none.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        placement:
+          type: [string, "null"]
+          maxLength: 120
+          description: Where it is on the body, in the client's words, or null.
+        artist:
+          description: |
+            The artist who made the tattoo, while the studio shows that
+            artist on its page; null otherwise.
+          oneOf:
+            - type: object
+              required: [slug, name]
+              additionalProperties: false
+              properties:
+                slug: { type: string, examples: [sita-rai] }
+                name: { type: string, maxLength: 120, examples: [Sita Rai] }
+            - type: "null"
+        date:
+          type: string
+          format: date
+          description: The day it was published on the studio's page, in the studio's timezone.
 
     Slot:
       type: object
