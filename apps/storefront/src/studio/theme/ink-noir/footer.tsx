@@ -1,4 +1,5 @@
-import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
+import { Mail, MapPin, Phone } from "lucide-react";
 import type { ReactNode } from "react";
 import { contactGroups } from "../../components/contact.tsx";
 import { NavList } from "../../components/nav-list.tsx";
@@ -13,9 +14,7 @@ import type {
 	StudioView,
 } from "../../view-model.ts";
 
-const CHAT_ICONS: Partial<Record<ContactLinkKind, typeof Phone>> = {
-	whatsapp: MessageCircle,
-	viber: MessageCircle,
+const CONTACT_ICONS: Partial<Record<ContactLinkKind, typeof Phone>> = {
 	call: Phone,
 	email: Mail,
 };
@@ -40,23 +39,21 @@ function Column({
 	);
 }
 
-function LinkList({
-	links,
-	icons,
-}: {
-	links: readonly ContactLink[];
-	icons: boolean;
-}) {
+function LinkList({ links }: { links: readonly ContactLink[] }) {
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: it is a <ul>; the role repairs WebKit's reading of list-style: none
 		// biome-ignore lint/a11y/noRedundantRoles: redundant for the spec, needed for WebKit with list-style: none
 		<ul className="ink-footer-links" role="list">
 			{links.map((link) => {
-				const Icon = icons ? CHAT_ICONS[link.kind] : undefined;
+				const Icon = CONTACT_ICONS[link.kind];
 				return (
 					<li key={`${link.kind}:${link.href}`}>
 						<a href={link.href} rel={linkRel(link.href)}>
-							{Icon ? <Icon aria-hidden="true" /> : null}
+							{Icon ? (
+								<Icon aria-hidden="true" />
+							) : (
+								<SocialIcon platform={link.kind} />
+							)}
 							<span>{link.label}</span>
 						</a>
 					</li>
@@ -123,7 +120,7 @@ export function InkNoirFooter({
 					) : null}
 					{chat.length > 0 ? (
 						<Column id="ink-footer-contact" title={studioCopy.nav.contact}>
-							<LinkList links={chat} icons />
+							<LinkList links={chat} />
 						</Column>
 					) : null}
 					{visit ? (
@@ -158,7 +155,7 @@ export function InkNoirFooter({
 					) : null}
 					{follow.length > 0 ? (
 						<Column id="ink-footer-follow" title={studioCopy.nav.follow}>
-							<LinkList links={follow} icons={false} />
+							<LinkList links={follow} />
 						</Column>
 					) : null}
 				</div>

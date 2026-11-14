@@ -86,6 +86,16 @@ export function useDeposit(token: string) {
 }
 
 /**
+ * Starts an online checkout for the deposit (`client.deposits.startCheckout`).
+ * Never retried; on success, open `data.checkoutUrl` in the same tab.
+ */
+export function useStartDepositCheckout(token: string) {
+	return useMutation(
+		tattooMutations.startDepositCheckout(useTattooClient(), token),
+	);
+}
+
+/**
  * Sends the payment screenshot (`client.deposits.submitProof`). Never
  * retried, like `useCreateInquiry`; on success `useDeposit(token)` shows the
  * answer (`submitted`).

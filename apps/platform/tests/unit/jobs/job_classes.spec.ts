@@ -18,6 +18,8 @@ const ALLOWLIST = {
 		"reads only ids from stuck_video_candidates() and stuck_client_video_candidates() and queues one FailStuckVideoJob or FailStuckClientVideoJob (TenantJobs) per row; reads and writes no tenant table itself",
 	SweepStaleSubmittersJob:
 		"Reviews and Fresh ink: reads only tenant ids from stale_submitter_tenants() and queues one ClearSubmittersJob (a TenantJob) per tenant; reads and writes no tenant table itself",
+	ReconcilePaymentsJob:
+		"reads only ids from gateway_checkouts_to_reconcile() and billing_tenants() and queues one TenantJob per row; reads and writes no tenant table itself",
 	SweepExpiredQuotesJob:
 		"reads only ids from expired_quote_candidates() and queues one ExpireQuoteJob (a TenantJob) per row; reads and writes no tenant table itself",
 };

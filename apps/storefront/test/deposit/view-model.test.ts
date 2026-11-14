@@ -820,3 +820,34 @@ describe("the answer follows an explicit pick (TAT-110 fix round 1)", () => {
 		assert.equal(page.answer, "bank");
 	});
 });
+
+test("online payment: offered only while due, the attempt's state read defensively", () => {
+	const due = depositView({
+		...PAGE,
+		onlinePayment: {
+			available: true,
+			checkout: { id: "x", status: "confirming" },
+		},
+	});
+	assert.deepEqual(due.online, { available: true, checkout: "confirming" });
+	const paid = depositView({
+		...PAGE,
+		state: "paid",
+		onlinePayment: { available: true, checkout: { id: "x", status: "paid" } },
+	});
+	assert.deepEqual(paid.online, { available: false, checkout: null });
+	const older = { ...PAGE } as Partial<typeof PAGE>;
+	delete older.onlinePayment;
+	assert.deepEqual(depositView(older as typeof PAGE).online, {
+		available: false,
+		checkout: null,
+	});
+	const odd = depositView({
+		...PAGE,
+		onlinePayment: {
+			available: true,
+			checkout: { id: "x", status: "weird" as "paid" },
+		},
+	});
+	assert.equal(odd.online.checkout, null);
+});

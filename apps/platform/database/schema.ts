@@ -175,6 +175,264 @@ export class ArtistSchema extends BaseModel {
 	declare visible: boolean;
 }
 
+export class BillingAccessPeriodSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"endsAt",
+		"id",
+		"invoiceId",
+		"startsAt",
+		"tenantId",
+	] as const;
+	$columns = BillingAccessPeriodSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare endsAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare invoiceId: string;
+	@column.dateTime()
+	declare startsAt: DateTime;
+	@column()
+	declare tenantId: string;
+}
+
+export class BillingCustomerSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"id",
+		"livemode",
+		"providerCustomerId",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = BillingCustomerSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare providerCustomerId: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class BillingEventSchema extends BaseModel {
+	static $columns = [
+		"id",
+		"livemode",
+		"objectId",
+		"occurredAt",
+		"processedAt",
+		"providerEventId",
+		"receivedAt",
+		"tenantId",
+		"type",
+	] as const;
+	$columns = BillingEventSchema.$columns;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare objectId: string | null;
+	@column.dateTime()
+	declare occurredAt: DateTime | null;
+	@column.dateTime()
+	declare processedAt: DateTime | null;
+	@column()
+	declare providerEventId: string;
+	@column.dateTime()
+	declare receivedAt: DateTime;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare type: string;
+}
+
+export class BillingInvoiceSchema extends BaseModel {
+	static $columns = [
+		"amountDue",
+		"amountPaid",
+		"createdAt",
+		"currency",
+		"dueAt",
+		"hostedInvoiceUrl",
+		"id",
+		"issuedAt",
+		"livemode",
+		"number",
+		"paidAt",
+		"periodEnd",
+		"periodStart",
+		"providerInvoiceId",
+		"status",
+		"subscriptionId",
+		"syncedAt",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = BillingInvoiceSchema.$columns;
+	@column()
+	declare amountDue: number;
+	@column()
+	declare amountPaid: number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column.dateTime()
+	declare dueAt: DateTime | null;
+	@column()
+	declare hostedInvoiceUrl: string | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column.dateTime()
+	declare issuedAt: DateTime | null;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare number: string | null;
+	@column.dateTime()
+	declare paidAt: DateTime | null;
+	@column.dateTime()
+	declare periodEnd: DateTime | null;
+	@column.dateTime()
+	declare periodStart: DateTime | null;
+	@column()
+	declare providerInvoiceId: string;
+	@column()
+	declare status: string;
+	@column()
+	declare subscriptionId: string;
+	@column.dateTime()
+	declare syncedAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class BillingPlanSchema extends BaseModel {
+	static $columns = [
+		"active",
+		"amount",
+		"code",
+		"createdAt",
+		"currency",
+		"id",
+		"intervalCount",
+		"intervalUnit",
+		"livemode",
+		"name",
+		"providerPlanId",
+		"trialDays",
+		"updatedAt",
+	] as const;
+	$columns = BillingPlanSchema.$columns;
+	@column()
+	declare active: boolean;
+	@column()
+	declare amount: number;
+	@column()
+	declare code: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare intervalCount: number;
+	@column()
+	declare intervalUnit: string;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare name: string;
+	@column()
+	declare providerPlanId: string | null;
+	@column()
+	declare trialDays: number;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class BillingSubscriptionSchema extends BaseModel {
+	static $columns = [
+		"cancelAtPeriodEnd",
+		"cancelEffectiveAt",
+		"canceledAt",
+		"createdAt",
+		"createdByUserId",
+		"currentPeriodEnd",
+		"currentPeriodStart",
+		"customerId",
+		"endedAt",
+		"id",
+		"livemode",
+		"nextInvoiceAt",
+		"pausedAt",
+		"pendingPlanId",
+		"planId",
+		"providerSubscriptionId",
+		"status",
+		"syncedAt",
+		"tenantId",
+		"trialEndsAt",
+		"updatedAt",
+	] as const;
+	$columns = BillingSubscriptionSchema.$columns;
+	@column()
+	declare cancelAtPeriodEnd: boolean;
+	@column.dateTime()
+	declare cancelEffectiveAt: DateTime | null;
+	@column.dateTime()
+	declare canceledAt: DateTime | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare createdByUserId: string | null;
+	@column.dateTime()
+	declare currentPeriodEnd: DateTime | null;
+	@column.dateTime()
+	declare currentPeriodStart: DateTime | null;
+	@column()
+	declare customerId: string;
+	@column.dateTime()
+	declare endedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare livemode: boolean;
+	@column.dateTime()
+	declare nextInvoiceAt: DateTime | null;
+	@column.dateTime()
+	declare pausedAt: DateTime | null;
+	@column()
+	declare pendingPlanId: string | null;
+	@column()
+	declare planId: string | null;
+	@column()
+	declare providerSubscriptionId: string;
+	@column()
+	declare status: string;
+	@column.dateTime()
+	declare syncedAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime()
+	declare trialEndsAt: DateTime | null;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
 export class ClientPostMediaSchema extends BaseModel {
 	static $columns = [
 		"alt",
@@ -596,6 +854,267 @@ export class FlashDesignSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 	@column()
 	declare width: number;
+}
+
+export class GatewayAccountSchema extends BaseModel {
+	static $columns = [
+		"connectedByUserId",
+		"createdAt",
+		"disconnectedAt",
+		"id",
+		"keyHint",
+		"livemode",
+		"provider",
+		"providerMerchantId",
+		"providerMerchantName",
+		"providerProjectId",
+		"providerProjectName",
+		"providerWebhookId",
+		"secretKeySealed",
+		"status",
+		"tenantId",
+		"updatedAt",
+		"verifiedAt",
+		"verifiedByUserId",
+		"webhookKey",
+		"webhookSecretSealed",
+	] as const;
+	$columns = GatewayAccountSchema.$columns;
+	@column()
+	declare connectedByUserId: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare disconnectedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare keyHint: string;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare provider: string;
+	@column()
+	declare providerMerchantId: string;
+	@column()
+	declare providerMerchantName: string;
+	@column()
+	declare providerProjectId: string;
+	@column()
+	declare providerProjectName: string;
+	@column()
+	declare providerWebhookId: string | null;
+	@column()
+	declare secretKeySealed: string;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column.dateTime()
+	declare verifiedAt: DateTime | null;
+	@column()
+	declare verifiedByUserId: string | null;
+	@column()
+	declare webhookKey: string;
+	@column()
+	declare webhookSecretSealed: string | null;
+}
+
+export class GatewayCheckoutSchema extends BaseModel {
+	static $columns = [
+		"accountId",
+		"amount",
+		"checkoutUrl",
+		"createdAt",
+		"currency",
+		"expiresAt",
+		"failureReason",
+		"id",
+		"idempotencyKey",
+		"lastSyncedAt",
+		"livemode",
+		"projectId",
+		"providerSessionId",
+		"purpose",
+		"status",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = GatewayCheckoutSchema.$columns;
+	@column()
+	declare accountId: string;
+	@column()
+	declare amount: number;
+	@column()
+	declare checkoutUrl: string | null;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column.dateTime()
+	declare expiresAt: DateTime | null;
+	@column()
+	declare failureReason: string | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare idempotencyKey: string;
+	@column.dateTime()
+	declare lastSyncedAt: DateTime | null;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare projectId: string;
+	@column()
+	declare providerSessionId: string | null;
+	@column()
+	declare purpose: string;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class GatewayEventSchema extends BaseModel {
+	static $columns = [
+		"accountId",
+		"id",
+		"livemode",
+		"objectId",
+		"occurredAt",
+		"processedAt",
+		"providerEventId",
+		"receivedAt",
+		"tenantId",
+		"type",
+	] as const;
+	$columns = GatewayEventSchema.$columns;
+	@column()
+	declare accountId: string;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare objectId: string | null;
+	@column.dateTime()
+	declare occurredAt: DateTime | null;
+	@column.dateTime()
+	declare processedAt: DateTime | null;
+	@column()
+	declare providerEventId: string;
+	@column.dateTime()
+	declare receivedAt: DateTime;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare type: string;
+}
+
+export class GatewayPaymentSchema extends BaseModel {
+	static $columns = [
+		"amount",
+		"checkoutId",
+		"createdAt",
+		"currency",
+		"failureReason",
+		"id",
+		"livemode",
+		"method",
+		"paidAt",
+		"paymentId",
+		"projectId",
+		"providerPaymentId",
+		"providerRef",
+		"refundedAmount",
+		"reviewReason",
+		"status",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = GatewayPaymentSchema.$columns;
+	@column()
+	declare amount: number;
+	@column()
+	declare checkoutId: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column()
+	declare failureReason: string | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare method: string | null;
+	@column.dateTime()
+	declare paidAt: DateTime | null;
+	@column()
+	declare paymentId: string | null;
+	@column()
+	declare projectId: string;
+	@column()
+	declare providerPaymentId: string;
+	@column()
+	declare providerRef: string | null;
+	@column()
+	declare refundedAmount: number;
+	@column()
+	declare reviewReason: string | null;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class GatewayRefundSchema extends BaseModel {
+	static $columns = [
+		"amount",
+		"createdAt",
+		"currency",
+		"failureReason",
+		"gatewayPaymentId",
+		"id",
+		"paymentId",
+		"projectId",
+		"providerRefundId",
+		"status",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = GatewayRefundSchema.$columns;
+	@column()
+	declare amount: number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare currency: string;
+	@column()
+	declare failureReason: string | null;
+	@column()
+	declare gatewayPaymentId: string;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare paymentId: string | null;
+	@column()
+	declare projectId: string;
+	@column()
+	declare providerRefundId: string;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
 }
 
 export class InquirySchema extends BaseModel {

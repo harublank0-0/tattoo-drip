@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { cn } from "cn";
 import CopyLinkButton from "~/components/copy_link_button";
 import DevHostWarning from "~/components/dev_host_warning";
@@ -46,6 +47,7 @@ export default function StudioLinkCard({
 					rel="noreferrer"
 					className={cn(buttonVariants({ variant: "outline" }), ACTION)}
 				>
+					<SocialIcon platform="whatsapp" />
 					Share on WhatsApp
 				</a>
 			</div>

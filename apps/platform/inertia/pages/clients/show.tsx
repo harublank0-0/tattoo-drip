@@ -1,6 +1,7 @@
 import { Head, Link } from "@inertiajs/react";
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { cn } from "cn";
-import { CalendarPlus, MessageCircle, Pencil, Phone } from "lucide-react";
+import { CalendarPlus, Pencil, Phone } from "lucide-react";
 import type { ReactNode } from "react";
 import { urlFor } from "~/client";
 import { calendarHref } from "~/components/calendar";
@@ -113,14 +114,14 @@ export default function ClientShow({
 						rel="noreferrer"
 						className={buttonVariants({ variant: "ghost", size: "sm" })}
 					>
-						<MessageCircle aria-hidden="true" />
+						<SocialIcon platform="whatsapp" />
 						WhatsApp
 					</a>
 					<a
 						href={links.viber}
 						className={buttonVariants({ variant: "ghost", size: "sm" })}
 					>
-						<MessageCircle aria-hidden="true" />
+						<SocialIcon platform="viber" />
 						Viber
 					</a>
 					<a

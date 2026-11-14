@@ -1,7 +1,7 @@
 import db from "@adonisjs/lucid/services/db";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { test } from "@japa/runner";
-import ReviewSections from "#database/migrations/1791950000001_add_review_sections_to_tenants";
+import ReviewSections from "#database/migrations/1791960000001_add_review_sections_to_tenants";
 import { DEFAULT_SECTIONS } from "#modules/storefront/look";
 
 /**

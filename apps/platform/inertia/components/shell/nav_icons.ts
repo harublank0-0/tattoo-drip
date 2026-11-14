@@ -8,6 +8,7 @@ import {
 	Inbox,
 	type LucideIcon,
 	Package,
+	Receipt,
 	Settings,
 	Star,
 	Users,
@@ -25,6 +26,7 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
 	portfolio: Images,
 	reviews: Star,
 	inventory: Package,
+	transactions: Receipt,
 	settings: Settings,
 };
 

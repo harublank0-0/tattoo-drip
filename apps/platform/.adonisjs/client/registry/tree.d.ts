@@ -47,6 +47,11 @@ export interface ApiDefinition {
       archive: typeof routes['tenant.inventory.archive']
       restore: typeof routes['tenant.inventory.restore']
     }
+    transactions: {
+      index: typeof routes['tenant.transactions.index']
+      export: typeof routes['tenant.transactions.export']
+      sync: typeof routes['tenant.transactions.sync']
+    }
     today: typeof routes['tenant.today']
     settings: typeof routes['tenant.settings'] & {
       profile: typeof routes['tenant.settings.profile'] & {
@@ -76,6 +81,17 @@ export interface ApiDefinition {
         edit: typeof routes['tenant.settings.payments.edit']
         move: typeof routes['tenant.settings.payments.move']
         destroy: typeof routes['tenant.settings.payments.destroy']
+      }
+      onlinePayments: typeof routes['tenant.settings.online_payments'] & {
+        connect: typeof routes['tenant.settings.online_payments.connect']
+        disconnect: typeof routes['tenant.settings.online_payments.disconnect']
+      }
+      billing: typeof routes['tenant.settings.billing'] & {
+        subscribe: typeof routes['tenant.settings.billing.subscribe']
+        cancel: typeof routes['tenant.settings.billing.cancel']
+        changePlan: typeof routes['tenant.settings.billing.change_plan']
+        sync: typeof routes['tenant.settings.billing.sync']
+        pay: typeof routes['tenant.settings.billing.pay']
       }
       deposits: {
         update: typeof routes['tenant.settings.deposits.update']
@@ -282,8 +298,18 @@ export interface ApiDefinition {
     }
     signOutOthers: typeof routes['account.sign_out_others']
   }
+  admin: {
+    billing: typeof routes['admin.billing']
+    payments: typeof routes['admin.payments'] & {
+      review: typeof routes['admin.payments.review']
+    }
+  }
   api: {
     v1: {
+      webhooks: {
+        platform: typeof routes['api.v1.webhooks.platform']
+        studio: typeof routes['api.v1.webhooks.studio']
+      }
       styles: {
         index: typeof routes['api.v1.styles.index']
       }
@@ -339,6 +365,7 @@ export interface ApiDefinition {
       deposits: {
         show: typeof routes['api.v1.deposits.show']
         store: typeof routes['api.v1.deposits.store']
+        checkout: typeof routes['api.v1.deposits.checkout']
       }
       review: {
         show: typeof routes['api.v1.review.show']

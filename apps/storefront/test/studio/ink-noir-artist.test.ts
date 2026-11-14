@@ -116,7 +116,7 @@ describe("Ink Noir's artist page", () => {
 		assert.match(page, /<dt>Studio<\/dt><dd dir="auto">Black Needle<\/dd>/);
 		assert.match(
 			page,
-			/href="https:\/\/instagram\.com\/sita\.ink" rel="noopener noreferrer">Instagram</,
+			/href="https:\/\/instagram\.com\/sita\.ink" rel="noopener noreferrer"><svg[^>]*aria-hidden="true"[^>]*><path[^>]*><\/path><\/svg>Instagram</,
 		);
 		// No style: a plain line, never an invented specialty.
 		assert.match(

@@ -33,6 +33,8 @@ import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 import TenantSlug from "#modules/tenancy/models/tenant_slug";
 import { testImages } from "#tests/helpers/images";
+import { billingRows, onlinePaymentRows } from "#tests/helpers/online_payments";
+import { paybridge } from "#tests/helpers/paybridge";
 import { reviewRows } from "#tests/helpers/reviews";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 import { stagedFiles } from "#tests/helpers/videos";
@@ -87,6 +89,8 @@ export type IsolationCase = {
 		| "closedDay"
 		| "invitation"
 		| "artistMembership"
+		| "billingInvoice"
+		| "gatewayCheckout"
 		| "reviewProject"
 		| "clientReview"
 		| "waitingPost"
@@ -133,6 +137,14 @@ export const EXEMPT_ROUTES: Record<string, string> = {
 
 const none = async () => null;
 
+const billingState = (target: Studio) => billingRows(target.tenant);
+const onlineState = (target: Studio) => onlinePaymentRows(target.tenant);
+const moneyState = async (target: Studio) => ({
+	online: await onlineState(target),
+	payments: await inTenant(target.tenant, async () =>
+		(await Payment.query().orderBy("id")).map((row) => row.serialize()),
+	),
+});
 // The review tables of the targeted studio (Reviews and Fresh ink).
 const reviewSnapshot = (target: Studio) => reviewRows(target.tenant);
 
@@ -431,6 +443,100 @@ const memberRows = (target: Studio) =>
 	}));
 
 export const isolationCases: IsolationCase[] = [
+	// Online payments and TattooDrip billing (docs/payments-paybridgenp.md).
+	{
+		method: "GET",
+		pattern: "/t/:tenant/transactions",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: moneyState,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/transactions/export.csv",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: moneyState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/transactions/:id/sync",
+		resource: "gatewayCheckout",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: moneyState,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/online-payments",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: onlineState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/online-payments",
+		actor: "owner",
+		// A new key of the studio's own (fake) project: replaces the connection.
+		body: () => ({
+			secretKey: paybridge.studioKey("isolation"),
+			confirmOwnAccount: "1",
+		}),
+		ownStatus: 302,
+		snapshot: onlineState,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/settings/online-payments",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: onlineState,
+	},
+	{
+		method: "GET",
+		pattern: "/t/:tenant/settings/billing",
+		actor: "owner",
+		ownStatus: 200,
+		snapshot: billingState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/billing/subscription",
+		actor: "owner",
+		body: () => ({ plan: "studio-monthly" }),
+		ownStatus: 302,
+		snapshot: billingState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/billing/subscription/cancel",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: billingState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/billing/subscription/plan",
+		actor: "owner",
+		body: () => ({ plan: "studio-yearly" }),
+		ownStatus: 302,
+		snapshot: billingState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/billing/sync",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: billingState,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/settings/billing/invoices/:id/pay",
+		resource: "billingInvoice",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: billingState,
+	},
 	{
 		method: "GET",
 		pattern: "/t/:tenant",

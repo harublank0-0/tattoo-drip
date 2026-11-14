@@ -12,6 +12,7 @@ import Tenant from "#modules/tenancy/models/tenant";
 import { type ProofPart, proofPart } from "#tests/helpers/deposits";
 import { testImages } from "#tests/helpers/images";
 import { intakeFields, intakeRows } from "#tests/helpers/intake";
+import { onlinePaymentRows } from "#tests/helpers/online_payments";
 import { reviewBody, reviewRows } from "#tests/helpers/reviews";
 import { inTenant, type Studio } from "#tests/helpers/tenants";
 
@@ -229,6 +230,19 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 		// The answer is the page in `submitted`, with A's reference code.
 		ownMarkers: (own) => [own.depositReferenceCode],
 		snapshot: depositRows,
+	},
+	{
+		method: "POST",
+		pattern: "/api/v1/tenants/:tenant/deposits/:token/checkout",
+		params: (studio) => ({ token: studio.depositToken }),
+		body: () => ({}),
+		// A's verified connection opens a checkout for A's own deposit.
+		ownStatus: 201,
+		ownMarkers: () => ["checkoutUrl", "checkout.paybridgenp.com"],
+		snapshot: async (target) => ({
+			deposit: await depositRows(target),
+			online: await onlinePaymentRows(target.tenant),
+		}),
 	},
 	// The review page (Reviews and Fresh ink, slice 1): the link's token in
 	// X-Review-Token, cross-sent by the harness like a path parameter.

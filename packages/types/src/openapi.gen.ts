@@ -844,6 +844,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tenants/{tenant}/deposits/{token}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /**
+                 * @description The deposit link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/deposit#<token>`). A bearer secret: never log it
+                 *     or send it to analytics.
+                 */
+                token: components["parameters"]["DepositToken"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pay the deposit online
+         * @description Starts (or reuses) a PayBridgeNP hosted checkout for the deposit
+         *     still due, paid to the studio's own eSewa, Khalti or Fonepay
+         *     merchant accounts (docs/payments-paybridgenp.md). Send no body: the
+         *     amount is the deposit still due, read by the API; the client never
+         *     sends one. Open the answer's `checkoutUrl` in the same tab. Coming
+         *     back from it proves nothing: reload the deposit page, whose
+         *     `onlinePayment.checkout` says `confirming` until the studio's
+         *     payment provider confirms the payment to the API, then `paid`.
+         *     Only while `onlinePayment.available` is true. Under an old slug it
+         *     is a 404. Rate-limited per address and per link.
+         *
+         *     Own codes: `online_payment_unavailable` (409: the studio doesn't
+         *     take online payments, the page's state isn't `due`, or the amount
+         *     is outside NPR 10 to NPR 10,00,000), `online_payment_in_progress`
+         *     (409: the previous online payment is still on the provider's page or
+         *     was just paid; never offer to pay again, reload later) and
+         *     `payment_provider_unavailable` (503: the provider didn't answer;
+         *     nothing was charged, try again).
+         */
+        post: operations["startDepositCheckout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tenants/{tenant}/review": {
         parameters: {
             query?: never;
@@ -2329,6 +2380,34 @@ export interface components {
             depositPolicy: string | null;
             /** @description Once the deposit is paid, the project's next session; null in every other state and when none is scheduled. */
             nextSession: components["schemas"]["DepositSession"] | null;
+            onlinePayment: components["schemas"]["DepositOnlinePayment"];
+        };
+        /**
+         * @description Paying the deposit online through the studio's own payment provider
+         *     (startDepositCheckout).
+         */
+        DepositOnlinePayment: {
+            /** @description The page may offer "Pay online" now (state `due`, and the studio takes online payments). */
+            available: boolean;
+            /** @description The latest online attempt of the last two days, or null. */
+            checkout: {
+                /** Format: uuid */
+                id: string;
+                /**
+                 * @description `confirming` (started, no confirmed payment yet: show it
+                 *     as being checked, never as paid), `paid` (confirmed and
+                 *     recorded), `failed` or `expired` (offer to try again).
+                 * @enum {string}
+                 */
+                status: "confirming" | "paid" | "failed" | "expired";
+            } | null;
+        };
+        DepositCheckout: {
+            /**
+             * Format: uri
+             * @description The provider's hosted checkout page. Valid for 30 minutes.
+             */
+            checkoutUrl: string;
         };
         /**
          * @description The project's earliest session that is still scheduled and hasn't
@@ -3747,6 +3826,64 @@ export interface operations {
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
             /** @description The API is busy (`service_busy`, with `Retry-After`). Try again in a moment. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    startDepositCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Tenant slug (also its subdomain), matched exactly: never case-folded.
+                 *     A tenant's old slugs answer reads (GET, HEAD) like its current slug,
+                 *     and the tenant resource names the current one. Any other method under
+                 *     an old slug is a 404, so writes must use the current slug.
+                 */
+                tenant: components["parameters"]["Tenant"];
+                /**
+                 * @description The deposit link's secret: the fragment of the link the studio sent
+                 *     (`https://<studio>/deposit#<token>`). A bearer secret: never log it
+                 *     or send it to analytics.
+                 */
+                token: components["parameters"]["DepositToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The checkout to open */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControl"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DepositCheckout"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description Online payment isn't available for this deposit now (`online_payment_unavailable`, `online_payment_in_progress`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description The payment provider or the API is busy (`payment_provider_unavailable`, `service_busy`). Try again in a moment. */
             503: {
                 headers: {
                     [name: string]: unknown;

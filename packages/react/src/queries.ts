@@ -294,6 +294,16 @@ export const tattooMutations = {
 			},
 		}),
 	/**
+	 * Starts an online deposit checkout. Never retried: the API reuses an
+	 * open checkout for the same amount anyway, and the caller then leaves
+	 * for the returned `checkoutUrl`.
+	 */
+	startDepositCheckout: (client: TattooClient, token: string) =>
+		mutationOptions({
+			mutationFn: () => client.deposits.startCheckout(token),
+			retry: false,
+		}),
+	/**
 	 * The review page's writes (Reviews and Fresh ink). Never retried (a
 	 * submit's challenge token is single-use, an upload could land twice).
 	 * Each answers with the page as it now is, which replaces the cached

@@ -17,6 +17,7 @@
 
 import app from "@adonisjs/core/services/app";
 import SweepStuckVideosJob from "#modules/artists/jobs/sweep_stuck_videos_job";
+import ReconcilePaymentsJob from "#modules/payments/jobs/reconcile_payments_job";
 import SweepExpiredQuotesJob from "#modules/projects/jobs/sweep_expired_quotes_job";
 import SweepStaleSubmittersJob from "#modules/reviews/jobs/sweep_stale_submitters_job";
 
@@ -29,6 +30,11 @@ if (app.getMode() === "run") {
 	await SweepStuckVideosJob.schedule({})
 		.id(SweepStuckVideosJob.scheduleId)
 		.cron(SweepStuckVideosJob.cron)
+		.run();
+	// Online payments: checks open checkouts and, daily, subscriptions.
+	await ReconcilePaymentsJob.schedule({})
+		.id(ReconcilePaymentsJob.scheduleId)
+		.cron(ReconcilePaymentsJob.cron)
 		.run();
 	// Reviews and Fresh ink: clears dispute records older than 90 days.
 	await SweepStaleSubmittersJob.schedule({})

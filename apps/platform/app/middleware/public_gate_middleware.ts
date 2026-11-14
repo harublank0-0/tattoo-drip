@@ -10,6 +10,7 @@ import {
 } from "#services/public_api";
 import { ApiException } from "#services/public_api_errors";
 import { clientAddress } from "#services/rate_limits";
+import { isWebhookRequest } from "#services/webhook_body";
 import { writeSlots } from "#services/write_slots";
 
 /**
@@ -24,7 +25,10 @@ import { writeSlots } from "#services/write_slots";
  */
 export default class PublicGateMiddleware {
 	async handle(ctx: HttpContext, next: NextFn) {
-		if (!isApiRequest(ctx)) return next();
+		// Payment webhooks come from the provider's few addresses for every
+		// studio at once: per-address budgets would refuse them. Their handler
+		// caps the body and checks the signature before any other work.
+		if (!isApiRequest(ctx) || isWebhookRequest(ctx)) return next();
 		const caller = callerOf(ctx);
 		const reads = READ_METHODS.has(ctx.request.method());
 		await consumeApiLimit(reads ? "callerReads" : "callerWrites", caller);

@@ -13,6 +13,8 @@ type ExtractProps<T> =
 declare module '@adonisjs/inertia/types' {
   export interface InertiaPages {
     'account/show': ExtractProps<(typeof import('../../inertia/pages/account/show.tsx'))['default']>
+    'admin/billing': ExtractProps<(typeof import('../../inertia/pages/admin/billing.tsx'))['default']>
+    'admin/payments': ExtractProps<(typeof import('../../inertia/pages/admin/payments.tsx'))['default']>
     'alerts/index': ExtractProps<(typeof import('../../inertia/pages/alerts/index.tsx'))['default']>
     'artists/form': ExtractProps<(typeof import('../../inertia/pages/artists/form.tsx'))['default']>
     'artists/index': ExtractProps<(typeof import('../../inertia/pages/artists/index.tsx'))['default']>
@@ -40,6 +42,7 @@ declare module '@adonisjs/inertia/types' {
     'projects/new': ExtractProps<(typeof import('../../inertia/pages/projects/new.tsx'))['default']>
     'projects/show': ExtractProps<(typeof import('../../inertia/pages/projects/show.tsx'))['default']>
     'reviews/index': ExtractProps<(typeof import('../../inertia/pages/reviews/index.tsx'))['default']>
+    'settings/billing': ExtractProps<(typeof import('../../inertia/pages/settings/billing.tsx'))['default']>
     'settings/discover_preview': ExtractProps<(typeof import('../../inertia/pages/settings/discover_preview.tsx'))['default']>
     'settings/discover': ExtractProps<(typeof import('../../inertia/pages/settings/discover.tsx'))['default']>
     'settings/faq_policies': ExtractProps<(typeof import('../../inertia/pages/settings/faq_policies.tsx'))['default']>
@@ -47,9 +50,11 @@ declare module '@adonisjs/inertia/types' {
     'settings/look': ExtractProps<(typeof import('../../inertia/pages/settings/look.tsx'))['default']>
     'settings/members': ExtractProps<(typeof import('../../inertia/pages/settings/members.tsx'))['default']>
     'settings/messages': ExtractProps<(typeof import('../../inertia/pages/settings/messages.tsx'))['default']>
+    'settings/online_payments': ExtractProps<(typeof import('../../inertia/pages/settings/online_payments.tsx'))['default']>
     'settings/payment_method_form': ExtractProps<(typeof import('../../inertia/pages/settings/payment_method_form.tsx'))['default']>
     'settings/payments': ExtractProps<(typeof import('../../inertia/pages/settings/payments.tsx'))['default']>
     'settings/profile': ExtractProps<(typeof import('../../inertia/pages/settings/profile.tsx'))['default']>
     'today/index': ExtractProps<(typeof import('../../inertia/pages/today/index.tsx'))['default']>
+    'transactions/index': ExtractProps<(typeof import('../../inertia/pages/transactions/index.tsx'))['default']>
   }
 }

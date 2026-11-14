@@ -7,7 +7,8 @@
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
-		".": "./src/index.ts"
+		".": "./src/index.ts",
+		"./social-icon": "./src/social-icon.ts"
 	},
 	"files": [
 		"dist"
@@ -17,6 +18,10 @@
 			".": {
 				"types": "./dist/index.d.ts",
 				"import": "./dist/index.js"
+			},
+			"./social-icon": {
+				"types": "./dist/social-icon.d.ts",
+				"import": "./dist/social-icon.js"
 			}
 		}
 	},

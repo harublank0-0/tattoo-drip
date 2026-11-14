@@ -1,5 +1,5 @@
 import { useLocation } from "@tanstack/react-router";
-import { MessageCircle } from "lucide-react";
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import type { ComponentType } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { artworkTitle } from "../artwork.ts";
@@ -120,7 +120,7 @@ export function StudioPage({
 									href={whatsapp.href}
 									rel={linkRel(whatsapp.href)}
 								>
-									<MessageCircle aria-hidden="true" />
+									<SocialIcon platform="whatsapp" />
 									<span>{studioCopy.whatsapp}</span>
 								</a>
 							) : null}

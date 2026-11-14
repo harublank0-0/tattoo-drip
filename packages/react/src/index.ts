@@ -33,6 +33,7 @@ export {
 	useReview,
 	useServices,
 	useSignReviewVideo,
+	useStartDepositCheckout,
 	useStudio,
 	useStudioReviews,
 	useStyles,

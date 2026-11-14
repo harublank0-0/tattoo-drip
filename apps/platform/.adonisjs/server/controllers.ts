@@ -5,9 +5,11 @@
 
 export const controllers = {
   Account: () => import('#controllers/account_controller'),
+  Admin: () => import('#controllers/admin_controller'),
   Alerts: () => import('#controllers/alerts_controller'),
   ArtistDiscover: () => import('#controllers/artist_discover_controller'),
   Artists: () => import('#controllers/artists_controller'),
+  Billing: () => import('#controllers/billing_controller'),
   Bookings: () => import('#controllers/bookings_controller'),
   Calendar: () => import('#controllers/calendar_controller'),
   Clients: () => import('#controllers/clients_controller'),
@@ -26,8 +28,10 @@ export const controllers = {
   MessageTemplates: () => import('#controllers/message_templates_controller'),
   NewAccount: () => import('#controllers/new_account_controller'),
   Onboarding: () => import('#controllers/onboarding_controller'),
+  OnlinePayments: () => import('#controllers/online_payments_controller'),
   PageLook: () => import('#controllers/page_look_controller'),
   PasswordReset: () => import('#controllers/password_reset_controller'),
+  PaybridgeWebhooks: () => import('#controllers/paybridge_webhooks_controller'),
   PaymentMethods: () => import('#controllers/payment_methods_controller'),
   Payments: () => import('#controllers/payments_controller'),
   Portfolio: () => import('#controllers/portfolio_controller'),
@@ -53,6 +57,7 @@ export const controllers = {
   StudioProfile: () => import('#controllers/studio_profile_controller'),
   StudioSlug: () => import('#controllers/studio_slug_controller'),
   Today: () => import('#controllers/today_controller'),
+  Transactions: () => import('#controllers/transactions_controller'),
   WorkPhotos: () => import('#controllers/work_photos_controller'),
   WorkVideos: () => import('#controllers/work_videos_controller'),
 }

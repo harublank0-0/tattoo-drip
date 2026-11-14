@@ -30,6 +30,7 @@ const PAGE: DepositPage = {
 	paymentMethods: [],
 	depositPolicy: null,
 	nextSession: null,
+	onlinePayment: { available: false, checkout: null },
 };
 
 /** A client whose fetch answers every call with `status` and `body`. */

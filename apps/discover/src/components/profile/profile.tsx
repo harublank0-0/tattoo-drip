@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import type {
 	DiscoverArtistDetail,
 	DiscoverStyle,
@@ -315,7 +316,8 @@ export function SocialLinks({
 						rel="noopener noreferrer"
 						className="inline-flex min-h-11 items-center gap-1.5 underline-offset-4 hover:underline lg:min-h-0"
 					>
-						{socialLabel(link.platform)}
+						<SocialIcon platform={link.platform} className="size-4 shrink-0" />
+						<span>{socialLabel(link.platform)}</span>
 						<ArrowUpRightIcon className="size-4" aria-hidden="true" />
 						<span className="sr-only">{`(${owner} page, another site)`}</span>
 					</a>

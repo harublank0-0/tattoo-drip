@@ -24,6 +24,11 @@ const PRODUCTION = {
 	// the live layout sets neither (a test that needs them sets both).
 	API_URL: "",
 	DISCOVER_URL: "",
+	// .env.test's sandbox payments are refused in production
+	// (docs/payments-paybridgenp.md): this boot takes payments off.
+	PAYBRIDGE_SECRET_KEY: "",
+	PAYBRIDGE_WEBHOOK_SECRET: "",
+	STUDIO_ONLINE_PAYMENTS: "disabled",
 };
 
 const APART = {
