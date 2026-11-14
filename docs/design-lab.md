@@ -88,4 +88,6 @@ There are no image uploads in the MVP. A reference-artwork upload would need an 
 | `DESIGN_LAB_MAX_VARIATIONS` | 2 | 1 to 4 |
 | `DESIGN_LAB_CREDITS_PER_IMAGE` | none | Optional estimate for the ledger |
 
+Network: the web and worker processes must reach `api.bfl.ai` (or the regional API host in `BFL_API_URL`) and BFL's image delivery hosts. BFL says to allow `delivery.*.bfl.ai` (or all of `*.bfl.ai`) rather than individual regional host names, which change.
+
 Going live: set `DESIGN_LAB_PROVIDER=bfl`, `BFL_API_KEY` and `BFL_MODEL` on the web **and** worker processes, run the migration, restart both, and generate one concept as an owner to confirm. `BFL_MODEL=flux-2-pro` is BFL's recommended default for text-to-image (checked 14 Nov 2026; `flux-2-flex` is stronger at lettering, and FLUX 3 Image is newer but uses a different request shape this provider has not been checked against). Check the account's balance with `GET https://api.bfl.ai/v1/credits` (header `x-key`).
