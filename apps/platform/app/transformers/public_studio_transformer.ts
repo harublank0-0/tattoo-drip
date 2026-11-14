@@ -1,4 +1,6 @@
 import { BaseTransformer } from "@adonisjs/core/transformers";
+import { reviewsEnabled } from "#modules/reviews/review_links";
+import { sectionsShown } from "#modules/storefront/look";
 import type { StudioPage } from "#modules/storefront/services/studio_page_service";
 import { socialLinks } from "#modules/storefront/studio_page";
 
@@ -87,7 +89,11 @@ export default class PublicStudioTransformer extends BaseTransformer<StudioPage>
 					colors: { accent: look.accent, accentDark: look.accentDark },
 					font: look.font,
 				},
-				sections: look.sections.map((type) => ({ type })),
+				// Reviews and Fresh ink's sections only while the feature is on: the
+				// page then makes no read for them (slice 3).
+				sections: sectionsShown(look.sections, reviewsEnabled()).map(
+					(type) => ({ type }),
+				),
 			},
 			openingHours: openingHours.map(({ day, opens, closes }) => ({
 				day,

@@ -80,20 +80,29 @@ test.group("the Fresh ink and Reviews sections migration (slice 3)", () => {
 				"info,inquiry,artists",
 				"work,work,artists,artists,info,zzz,zzz,inquiry", // eight keys, repeats and unknown ones
 				`work,artists,${"x".repeat(79)},inquiry`, // a hundred characters
+				"info,work,inquiry,artists,flash", // the anchors last: after Flash
+				"inquiry,work", // only Recent work, after the form
+				"info,inquiry", // no anchor: before Good to know
+				"inquiry", // the form alone: before it
 			];
 			await seed(trx, stored);
 			assert.deepEqual(await lists(trx), stored);
 
 			await run(trx, "up");
 
-			// Fresh ink and Reviews go right before Good to know, else before the form.
+			// Fresh ink and Reviews go right after the last of Recent work, the
+			// artists and Flash, else before Good to know, else before the form.
 			assert.deepEqual(await lists(trx), [
 				"work,artists,flash,fresh_ink,reviews,info,inquiry",
 				"work,artists,fresh_ink,reviews,inquiry",
 				"inquiry,work,fresh_ink,reviews,info",
-				"fresh_ink,reviews,info,inquiry,artists",
+				"info,inquiry,artists,fresh_ink,reviews",
 				"work,artists,fresh_ink,reviews,info,inquiry",
 				"work,artists,fresh_ink,reviews,inquiry",
+				"info,work,inquiry,artists,flash,fresh_ink,reviews",
+				"inquiry,work,fresh_ink,reviews",
+				"fresh_ink,reviews,info,inquiry",
+				"fresh_ink,reviews,inquiry",
 			]);
 			assert.include(
 				(await trx.rawQuery(READ_DEFAULT)).rows[0].column_default,
@@ -115,6 +124,8 @@ test.group("the Fresh ink and Reviews sections migration (slice 3)", () => {
 
 			await run(trx, "down");
 
+			// down() gives back the lists as they were (the two rows changed
+			// above lose their own keys too).
 			assert.deepEqual(await lists(trx), [
 				"work,inquiry",
 				"work,inquiry",
@@ -122,6 +133,10 @@ test.group("the Fresh ink and Reviews sections migration (slice 3)", () => {
 				"info,inquiry,artists",
 				"work,artists,info,inquiry",
 				"work,artists,inquiry",
+				"info,work,inquiry,artists,flash",
+				"inquiry,work",
+				"info,inquiry",
+				"inquiry",
 			]);
 			assert.include(
 				(await trx.rawQuery(READ_DEFAULT)).rows[0].column_default,

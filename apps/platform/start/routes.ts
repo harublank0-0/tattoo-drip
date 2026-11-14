@@ -937,13 +937,15 @@ router
 				// TattooDrip has not taken down, newest first, a page at a time. Only
 				// the query string is read. While REVIEWS_ENABLED is off both are
 				// empty pages, never an error, so the page's sections render nothing.
+				// A shorter stale window than the other reads (60 s, as Discover's):
+				// a takedown's text leaves shared caches within 2 minutes.
 				router
 					.get("/reviews", [controllers.PublicStudioReviews, "index"])
-					.use(middleware.publicCache())
+					.use(middleware.publicCache({ maxAge: 60, staleWhileRevalidate: 60 }))
 					.as("api.v1.reviews.index");
 				router
 					.get("/fresh-ink", [controllers.PublicStudioReviews, "freshInk"])
-					.use(middleware.publicCache())
+					.use(middleware.publicCache({ maxAge: 60, staleWhileRevalidate: 60 }))
 					.as("api.v1.fresh_ink.index");
 				// The intake (TAT-51). intakeGuard counts the address, checks the
 				// bot challenge and counts the studio before its multipart body is

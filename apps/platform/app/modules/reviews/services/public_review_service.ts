@@ -67,7 +67,7 @@ export type ShownFreshInkPost = ShownWorkPhoto & {
 	styles: TattooStyleRef[];
 	placement: string | null;
 	artist: ShownArtistTag | null;
-	/** The day it was published on the studio's page, in its timezone (YYYY-MM-DD). */
+	/** The day it was published (`published_at`: the latest publication, for any surface), in its timezone (YYYY-MM-DD). */
 	date: string;
 };
 

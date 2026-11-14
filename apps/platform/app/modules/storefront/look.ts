@@ -72,6 +72,22 @@ export const DEFAULT_SECTIONS: readonly SectionKey[] = [
 export const REVIEW_SECTIONS: readonly SectionKey[] = ["fresh_ink", "reviews"];
 
 /**
+ * The sections that exist for this request: all of them, but Reviews and
+ * Fresh ink's only while REVIEWS_ENABLED is on (`reviewsOn`, read by the
+ * caller: this file is pure). Settings, Page look lists these, and the
+ * public `Studio.storefront.sections` carries these, so a studio page makes
+ * no reviews or Fresh ink read while the feature is off.
+ */
+export function sectionsShown(
+	keys: readonly SectionKey[],
+	reviewsOn: boolean,
+): SectionKey[] {
+	return reviewsOn
+		? [...keys]
+		: keys.filter((key) => !REVIEW_SECTIONS.includes(key));
+}
+
+/**
  * The list a save stores when the form could not show `kept` (sections it
  * neither listed nor sent): `sent` without them, then each of them the
  * stored list holds, put back right after the nearest section before it in

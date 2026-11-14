@@ -12,7 +12,7 @@ import {
 	lookOf,
 	REVIEW_SECTIONS,
 	SECTION_KEYS,
-	type SectionKey,
+	sectionsShown,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
@@ -55,7 +55,7 @@ export default class PageLookController {
 				accent: look.accent,
 				accentDark: look.accentDark,
 				font: look.font,
-				sections: shownSections(look.sections),
+				sections: sectionsShown(look.sections, reviewsEnabled()),
 				// Not part of the served look (the flash reads apply it): the form's own.
 				claimedFlash: claimedFlashOf(tenant),
 			},
@@ -63,7 +63,7 @@ export default class PageLookController {
 			themes: THEMES,
 			fonts: FONTS,
 			// Reviews and Fresh ink's sections only while the feature is on.
-			sectionKeys: shownSections(SECTION_KEYS),
+			sectionKeys: sectionsShown(SECTION_KEYS, reviewsEnabled()),
 			// Where an empty colour box starts its swatch.
 			swatches: { light: THEME_ACCENT, dark: THEME_ACCENT_DARK },
 			// The logo's 640 px copy for the preview, never the key or the columns.
@@ -127,15 +127,4 @@ export default class PageLookController {
 			.redirect()
 			.toRoute("tenant.settings.look", { tenant: tenant.slug });
 	}
-}
-
-/**
- * The sections Settings, Page look lists: all of them, but Reviews and Fresh
- * ink's only while REVIEWS_ENABLED is on (the dashboard shows nothing of the
- * feature while it is off).
- */
-function shownSections(keys: readonly SectionKey[]): SectionKey[] {
-	return reviewsEnabled()
-		? [...keys]
-		: keys.filter((key) => !REVIEW_SECTIONS.includes(key));
 }

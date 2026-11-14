@@ -40,7 +40,8 @@ import { inTenant, studioWithOwner, twoStudios } from "#tests/helpers/tenants";
  * flag, a deleted studio and the other studio's rows.
  */
 
-const CACHED = "public, max-age=60, stale-while-revalidate=600";
+/** Shorter than the other reads (60 s stale): a takedown leaves shared caches within 2 minutes. */
+const CACHED = "public, max-age=60, stale-while-revalidate=60";
 
 /** The documented fields (openapi.yaml). A new one needs the contract and a ruling first. */
 const REVIEWS_BODY = ["data", "nextCursor", "rating"];
@@ -414,6 +415,37 @@ test.group("GET /api/v1/tenants/:tenant/reviews (listReviews)", (group) => {
 			404,
 			"not_found",
 		);
+	});
+
+	test("while reviews are off getStudio's sections leave out Fresh ink and Reviews, so the page makes no read for them", async ({
+		client,
+		assert,
+	}) => {
+		const s = await studio("sp-reviews-g");
+		const sections = async () =>
+			(
+				(await client.get(`/api/v1/tenants/${s.tenant.slug}`)).body() as {
+					data: { storefront: { sections: { type: string }[] } };
+				}
+			).data.storefront.sections.map(({ type }) => type);
+		assert.deepEqual(await sections(), [
+			"work",
+			"artists",
+			"flash",
+			"fresh_ink",
+			"reviews",
+			"info",
+			"inquiry",
+		]);
+		await withReviewsOff(async () => {
+			assert.deepEqual(await sections(), [
+				"work",
+				"artists",
+				"flash",
+				"info",
+				"inquiry",
+			]);
+		});
 	});
 
 	test("never lists the other studio's reviews, through the route or from the other studio's context", async ({

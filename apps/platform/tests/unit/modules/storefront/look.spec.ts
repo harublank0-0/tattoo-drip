@@ -23,6 +23,7 @@ import {
 	SECTION_KEYS,
 	sectionList,
 	sectionsOf,
+	sectionsShown,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEME_KEYS,
@@ -275,6 +276,22 @@ test.group("sections", () => {
 			"reviews",
 			"inquiry",
 		]);
+	});
+
+	test("sectionsShown leaves out Fresh ink and Reviews only while the feature is off", ({
+		assert,
+	}) => {
+		assert.deepEqual(sectionsShown(DEFAULT_SECTIONS, true), [
+			...DEFAULT_SECTIONS,
+		]);
+		assert.deepEqual(sectionsShown(DEFAULT_SECTIONS, false), [
+			"work",
+			"artists",
+			"flash",
+			"info",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsShown(["reviews", "inquiry"], false), ["inquiry"]);
 	});
 
 	test("keepSections puts back what the form could not show, where the stored list had it", ({

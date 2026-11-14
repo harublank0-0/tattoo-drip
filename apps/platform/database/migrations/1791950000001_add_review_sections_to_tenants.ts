@@ -8,8 +8,10 @@ import { BaseSchema } from "@adonisjs/lucid/schema";
  * by default, so: the column's default becomes
  * 'work,artists,flash,fresh_ink,reviews,info,inquiry' and every stored list
  * gets `fresh_ink,reviews` (the one it lacks, when it holds the other, which
- * only a development database can) right before `info`, else right before
- * `inquiry`. An owner's earlier order stays. Each renders nothing until a
+ * only a development database can) right after the last of `work`,
+ * `artists` and `flash` it holds (the page's photos and people, which the
+ * clients' own photos and words follow), else right before `info`, else
+ * right before `inquiry`. An owner's earlier order stays. Each renders nothing until a
  * client's post or review is shown there (and nothing while REVIEWS_ENABLED
  * is off), so showing them everywhere changes no page by itself: that is the
  * spec's "off by default, on once there is something to show".
@@ -68,16 +70,21 @@ export default class extends BaseSchema {
 			`alter table tenants add constraint tenants_storefront_sections_format check (${NEW_CHECK})`,
 		);
 		this.schema.raw(`${REBUILT(KNOWN)}, missing as (
-				select id, sections, concat_ws(',',
-					case when not ('fresh_ink' = any (string_to_array(sections, ','))) then 'fresh_ink' end,
-					case when not ('reviews' = any (string_to_array(sections, ','))) then 'reviews' end
-				) as keys
+				select id, sections, string_to_array(sections, ',') as list,
+					concat_ws(',',
+						case when not ('fresh_ink' = any (string_to_array(sections, ','))) then 'fresh_ink' end,
+						case when not ('reviews' = any (string_to_array(sections, ','))) then 'reviews' end
+					) as keys,
+					(select max(k.place) from unnest(string_to_array(sections, ',')) with ordinality as k(section, place)
+						where k.section in ('work', 'artists', 'flash')) as anchor
 				from listed
 			)
 			update tenants t set storefront_sections = next.sections
 			from (
 				select id, case
 					when keys = '' then sections
+					when anchor is not null
+						then array_to_string(list[1:anchor] || string_to_array(keys, ',') || list[anchor + 1:], ',')
 					when 'info' = any (string_to_array(sections, ','))
 						then regexp_replace(sections, '(^|,)info(,|$)', '\\1' || keys || ',info\\2')
 					when 'inquiry' = any (string_to_array(sections, ','))
