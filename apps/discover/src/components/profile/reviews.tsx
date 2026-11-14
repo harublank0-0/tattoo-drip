@@ -3,18 +3,19 @@ import { Link } from "@tanstack/react-router";
 import { useDiscoverClient } from "@tattoo-drip/react";
 import type {
 	DiscoverFreshInkPage,
+	DiscoverFreshInkPost,
 	DiscoverReview,
 	DiscoverReviewsPage,
 } from "@tattoo-drip/sdk";
 import { StarIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MoreLink } from "#/components/directory/hub";
 import { useMounted } from "#/components/directory/pagination";
 import {
 	EditorialSection,
 	SectionHeading,
 } from "#/components/discovery/layout";
-import { FreshInkColumns } from "#/components/gallery/fresh-ink";
+import { FreshInkColumns, USER_TEXT } from "#/components/gallery/fresh-ink";
 import { Button } from "#/components/ui/button";
 import { tattooProfile } from "#/lib/destinations";
 import {
@@ -26,6 +27,7 @@ import {
 	type ReviewSubject,
 	ratingSummary,
 	ratingWords,
+	subjectKey,
 } from "#/lib/reviews";
 import { paths } from "#/lib/routes";
 import { cn } from "#/lib/utils";
@@ -37,7 +39,9 @@ import { cn } from "#/lib/utils";
  * optional reads: a failed or empty one renders nothing (no heading, no
  * "no reviews yet"), and while reviews are switched off on the platform the
  * API answers empty pages, so the profile shows nothing of either. "Show
- * more" reads the next page in the browser (it appears after hydration).
+ * more" reads the next page in the browser (it appears after hydration);
+ * the sections are keyed by the profile, so moving to another profile on
+ * the same route (an artist to a colleague) starts them again.
  */
 
 /** Five stars, `filled` of them filled: decoration only, the words say the rating. */
@@ -65,48 +69,93 @@ export function Stars({
 	);
 }
 
-/** The next pages of a list, read on demand and kept with the first. */
-function useMore<P extends { nextCursor: string | null }>(
+type MoreState = "idle" | "loading" | "failed";
+
+/**
+ * "Show more": the first page comes from the loader (always the current
+ * one); only the pages read here are state. After a page arrives, focus
+ * moves to its first new item (`itemId`, which takes focus) and a polite
+ * message says how many were added, also when it was the last page and the
+ * button goes away.
+ */
+function useMore<
+	T extends { id: string },
+	P extends { data: T[]; nextCursor: string | null },
+>(
 	first: P,
 	read: (cursor: string) => Promise<P>,
+	itemId: (item: T) => string,
+	noun: (count: number) => string,
 ) {
-	const [pages, setPages] = useState<P[]>([first]);
-	const [state, setState] = useState<"idle" | "loading" | "failed">("idle");
-	const last = pages[pages.length - 1];
+	const [extra, setExtra] = useState<P[]>([]);
+	const [state, setState] = useState<MoreState>("idle");
+	const [message, setMessage] = useState("");
+	const focusNext = useRef<string | null>(null);
+	const pages = [first, ...extra];
+	const last = pages[pages.length - 1] as P;
+	useEffect(() => {
+		if (!focusNext.current) return;
+		document.getElementById(focusNext.current)?.focus();
+		focusNext.current = null;
+	});
 	const more = async () => {
-		if (!last.nextCursor) return;
+		if (state === "loading" || !last.nextCursor) return;
 		setState("loading");
 		try {
 			const page = await read(last.nextCursor);
-			setPages((current) => [...current, page]);
+			const shown = new Set(mergePages(pages).map((item) => item.id));
+			const added = page.data.filter((item) => !shown.has(item.id));
+			focusNext.current = added[0] ? itemId(added[0]) : null;
+			setExtra((current) => [...current, page]);
+			setMessage(
+				added.length > 0
+					? `${added.length} more ${noun(added.length)} shown${page.nextCursor ? "" : ", that's all of them"}.`
+					: `No more ${noun(2)}.`,
+			);
 			setState("idle");
 		} catch {
 			setState("failed");
 		}
 	};
-	return { pages, more, state, hasMore: Boolean(last.nextCursor) };
+	return {
+		items: mergePages(pages),
+		more,
+		state,
+		message,
+		hasMore: Boolean(last.nextCursor),
+	};
 }
 
 function ShowMore({
 	label,
 	more,
 	state,
+	hasMore,
+	message,
 }: {
 	label: string;
 	more: () => void;
-	state: "idle" | "loading" | "failed";
+	state: MoreState;
+	hasMore: boolean;
+	message: string;
 }) {
+	const loading = state === "loading";
 	return (
 		<div className="mt-8 flex flex-col items-start gap-2">
-			<Button
-				type="button"
-				variant="outline"
-				onClick={more}
-				disabled={state === "loading"}
-				aria-busy={state === "loading" || undefined}
-			>
-				{state === "loading" ? "Loading…" : label}
-			</Button>
+			{hasMore && (
+				<Button
+					type="button"
+					variant="outline"
+					onClick={more}
+					aria-disabled={loading || undefined}
+					aria-busy={loading || undefined}
+					className={loading ? "cursor-progress opacity-70" : undefined}
+				>
+					{loading ? "Loading…" : label}
+				</Button>
+			)}
+			{/* Polite, and there before it changes, so the count is announced. */}
+			<output className="sr-only">{message}</output>
 			{state === "failed" && (
 				<p role="alert" className="text-sm">
 					That didn't load. Try again in a moment.
@@ -118,25 +167,34 @@ function ShowMore({
 
 /** One review: its stars and words, the client's text, who and when, the artist, the studio's reply. */
 function ReviewItem({
+	id,
 	review,
 	showArtist,
 }: {
+	id: string;
 	review: DiscoverReview;
 	showArtist: boolean;
 }) {
 	const artist = tattooProfile(review);
 	return (
-		<li className="flex flex-col gap-3 border-b border-line py-6">
+		<li
+			id={id}
+			tabIndex={-1}
+			className="flex min-w-0 flex-col gap-3 border-b border-line py-6 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+		>
 			<p className="flex flex-wrap items-center gap-2">
 				<Stars filled={review.rating} />
 				<span className="text-sm font-medium">
 					{ratingWords(review.rating)}
 				</span>
 			</p>
-			<p className="max-w-prose text-lg whitespace-pre-line" dir="auto">
+			<p
+				className={cn("max-w-prose text-lg whitespace-pre-line", USER_TEXT)}
+				dir="auto"
+			>
 				{review.body}
 			</p>
-			<p className="text-sm text-muted-foreground">
+			<p className={cn("text-sm text-muted-foreground", USER_TEXT)}>
 				<bdi className="font-medium text-foreground">{review.shownName}</bdi>
 				{" · "}
 				<time dateTime={review.date}>{dayText(review.date)}</time>
@@ -158,8 +216,8 @@ function ReviewItem({
 				)}
 			</p>
 			{review.reply && (
-				<div className="ml-4 flex max-w-prose flex-col gap-1 border-l-2 border-line-strong pl-4">
-					<p className="text-sm font-medium">
+				<div className="ml-4 flex max-w-prose min-w-0 flex-col gap-1 border-l-2 border-line-strong pl-4">
+					<p className={cn("text-sm font-medium", USER_TEXT)}>
 						{"Reply from "}
 						<bdi>{review.studio.name}</bdi>
 						{" · "}
@@ -167,7 +225,7 @@ function ReviewItem({
 							{dayText(review.reply.date)}
 						</time>
 					</p>
-					<p className="whitespace-pre-line" dir="auto">
+					<p className={cn("whitespace-pre-line", USER_TEXT)} dir="auto">
 						{review.reply.body}
 					</p>
 				</div>
@@ -199,6 +257,7 @@ export function ReviewsSection({
 	if (!first || first.data.length === 0) return null;
 	return (
 		<ReviewsList
+			key={subjectKey(subject)}
 			id={id}
 			subject={subject}
 			first={first}
@@ -224,22 +283,27 @@ function ReviewsList({
 	const client = useDiscoverClient();
 	const queryClient = useQueryClient();
 	const mounted = useMounted();
-	const { pages, more, state, hasMore } = useMore(first, (cursor) =>
-		queryClient.fetchQuery(
-			profileReviewQueries(client, subject, { reviews: cursor }).reviews,
-		),
+	const itemId = (review: DiscoverReview) => `${id}-${review.id}`;
+	const { items, more, state, message, hasMore } = useMore(
+		first,
+		(cursor) =>
+			queryClient.fetchQuery(
+				profileReviewQueries(client, subject, { reviews: cursor }).reviews,
+			),
+		itemId,
+		(count) => (count === 1 ? "review" : "reviews"),
 	);
-	const reviews = mergePages(pages);
 	const summary = ratingSummary(first.rating);
 	return (
 		<EditorialSection labelledBy={id} className="lg:py-20">
 			<div className="grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
-				<div className="flex flex-col gap-6">
+				<div className="flex min-w-0 flex-col gap-6">
 					<SectionHeading
 						id={id}
 						eyebrow="Reviews"
 						title={`Reviews of ${name}`}
-						intro="Written by clients through the private link the studio sends after their tattoo. Newest first, never sorted by stars."
+						className={USER_TEXT}
+						intro="Written by clients through the private link sent after their tattoo. Newest first, never sorted by stars."
 					/>
 					{first.rating && summary && (
 						<div className="flex flex-col gap-2 border-t border-ink pt-4">
@@ -259,18 +323,25 @@ function ReviewsList({
 						</div>
 					)}
 				</div>
-				<div>
+				<div className="min-w-0">
 					<ul className="flex flex-col border-t border-ink">
-						{reviews.map((review) => (
+						{items.map((review) => (
 							<ReviewItem
 								key={review.id}
+								id={itemId(review)}
 								review={review}
 								showArtist={showArtist}
 							/>
 						))}
 					</ul>
-					{mounted && hasMore && (
-						<ShowMore label="Show more reviews" more={more} state={state} />
+					{mounted && (
+						<ShowMore
+							label="Show more reviews"
+							more={more}
+							state={state}
+							hasMore={hasMore}
+							message={message}
+						/>
 					)}
 				</div>
 			</div>
@@ -278,20 +349,36 @@ function ReviewsList({
 	);
 }
 
-/** A profile's Fresh ink: a night band of tiles, each opening its viewer. Nothing when there is none. */
+/**
+ * A profile's Fresh ink: a night band of tiles, each opening its viewer.
+ * Nothing when there is none. `country` is the profile's own, when it is a
+ * market: "All Fresh ink" then opens that country's feed, not the
+ * visitor's.
+ */
 export function FreshInkSection({
 	id,
 	subject,
 	first,
 	name,
+	country,
 }: {
 	id: string;
 	subject: ReviewSubject;
 	first: DiscoverFreshInkPage | undefined;
 	name: string;
+	country?: string;
 }) {
 	if (!first || first.data.length === 0) return null;
-	return <FreshInkList id={id} subject={subject} first={first} name={name} />;
+	return (
+		<FreshInkList
+			key={subjectKey(subject)}
+			id={id}
+			subject={subject}
+			first={first}
+			name={name}
+			country={country}
+		/>
+	);
 }
 
 function FreshInkList({
@@ -299,21 +386,27 @@ function FreshInkList({
 	subject,
 	first,
 	name,
+	country,
 }: {
 	id: string;
 	subject: ReviewSubject;
 	first: DiscoverFreshInkPage;
 	name: string;
+	country?: string;
 }) {
 	const client = useDiscoverClient();
 	const queryClient = useQueryClient();
 	const mounted = useMounted();
-	const { pages, more, state, hasMore } = useMore(first, (cursor) =>
-		queryClient.fetchQuery(
-			profileReviewQueries(client, subject, { freshInk: cursor }).freshInk,
-		),
+	const itemId = (post: DiscoverFreshInkPost) => `${id}-${post.id}`;
+	const { items, more, state, message, hasMore } = useMore(
+		first,
+		(cursor) =>
+			queryClient.fetchQuery(
+				profileReviewQueries(client, subject, { freshInk: cursor }).freshInk,
+			),
+		itemId,
+		(count) => (count === 1 ? "post" : "posts"),
 	);
-	const posts = mergePages(pages);
 	return (
 		<EditorialSection tone="night" labelledBy={id} className="lg:py-20">
 			<div className="mb-8 flex flex-col gap-4 lg:mb-12 lg:flex-row lg:items-end lg:justify-between">
@@ -321,14 +414,21 @@ function FreshInkList({
 					id={id}
 					eyebrow="Fresh ink"
 					title={`Healed work from ${name}'s clients`}
+					className={USER_TEXT}
 					intro="Photos and short videos clients posted of their healed tattoos, shown with the studio's approval."
 				/>
-				<MoreLink to={paths.freshInk()}>All Fresh ink</MoreLink>
+				<MoreLink
+					to={paths.freshInk()}
+					search={country ? { country } : undefined}
+				>
+					All Fresh ink
+				</MoreLink>
 			</div>
 			<FreshInkColumns
-				posts={posts}
+				posts={items}
 				columns="lg:columns-3"
 				sizes="(min-width: 40rem) 33vw, 50vw"
+				itemId={itemId}
 				caption={(post) => (
 					<>
 						<bdi>{post.shownName}</bdi>
@@ -336,8 +436,14 @@ function FreshInkList({
 					</>
 				)}
 			/>
-			{mounted && hasMore && (
-				<ShowMore label="Show more Fresh ink" more={more} state={state} />
+			{mounted && (
+				<ShowMore
+					label="Show more Fresh ink"
+					more={more}
+					state={state}
+					hasMore={hasMore}
+					message={message}
+				/>
 			)}
 		</EditorialSection>
 	);

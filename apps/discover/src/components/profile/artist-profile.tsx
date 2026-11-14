@@ -30,6 +30,7 @@ import { bookingLinks, generalRequest, safeSocialUrl } from "#/lib/booking";
 import { crumbs } from "#/lib/breadcrumbs";
 import { nearbyLinks, placeLine, possessive } from "#/lib/profiles";
 import type { ReviewSubject } from "#/lib/reviews";
+import { marketOf } from "#/lib/reviews";
 import { paths } from "#/lib/routes";
 
 /**
@@ -207,6 +208,7 @@ export function ArtistProfile({
 				subject={subject}
 				first={freshInk}
 				name={artist.name}
+				country={marketOf(artist.location, markets)}
 			/>
 
 			<ReviewsSection

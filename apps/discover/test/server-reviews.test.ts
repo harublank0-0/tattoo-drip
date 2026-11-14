@@ -72,8 +72,9 @@ describe("Reviews and Fresh ink on the built server", { skip }, () => {
 			/<h2[^>]*>Healed work from Stub Studio 1(&#x27;|')s clients<\/h2>/,
 		);
 		assert.match(page, /aria-haspopup="dialog"/);
-		assert.match(page, /3 photos and videos/);
-		assert.match(page, /href="\/fresh-ink"/);
+		assert.match(page, /2 photos and a video/);
+		// The studio is in a market (NP): its own country, not the visitor's.
+		assert.match(page, /href="\/fresh-ink\?country=NP"/);
 		// JSON-LD: the TattooParlor with AggregateRating and the shown reviews.
 		const parlor = nodes(page).find((node) => node["@type"] === "TattooParlor");
 		assert.ok(parlor, "a TattooParlor node");
@@ -90,11 +91,11 @@ describe("Reviews and Fresh ink on the built server", { skip }, () => {
 
 	test("an artist below the threshold: the reviews without an average, and no review JSON-LD", async () => {
 		const response = await discover.get(
-			"/studios/stub-studio-1/artists/crew-1-a",
+			"/studios/stub-studio-1/artists/stub-artist-1",
 		);
 		assert.equal(response.status, 200);
 		const page = await html(response);
-		assert.match(page, /<h2[^>]*>Reviews of Stub Crew 1A<\/h2>/);
+		assert.match(page, /<h2[^>]*>Reviews of Stub Artist 1<\/h2>/);
 		assert.match(text(page), /2 out of 5/);
 		assert.doesNotMatch(text(page), /from \d+ reviews/);
 		assert.doesNotMatch(

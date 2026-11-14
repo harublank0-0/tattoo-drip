@@ -683,6 +683,8 @@ export async function stubApi(count = 1): Promise<StubApi> {
 							owner.studio,
 							owner.artist,
 							segments.length === 3 && segments[0] === "studios",
+							limit,
+							address.searchParams.get("cursor"),
 						),
 					),
 				);
@@ -959,35 +961,53 @@ function stubReviews(
 	studio: StubRef,
 	artist: { id: string; slug: string; name: string } | undefined,
 	whole: boolean,
+	limit = 24,
+	cursor: string | null = null,
 ) {
 	const by = artist ?? {
 		id: uuid(9, 0),
 		slug: "stub-artist",
 		name: "Stub Artist",
 	};
-	const ratings = whole ? [5, 4, 5, 3] : [5, 2];
+	// A studio's crew artists (`crew-<n>-a`, `-b`) have eight reviews (two
+	// pages of six: "Show more"), the rest of the artists two.
+	const crew = !whole && by.slug.startsWith("crew-");
+	const ratings = whole
+		? [5, 4, 5, 3]
+		: crew
+			? [5, 4, 4, 3, 4, 5, 3, 4]
+			: [5, 2];
+	const offset = cursor
+		? Number(Buffer.from(cursor, "base64url").toString()) || 0
+		: 0;
+	const all = ratings.map((rating, index) => ({
+		id: uuid(7, index + (whole ? 0 : 50 + Number(by.id.slice(-6)) * 10)),
+		rating,
+		body:
+			index === 1
+				? "Healed evenly.\n\nWould come back <b>again</b>."
+				: `Stub review ${index} of ${by.name}: the lines healed crisp and clean.`,
+		shownName:
+			index === 2 ? "\u0633\u0627\u0631\u0627 \u0645." : `Stub Client ${index}`,
+		date: `2026-10-${String(10 - index).padStart(2, "0")}`,
+		artist: { id: by.id, slug: by.slug, name: by.name },
+		studio,
+		reply:
+			index === 0
+				? { body: "Thank you for coming in!", date: "2026-10-11" }
+				: null,
+	}));
 	return {
-		data: ratings.map((rating, index) => ({
-			id: uuid(7, index + (whole ? 0 : 50)),
-			rating,
-			body:
-				index === 1
-					? "Healed evenly.\n\nWould come back <b>again</b>."
-					: `Stub review ${index}: the lines healed crisp and clean.`,
-			shownName:
-				index === 2
-					? "\u0633\u0627\u0631\u0627 \u0645."
-					: `Stub Client ${index}`,
-			date: `2026-10-${String(10 - index).padStart(2, "0")}`,
-			artist: { id: by.id, slug: by.slug, name: by.name },
-			studio,
-			reply:
-				index === 0
-					? { body: "Thank you for coming in!", date: "2026-10-11" }
-					: null,
-		})),
-		nextCursor: null,
-		rating: whole ? { average: 4.3, count: 4 } : null,
+		data: all.slice(offset, offset + limit),
+		nextCursor:
+			offset + limit < all.length
+				? Buffer.from(String(offset + limit)).toString("base64url")
+				: null,
+		rating: whole
+			? { average: 4.3, count: 4 }
+			: crew
+				? { average: 4, count: 8 }
+				: null,
 	};
 }
 
@@ -1051,6 +1071,8 @@ function stubPosts(
 		placement: index === 0 ? "Left forearm" : null,
 		date: "2026-10-12",
 		artist: { id: artist.id, slug: artist.slug, name: artist.name },
+		artistAcceptingInquiries:
+			(artist as { acceptingInquiries?: boolean }).acceptingInquiries ?? true,
 		studio,
 		location: place,
 		storefrontUrl: `${origin}/`,

@@ -20,12 +20,16 @@ import {
 	dayText,
 	filledStars,
 	freshInkAlt,
+	freshInkBooking,
+	marketOf,
 	mediaCount,
+	mediaWords,
 	mergePages,
 	profileReviewQueries,
 	ratingSummary,
 	ratingWords,
 	reviewsLd,
+	subjectKey,
 	videoLabel,
 } from "../src/lib/reviews.ts";
 import { hasRoute, paths } from "../src/lib/routes.ts";
@@ -90,13 +94,25 @@ describe("ratings in words", () => {
 		assert.equal(videoLabel(42_400), "Video, 0:42");
 		assert.equal(videoLabel(60_000), "Video, 1:00");
 		assert.equal(mediaCount({ angles: [] }), null);
+		assert.equal(mediaWords({ angles: [] }), "1 photo");
 		assert.equal(
 			mediaCount({ angles: [{ kind: "photo" }] as never }),
 			"2 photos",
 		);
 		assert.equal(
 			mediaCount({ angles: [{ kind: "photo" }, { kind: "video" }] as never }),
-			"3 photos and videos",
+			"2 photos and a video",
+		);
+		assert.equal(
+			mediaWords({
+				angles: [
+					{ kind: "video" },
+					{ kind: "video" },
+					{ kind: "other" },
+				] as never,
+			}),
+			"1 photo and 2 videos",
+			"only what the viewer shows",
 		);
 		const artist = { id: "a1", slug: "maya", name: "Maya" };
 		assert.equal(freshInkAlt({ alt: "  Koi, healed ", artist }), "Koi, healed");
@@ -105,6 +121,75 @@ describe("ratings in words", () => {
 			freshInkAlt({ alt: " ", artist }, { index: 1, total: 3 }),
 			"Healed tattoo by Maya, photo 2 of 3",
 		);
+	});
+
+	test("a post's booking follows the artwork page's rule for an artist who isn't taking requests", () => {
+		const general = (request: string) => request.replace("?artist=maya&", "?");
+		const request = "https://needle.example/book?artist=maya&ref=a.b";
+		const artist = { id: "a1", slug: "maya", name: "Maya" };
+		const studio = {
+			slug: "needle",
+			name: "Black Needle",
+			type: "studio" as const,
+		};
+		assert.deepEqual(
+			freshInkBooking(
+				{ artistAcceptingInquiries: true, artist, studio },
+				request,
+				general,
+			),
+			{ request, label: "Request with Maya" },
+		);
+		assert.deepEqual(
+			freshInkBooking(
+				{ artistAcceptingInquiries: false, artist, studio },
+				request,
+				general,
+			),
+			{
+				request: "https://needle.example/book?ref=a.b",
+				label: "Request a session at Black Needle",
+				closed: "Maya isn't taking new requests right now.",
+			},
+		);
+		const solo = {
+			slug: "maya-solo",
+			name: "Maya Solo",
+			type: "independent" as const,
+		};
+		assert.deepEqual(
+			freshInkBooking(
+				{ artistAcceptingInquiries: false, artist, studio: solo },
+				request,
+				general,
+			),
+			{
+				request: null,
+				label: "",
+				closed: "Maya isn't taking new requests right now.",
+			},
+		);
+		assert.equal(
+			freshInkBooking(
+				{ artistAcceptingInquiries: false, artist, studio },
+				null,
+				general,
+			).request,
+			null,
+		);
+	});
+
+	test("profiles key their sections apart (an artist and a colleague), and keep a market's country for the feed", () => {
+		const a = subjectKey({ kind: "studioArtist", studio: "s", artist: "maya" });
+		const b = subjectKey({ kind: "studioArtist", studio: "s", artist: "sita" });
+		assert.notEqual(a, b);
+		assert.notEqual(
+			subjectKey({ kind: "studio", slug: "s" }),
+			subjectKey({ kind: "independent", slug: "s" }),
+		);
+		assert.equal(marketOf({ country: "IN" }, ["NP", "IN"]), "IN");
+		assert.equal(marketOf({ country: "US" }, ["NP", "IN"]), undefined);
+		assert.equal(marketOf(null, ["NP"]), undefined);
 	});
 
 	test("Show more merges pages without repeating a row", () => {

@@ -75,13 +75,13 @@ export function FreshInkPage({
 			<PageHeader
 				eyebrow="Clients' healed tattoos"
 				title="Fresh ink"
-				intro={`Healed tattoos clients of listed studios in ${where} have posted, newest first. Each was posted through the studio's own review link, with the studio's approval. Open one to see every photo and video and who made it.`}
+				intro={`Healed tattoos posted by clients of listed studios in ${where}, newest first. Each came through the studio's own review link, with the studio's approval. Open one to see every photo and video and who made it.`}
 				breadcrumbs={crumbs.freshInk()}
 			/>
 			<PageContainer className="flex flex-col gap-6 py-8 lg:py-10">
 				<div className="flex flex-col gap-4">
 					<FilterToolbar
-						kind="tattoos"
+						kind="fresh-ink"
 						action={action}
 						search={search as DirectorySearch}
 						filters={filters as DirectorySearch}
@@ -96,7 +96,7 @@ export function FreshInkPage({
 						)}
 					/>
 					<MobileFilters
-						kind="tattoos"
+						kind="fresh-ink"
 						filters={filters as DirectorySearch}
 						lists={lists}
 						onApply={(draft) =>

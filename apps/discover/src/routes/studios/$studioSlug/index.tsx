@@ -31,6 +31,7 @@ import {
 	possessive,
 	studioProfileQueries,
 } from "#/lib/profiles";
+import { marketOf } from "#/lib/reviews";
 import { paths } from "#/lib/routes";
 import { pageMeta } from "#/lib/seo";
 import { structuredData } from "#/lib/structured-data";
@@ -193,6 +194,7 @@ function StudioProfile() {
 				subject={subject}
 				first={freshInk}
 				name={studio.name}
+				country={marketOf(studio.location, discover.settings.markets)}
 			/>
 
 			<ReviewsSection

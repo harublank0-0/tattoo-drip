@@ -96,6 +96,23 @@ export function profileReviewQueries(
 	};
 }
 
+/** A profile's own country when it is one of Discover's markets (the feed's link keeps it), else none. */
+export function marketOf(
+	location: { country: string } | null | undefined,
+	markets: readonly string[],
+): string | undefined {
+	return location && markets.includes(location.country)
+		? location.country
+		: undefined;
+}
+
+/** One string per profile: the sections are keyed by it, so another profile starts them again. */
+export function subjectKey(subject: ReviewSubject): string {
+	return subject.kind === "studioArtist"
+		? `studioArtist:${subject.studio}/${subject.artist}`
+		: `${subject.kind}:${subject.slug}`;
+}
+
 /** The first pages a profile renders: either may be missing (a failed optional read). */
 export type ProfileClientContent = {
 	reviews?: DiscoverReviewsPage;
@@ -163,15 +180,55 @@ export function videoLabel(durationMs: number): string {
 	return `Video, ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-/** How many photos and videos a post has: "3 photos and videos", or null for one. */
+/**
+ * What a post holds, counting only what the viewer shows (its photos and
+ * ready videos): "1 photo", "3 photos", "2 photos and a video", "1 photo
+ * and 2 videos".
+ */
+export function mediaWords(post: Pick<DiscoverFreshInkPost, "angles">): string {
+	const photos =
+		1 + post.angles.filter((angle) => angle.kind === "photo").length;
+	const videos = post.angles.filter((angle) => angle.kind === "video").length;
+	const shown = `${photos} ${photos === 1 ? "photo" : "photos"}`;
+	if (videos === 0) return shown;
+	return `${shown} and ${videos === 1 ? "a video" : `${videos} videos`}`;
+}
+
+/** A tile's badge: `mediaWords`, or null for a post of one photo. */
 export function mediaCount(
 	post: Pick<DiscoverFreshInkPost, "angles">,
 ): string | null {
-	const total = post.angles.length + 1;
-	if (total === 1) return null;
-	const videos = post.angles.filter((angle) => angle.kind === "video").length;
-	if (videos === 0) return `${total} photos`;
-	return `${total} photos and videos`;
+	return post.angles.some(
+		(angle) => angle.kind === "photo" || angle.kind === "video",
+	)
+		? mediaWords(post)
+		: null;
+}
+
+/**
+ * Whose a post's booking is, by the artwork page's rule (D08/D09): an
+ * artist taking requests gets "Request with <artist>"; a studio's artist
+ * who isn't gets the studio's general request ("Request a session at
+ * <studio>"); a paused independent artist gets none.
+ */
+export function freshInkBooking(
+	post: Pick<
+		DiscoverFreshInkPost,
+		"artistAcceptingInquiries" | "artist" | "studio"
+	>,
+	request: string | null,
+	general: (request: string) => string,
+): { request: string | null; label: string; closed?: string } {
+	if (post.artistAcceptingInquiries)
+		return { request, label: `Request with ${post.artist.name}` };
+	const closed = `${post.artist.name} isn't taking new requests right now.`;
+	if (post.studio.type === "independent")
+		return { request: null, label: "", closed };
+	return {
+		request: request ? general(request) : null,
+		label: `Request a session at ${post.studio.name}`,
+		closed,
+	};
 }
 
 /** The pages a "Show more" list holds, merged, without repeating an id. */

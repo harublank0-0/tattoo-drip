@@ -158,7 +158,11 @@ export function BookingActions({
 				{request && (
 					<a
 						href={request}
-						className={buttonVariants({ variant: "accent", size })}
+						className={cn(
+							buttonVariants({ variant: "accent", size }),
+							// A long studio or artist name wraps on a phone instead of overflowing.
+							"h-auto max-w-full shrink py-2 text-left whitespace-normal",
+						)}
 					>
 						{requestLabel}
 						<ArrowUpRightIcon aria-hidden="true" />
@@ -168,7 +172,11 @@ export function BookingActions({
 				{site && (
 					<a
 						href={site}
-						className={buttonVariants({ variant: "outline", size })}
+						className={cn(
+							buttonVariants({ variant: "outline", size }),
+							// A long studio or artist name wraps on a phone instead of overflowing.
+							"h-auto max-w-full shrink py-2 text-left whitespace-normal",
+						)}
 					>
 						{siteLabel}
 						<ArrowUpRightIcon aria-hidden="true" />
