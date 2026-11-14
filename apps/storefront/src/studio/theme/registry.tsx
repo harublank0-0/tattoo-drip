@@ -6,7 +6,9 @@ import {
 	ArtworkPage,
 	FlashDesignPage,
 	FlashPage,
+	FreshInkPage,
 	RequestPage,
+	ReviewsPage,
 	StudioPage,
 	WorkPage,
 } from "../components/pages.tsx";
@@ -15,6 +17,7 @@ import { AtelierArtistPage } from "./atelier/artist-page.tsx";
 import { AtelierArtistsPage } from "./atelier/artists-page.tsx";
 import { AtelierArtworkPage } from "./atelier/artwork-page.tsx";
 import { AtelierBookPage } from "./atelier/book-page.tsx";
+import { AtelierFreshInkPage, AtelierReviewsPage } from "./atelier/clients.tsx";
 import { AtelierGalleryPage } from "./atelier/gallery-page.tsx";
 import { AtelierStudioPage } from "./atelier/home-page.tsx";
 import { AtelierShell } from "./atelier/shell.tsx";
@@ -23,6 +26,10 @@ import { FlashParlourArtistPage } from "./flash-parlour/artist-page.tsx";
 import { FlashParlourArtistsPage } from "./flash-parlour/artists-page.tsx";
 import { FlashParlourArtworkPage } from "./flash-parlour/artwork-page.tsx";
 import { FlashParlourBookPage } from "./flash-parlour/book-page.tsx";
+import {
+	FlashParlourFreshInkPage,
+	FlashParlourReviewsPage,
+} from "./flash-parlour/clients.tsx";
 import { FlashParlourFlashDesignPage } from "./flash-parlour/flash-design-page.tsx";
 import { FlashParlourFlashPage } from "./flash-parlour/flash-page.tsx";
 import { FlashParlourGalleryPage } from "./flash-parlour/gallery-page.tsx";
@@ -33,6 +40,10 @@ import { InkNoirArtistsPage } from "./ink-noir/artists/artists-page.tsx";
 import { InkNoirBookPage } from "./ink-noir/book/book-page.tsx";
 import { InkNoirArtworkPage } from "./ink-noir/gallery/artwork-page.tsx";
 import { InkNoirGalleryPage } from "./ink-noir/gallery/gallery-page.tsx";
+import {
+	InkNoirFreshInkPage,
+	InkNoirReviewsPage,
+} from "./ink-noir/home/fresh-ink.tsx";
 import { InkNoirStudioPage } from "./ink-noir/home/home-page.tsx";
 import { InkNoirInfoPage } from "./ink-noir/info/info-page.tsx";
 import { InkNoirShell } from "./ink-noir/shell.tsx";
@@ -40,6 +51,7 @@ import { IrezumiArtistPage } from "./irezumi/artist-page.tsx";
 import { IrezumiArtistsPage } from "./irezumi/artists-page.tsx";
 import { IrezumiArtworkPage } from "./irezumi/artwork-page.tsx";
 import { IrezumiBookPage } from "./irezumi/book-page.tsx";
+import { IrezumiFreshInkPage, IrezumiReviewsPage } from "./irezumi/clients.tsx";
 import { IrezumiGalleryPage } from "./irezumi/gallery-page.tsx";
 import { IrezumiStudioPage } from "./irezumi/home-page.tsx";
 import { IrezumiShell } from "./irezumi/shell.tsx";
@@ -70,6 +82,10 @@ export interface Theme {
 	readonly FlashDesignPage: ComponentType<
 		ComponentProps<typeof FlashDesignPage>
 	>;
+	/** `/reviews` (Reviews and Fresh ink, slice 3): the shared page in every theme's shell. */
+	readonly ReviewsPage: ComponentType<ComponentProps<typeof ReviewsPage>>;
+	/** `/fresh-ink` (slice 3): the shared page in every theme's shell. */
+	readonly FreshInkPage: ComponentType<ComponentProps<typeof FreshInkPage>>;
 	readonly RequestPage: ComponentType<ComponentProps<typeof RequestPage>>;
 	/** `/about`, `/services`, `/faq`, `/contact`, `/policies`, `/aftercare` (Prompt 7). */
 	readonly InfoPage: ComponentType<ComponentProps<typeof InfoPage>>;
@@ -100,6 +116,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage,
 		FlashPage,
 		FlashDesignPage,
+		ReviewsPage,
+		FreshInkPage,
 		RequestPage,
 		InfoPage,
 	},
@@ -112,6 +130,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: InkNoirArtworkPage,
 		FlashPage,
 		FlashDesignPage,
+		ReviewsPage: InkNoirReviewsPage,
+		FreshInkPage: InkNoirFreshInkPage,
 		RequestPage: InkNoirBookPage,
 		InfoPage: InkNoirInfoPage,
 	},
@@ -124,6 +144,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: IrezumiArtworkPage,
 		FlashPage,
 		FlashDesignPage,
+		ReviewsPage: IrezumiReviewsPage,
+		FreshInkPage: IrezumiFreshInkPage,
 		RequestPage: IrezumiBookPage,
 		InfoPage,
 	},
@@ -136,6 +158,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: AtelierArtworkPage,
 		FlashPage,
 		FlashDesignPage,
+		ReviewsPage: AtelierReviewsPage,
+		FreshInkPage: AtelierFreshInkPage,
 		RequestPage: AtelierBookPage,
 		InfoPage,
 	},
@@ -148,6 +172,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: FlashParlourArtworkPage,
 		FlashPage: FlashParlourFlashPage,
 		FlashDesignPage: FlashParlourFlashDesignPage,
+		ReviewsPage: FlashParlourReviewsPage,
+		FreshInkPage: FlashParlourFreshInkPage,
 		RequestPage: FlashParlourBookPage,
 		InfoPage,
 	},
@@ -213,4 +239,16 @@ export function ThemedInfoPage(props: ComponentProps<typeof InfoPage>) {
 export function ThemedRequestPage(props: ComponentProps<typeof RequestPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.RequestPage {...props} Shell={theme.Shell} />;
+}
+
+/** `/reviews` in the studio's theme (Reviews and Fresh ink, slice 3). */
+export function ThemedReviewsPage(props: ComponentProps<typeof ReviewsPage>) {
+	const theme = themeFor(props.data.theme.key);
+	return <theme.ReviewsPage {...props} Shell={theme.Shell} />;
+}
+
+/** `/fresh-ink` in the studio's theme (slice 3). */
+export function ThemedFreshInkPage(props: ComponentProps<typeof FreshInkPage>) {
+	const theme = themeFor(props.data.theme.key);
+	return <theme.FreshInkPage {...props} Shell={theme.Shell} />;
 }

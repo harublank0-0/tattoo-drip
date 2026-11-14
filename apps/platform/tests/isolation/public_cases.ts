@@ -176,6 +176,27 @@ export const publicIsolationCases: PublicIsolationCase[] = [
 		snapshot: flashRows,
 	},
 	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/reviews",
+		// twoStudios seeds a live review each studio's page shows
+		// (clientReview, with a reply): its id shows the answer is A's.
+		ownStatus: 200,
+		ownMarkers: (own) => [own.clientReview.id, own.artistProfile.name],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
+		method: "GET",
+		pattern: "/api/v1/tenants/:tenant/fresh-ink",
+		// twoStudios seeds a published post each studio's page shows
+		// (freshInkPost): its id and its public copy's folder are A's.
+		ownStatus: 200,
+		ownMarkers: (own) => [
+			own.freshInkPost.id,
+			`tenants/${own.tenant.id}/fresh_ink_photo/`,
+		],
+		snapshot: (target) => reviewRows(target.tenant),
+	},
+	{
 		method: "POST",
 		pattern: "/api/v1/tenants/:tenant/inquiries",
 		encoding: "multipart",

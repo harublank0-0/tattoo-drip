@@ -59,8 +59,8 @@ Only where studios show the pain:
 Decided by the product owner on 2026-11-12 ([spec](superpowers/specs/2026-11-12-reviews-and-fresh-ink-design.md)): a client tattooed at a studio rates and reviews it and shows the healed tattoo ("Fresh ink"), through a private link the studio sends after the project, with no client account. Four slices:
 
 1. Data, links and the client's page (`/review#<token>`), behind `REVIEWS_ENABLED` until the client content terms ([draft](legal/client-content-terms.md)) are legally reviewed. Built.
-2. The dashboard: Ask for a review, the message template, the Reviews page (approve, decline, reply, report), operator takedowns and the report list.
-3. The studio site's `reviews` and `fresh_ink` sections in every theme, and their public API.
+2. The dashboard: Ask for a review, the message template, the Reviews page (approve, decline, reply, report), operator takedowns and the report list. Built.
+3. The studio site's `reviews` and `fresh_ink` sections in every theme, and their public API (`listReviews`, `listFreshInk`). Built, behind the same flag.
 4. Discover: the views, profile sections, the global Fresh ink feed, ratings from three reviews.
 
 ## Later, maybe never

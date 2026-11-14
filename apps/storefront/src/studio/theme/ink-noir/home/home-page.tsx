@@ -4,10 +4,12 @@ import { goodToKnowIsEmpty } from "../../../good-to-know.ts";
 import type { StudioPageData } from "../../../loaders.ts";
 import { InkNoirShell } from "../shell.tsx";
 import { CinematicHero } from "./cinematic-hero.tsx";
+import { InkNoirReviews } from "./client-reviews.tsx";
 import { inkNoirHomeCopy } from "./copy.ts";
 import { FeaturedArtists } from "./featured-artists.tsx";
 import { FeaturedWork } from "./featured-work.tsx";
 import { FinalBookingCta } from "./final-booking-cta.tsx";
+import { InkNoirFreshInk } from "./fresh-ink.tsx";
 import {
 	type HomeSection,
 	type InkNoirHome,
@@ -107,6 +109,12 @@ function HomeSectionView({
 				<div className="ink-container ink-flash">
 					<FlashSection list={data.flash} artists={data.artists} />
 				</div>
+			);
+		case "fresh_ink":
+			return <InkNoirFreshInk view={data.freshInk} />;
+		case "reviews":
+			return (
+				<InkNoirReviews view={data.reviews} studioName={data.studio.name} />
 			);
 		case "info":
 			return <StudioExperience view={data.goodToKnow} studio={data.studio} />;

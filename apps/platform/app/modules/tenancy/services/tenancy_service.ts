@@ -6,10 +6,12 @@ import ImageService from "#modules/media/services/image_service";
 import {
 	type ClaimedFlash,
 	type FontKey,
+	keepSections,
 	LOGO_TILE_COLOURS,
 	type LogoTile,
 	type SectionKey,
 	sectionList,
+	sectionsOf,
 	type ThemeKey,
 } from "#modules/storefront/look";
 import {
@@ -203,10 +205,14 @@ export default class TenancyService {
 	 * context is not found (E_ROW_NOT_FOUND) instead of silently updated to
 	 * nothing; only the six look columns are written (Lucid saves the dirty
 	 * ones), so a logo or cover saved at the same moment is not overwritten.
+	 * `kept` are sections the form did not show (Reviews and Fresh ink's
+	 * while REVIEWS_ENABLED is off): the stored list keeps each where it was
+	 * (`keepSections`, read under the lock), whatever the form sent.
 	 */
 	async updateLook(
 		tenant: Pick<Tenant, "id">,
 		input: PageLookInput,
+		kept: readonly SectionKey[] = [],
 	): Promise<Tenant> {
 		return withTransaction(async (trx) => {
 			const live = await Tenant.query({ client: trx })
@@ -219,7 +225,15 @@ export default class TenancyService {
 				brandAccentDark: input.accentDark,
 				brandFont: input.font,
 				storefrontClaimedFlash: input.claimedFlash,
-				storefrontSections: sectionList(input.sections).join(","),
+				storefrontSections: sectionList(
+					kept.length === 0
+						? input.sections
+						: keepSections(
+								input.sections,
+								sectionsOf(live.storefrontSections),
+								kept,
+							),
+				).join(","),
 			});
 			await live.save();
 			return live;

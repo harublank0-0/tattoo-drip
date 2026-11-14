@@ -30,6 +30,16 @@ export const SECTION_WORDS = {
 		description:
 			"A few of your newest flash designs, with a link to all of them.",
 	},
+	fresh_ink: {
+		title: "Fresh ink",
+		description:
+			"Healed tattoos your clients posted and you approved, with a link to all of them. Shows once one is on your page.",
+	},
+	reviews: {
+		title: "Reviews",
+		description:
+			"Your clients' reviews, newest first, with your average once you have 3, and a link to all of them. Shows once a client lets a review show on your page.",
+	},
 	info: {
 		title: "Good to know",
 		description:

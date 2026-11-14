@@ -84,6 +84,14 @@ export function assertSafePage(html: string, options: SafePageOptions = {}) {
 				insideLink(html, image, "ink-piece-link"),
 				`a gallery card's photo outside its link: ${image}`,
 			);
+		} else if (/class="ink-fresh-photo"/.test(image)) {
+			// Ink Noir's Fresh ink tile (slice 3): the same, inside the viewer
+			// button whose scrim names the post.
+			assert.match(image, / alt=""/, image);
+			assert.ok(
+				insideLink(html, image, "ink-tile-open", true),
+				`an Ink Noir Fresh ink photo outside its button: ${image}`,
+			);
 		} else if (/class="irz-piece-photo"/.test(image)) {
 			// Irezumi's pieces: the same, inside the piece's link or viewer
 			// button, which its title names.

@@ -191,6 +191,8 @@ export type ScannedRoutes = {
     'api.v1.work.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'photo': ParamValue} }
     'api.v1.flash.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.flash.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'design': ParamValue} }
+    'api.v1.reviews.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.inquiries.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
     'api.v1.deposits.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
@@ -284,6 +286,8 @@ export type ScannedRoutes = {
     'api.v1.work.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'photo': ParamValue} }
     'api.v1.flash.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.flash.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'design': ParamValue} }
+    'api.v1.reviews.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
     'api.v1.review.show': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }
@@ -365,6 +369,8 @@ export type ScannedRoutes = {
     'api.v1.work.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'photo': ParamValue} }
     'api.v1.flash.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.flash.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'design': ParamValue} }
+    'api.v1.reviews.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'api.v1.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.deposits.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'token': ParamValue} }
     'api.v1.review.show': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
   }

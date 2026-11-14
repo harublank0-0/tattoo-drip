@@ -13,6 +13,7 @@ import { OpenNow } from "../../open-now.tsx";
 import { logoSizes } from "../../srcset.ts";
 import type { SectionKey } from "../config.ts";
 import { ArtistIndex } from "./artist-index.tsx";
+import { AtelierFreshInk, AtelierReviews } from "./clients.tsx";
 import { atelierCopy } from "./copy.ts";
 import {
 	type AtelierHome,
@@ -188,6 +189,12 @@ function HomeSection({
 				<div className="atl-container atl-shared">
 					<FlashSection list={data.flash} artists={data.artists} />
 				</div>
+			);
+		case "fresh_ink":
+			return <AtelierFreshInk view={data.freshInk} />;
+		case "reviews":
+			return (
+				<AtelierReviews view={data.reviews} studioName={data.studio.name} />
 			);
 		case "info":
 			// GoodToKnowSection renders nothing for a studio that filled nothing in: then no wrapper either.

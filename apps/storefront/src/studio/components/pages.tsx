@@ -1,15 +1,19 @@
 import { useLocation } from "@tanstack/react-router";
 import { SocialIcon } from "@tattoo-drip/react/social-icon";
+import type { ComponentType } from "react";
 import { Fill } from "../../intake/components/fill.tsx";
 import { artworkTitle } from "../artwork.ts";
 import { studioCopy } from "../copy.ts";
 import { flashDesignAction } from "../flash.ts";
+import type { FreshInkPostView } from "../fresh-ink.ts";
 import {
 	flashHref,
+	freshInkHref,
 	isAllowedHref,
 	linkRel,
 	portfolioHref,
 	requestHref,
+	reviewsHref,
 	workHref,
 } from "../links.ts";
 import type {
@@ -18,7 +22,9 @@ import type {
 	ArtworkPageData,
 	FlashDesignPageData,
 	FlashPageData,
+	FreshInkPageData,
 	RequestPageData,
+	ReviewsPageData,
 	StudioPageData,
 	WorkPageData,
 } from "../loaders.ts";
@@ -37,6 +43,7 @@ import {
 	FlashSection,
 	FlashSummary,
 } from "./flash.tsx";
+import { FreshInkGrid, FreshInkSection } from "./fresh-ink.tsx";
 import {
 	ArtworkFigure,
 	HealedFilter,
@@ -45,6 +52,7 @@ import {
 } from "./gallery.tsx";
 import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
+import { RatingSummary, ReviewList, ReviewsSection } from "./reviews.tsx";
 import { type Shell, StencilShell } from "./shell.tsx";
 import { BookingStrip } from "./steps.tsx";
 
@@ -139,7 +147,8 @@ export function StudioPage({
 /**
  * One of the studio page's sections, in the order the theme's config gives
  * (TAT-54): Recent work (TAT-126), the artists, Flash (TAT-129, which renders
- * nothing until an artist adds a design), Good to know (TAT-128, which
+ * nothing until an artist adds a design), Fresh ink and Reviews (Reviews and
+ * Fresh ink, slice 3: nothing until something is shown), Good to know (TAT-128, which
  * renders nothing until the studio filled something in) and the inquiry
  * section, which is always one of them (readSections) and, since TAT-127, only
  * invites: the form is on /request.
@@ -163,6 +172,12 @@ function StudioSection({
 			);
 		case "flash":
 			return <FlashSection list={data.flash} artists={data.artists} />;
+		case "fresh_ink":
+			return <FreshInkSection view={data.freshInk} />;
+		case "reviews":
+			return (
+				<ReviewsSection view={data.reviews} studioName={data.studio.name} />
+			);
 		case "info":
 			return <GoodToKnowSection view={data.goodToKnow} />;
 		case "inquiry":
@@ -506,6 +521,184 @@ export function FlashPage({
 				)}
 			</section>
 			<StudioAside studio={studio} />
+		</Shell>
+	);
+}
+
+/** What a theme's head of `/reviews` and `/fresh-ink` gets: its h1's id and words, a kicker and a line. */
+export interface ClientPageHeadProps {
+	readonly id: string;
+	readonly label: string;
+	readonly title: string;
+	readonly line: string;
+}
+
+/**
+ * How a theme composes `/reviews` and `/fresh-ink` (Reviews and Fresh ink,
+ * slice 3): its `<main>` class, its page head, the body's classes (its
+ * section, container and the class its home section's cards are styled
+ * under, so the page's cards match), the reviews list's class, the grid the
+ * posts hang in, the paging links' classes, and whether the studio block
+ * follows. Stencil & Ink's is the default (CLIENT_PAGE_LAYOUT).
+ */
+export interface ClientPageLayout {
+	readonly mainClassName?: string;
+	readonly Head: ComponentType<ClientPageHeadProps>;
+	readonly bodyClassName: string;
+	readonly listClassName: string;
+	readonly Posts: ComponentType<{ posts: readonly FreshInkPostView[] }>;
+	readonly linkClassName: string;
+	readonly moreClassName: string;
+	readonly aside: boolean;
+}
+
+/** Stencil & Ink's head: the section title as the h1 and the line under it. */
+function StencilClientHead({ id, title, line }: ClientPageHeadProps) {
+	return (
+		<>
+			<h1 id={id} className="section-title client-page-title">
+				{title}
+			</h1>
+			<p className="client-page-intro measure">{line}</p>
+		</>
+	);
+}
+
+/** Stencil & Ink's composition, and the default. */
+export const CLIENT_PAGE_LAYOUT: ClientPageLayout = {
+	Head: StencilClientHead,
+	bodyClassName: "client-page-body",
+	listClassName: "client-review-list",
+	Posts: FreshInkGrid,
+	linkClassName: "text-link",
+	moreClassName: "action action-secondary",
+	aside: true,
+};
+
+/**
+ * `/reviews` (Reviews and Fresh ink, slice 3), in every theme's shell and its
+ * composition (`layout`): the head, the average from 3 reviews, then the
+ * reviews newest first, 24 a page, "Show more" a plain link to the next page
+ * and "Back to the newest" from a later one. Never review structured data
+ * (ruling 10). The loader makes a page with nothing on it the not-found page,
+ * so there is no empty state here.
+ */
+export function ReviewsPage({
+	data,
+	Shell = StencilShell,
+	layout = CLIENT_PAGE_LAYOUT,
+}: {
+	data: ReviewsPageData;
+	Shell?: Shell;
+	layout?: ClientPageLayout;
+}) {
+	const { studio, theme, view, search } = data;
+	const { Head } = layout;
+	return (
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="reviews"
+			artistsShown={data.hasArtists}
+			mainClassName={layout.mainClassName}
+		>
+			<Head
+				id="reviews-page-title"
+				label={studioCopy.reviews.pageLabel}
+				title={studioCopy.reviews.pageTitle}
+				line={studioCopy.reviews.intro}
+			/>
+			<section
+				className={`client-page reviews-page ${layout.bodyClassName}`}
+				aria-labelledby="reviews-page-title"
+			>
+				{view.rating ? <RatingSummary rating={view.rating} /> : null}
+				{search.cursor !== undefined ? (
+					<p className="work-newest">
+						<a className={layout.linkClassName} href={reviewsHref({})}>
+							{studioCopy.reviews.newest}
+						</a>
+					</p>
+				) : null}
+				<ReviewList
+					reviews={view.reviews}
+					studioName={studio.name}
+					className={layout.listClassName}
+				/>
+				{view.nextCursor !== null ? (
+					<p className="flash-more-bar">
+						<a
+							className={layout.moreClassName}
+							href={reviewsHref({ cursor: view.nextCursor })}
+						>
+							{studioCopy.reviews.showMore}
+						</a>
+					</p>
+				) : null}
+			</section>
+			{layout.aside ? <StudioAside studio={studio} /> : null}
+		</Shell>
+	);
+}
+
+/**
+ * `/fresh-ink` (slice 3), in every theme's shell and composition: the posts
+ * newest first in the theme's own grid, each opening its viewer with its
+ * angles, 24 a page, paged like `/reviews`.
+ */
+export function FreshInkPage({
+	data,
+	Shell = StencilShell,
+	layout = CLIENT_PAGE_LAYOUT,
+}: {
+	data: FreshInkPageData;
+	Shell?: Shell;
+	layout?: ClientPageLayout;
+}) {
+	const { studio, theme, view, search } = data;
+	const { Head, Posts } = layout;
+	return (
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="fresh-ink"
+			artistsShown={data.hasArtists}
+			mainClassName={layout.mainClassName}
+		>
+			<Head
+				id="fresh-ink-page-title"
+				label={studioCopy.freshInk.pageLabel}
+				title={studioCopy.freshInk.pageTitle}
+				line={studioCopy.freshInk.intro}
+			/>
+			<section
+				className={`client-page fresh-ink-page ${layout.bodyClassName}`}
+				aria-labelledby="fresh-ink-page-title"
+			>
+				{search.cursor !== undefined ? (
+					<p className="work-newest">
+						<a className={layout.linkClassName} href={freshInkHref({})}>
+							{studioCopy.freshInk.newest}
+						</a>
+					</p>
+				) : null}
+				<Posts posts={view.posts} />
+				{view.nextCursor !== null ? (
+					<p className="flash-more-bar">
+						<a
+							className={layout.moreClassName}
+							href={freshInkHref({ cursor: view.nextCursor })}
+						>
+							{studioCopy.freshInk.showMore}
+						</a>
+					</p>
+				) : null}
+			</section>
+			{layout.aside ? <StudioAside studio={studio} /> : null}
 		</Shell>
 	);
 }

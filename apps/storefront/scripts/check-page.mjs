@@ -94,6 +94,10 @@ const EMPTY_FLASH = {
 	filters: { artists: [] },
 };
 
+// The reviews and Fresh ink reads with nothing in them (Reviews and Fresh ink, slice 3).
+const EMPTY_REVIEWS = { data: [], nextCursor: null, rating: null };
+const EMPTY_FRESH_INK = { data: [], nextCursor: null };
+
 if (!existsSync(SERVER)) {
 	console.error("There is no build to run. Run pnpm build first.");
 	process.exit(1);
@@ -148,6 +152,13 @@ const api = http.createServer((request, response) => {
 		// Flash (TAT-129): the list is empty; a design is the API's 404 below.
 		if (request.url.startsWith(`/api/v1/tenants/${SLUG}/flash?`)) {
 			return send(200, EMPTY_FLASH);
+		}
+		// Reviews and Fresh ink (slice 3): none to show, as for most studios.
+		if (request.url.startsWith(`/api/v1/tenants/${SLUG}/reviews?`)) {
+			return send(200, EMPTY_REVIEWS);
+		}
+		if (request.url.startsWith(`/api/v1/tenants/${SLUG}/fresh-ink?`)) {
+			return send(200, EMPTY_FRESH_INK);
 		}
 		if (request.url.startsWith(`/api/v1/tenants/${SLUG}/work?`)) {
 			if (mode === "work-5xx") {
@@ -305,8 +316,10 @@ try {
 		!page.body.includes(CANARY) && !page.headers.includes(CANARY),
 		"THE SERVER KEY IS IN THE PAGE OR ITS HEADERS.",
 	);
-	// The studio page asks for the lookup, the artists and the newest 9 photos
-	// (Recent work, TAT-126), and shows no Recent work when there are none.
+	// The studio page asks for the lookup, the artists, the newest 6 flash
+	// designs, Fresh ink and reviews (Reviews and Fresh ink, slice 3) and the
+	// newest 9 photos (Recent work, TAT-126), and shows no Recent work when
+	// there are none.
 	expect(
 		apiLog
 			.map((call) => call.url)
@@ -316,6 +329,8 @@ try {
 				`/api/v1/tenants/${SLUG}`,
 				`/api/v1/tenants/${SLUG}/artists`,
 				`/api/v1/tenants/${SLUG}/flash?available=true&limit=6`,
+				`/api/v1/tenants/${SLUG}/fresh-ink?limit=6`,
+				`/api/v1/tenants/${SLUG}/reviews?limit=6`,
 				`/api/v1/tenants/${SLUG}/work?limit=9`,
 			].join(",") &&
 			apiLog.every(
@@ -324,7 +339,7 @@ try {
 					call.visitor === VISITOR &&
 					call.cookie === null,
 			),
-		`The page made the API calls ${apiLog.map((call) => call.url).join(", ")} instead of one keyed, cookie-less lookup, one artists read, the newest 6 flash designs and the newest 9 photos, each carrying the visitor's address.`,
+		`The page made the API calls ${apiLog.map((call) => call.url).join(", ")} instead of one keyed, cookie-less lookup, one artists read, the newest 6 flash designs, the newest 6 Fresh ink posts, the newest 6 reviews and the newest 9 photos, each carrying the visitor's address.`,
 	);
 	expect(
 		!page.body.includes("Recent work") && !page.body.includes("All work"),
@@ -565,6 +580,36 @@ try {
 		`/flash/NOT-A-UUID is ${page.status}, or asked the API for ${apiLog.map((call) => call.url).join(", ")}.`,
 	);
 
+	// /reviews and /fresh-ink (Reviews and Fresh ink, slice 3): with nothing to
+	// show they are the cached not-found page, after the lookup, the artists and
+	// the first page's read.
+	for (const [path, read] of [
+		["/reviews", "reviews?limit=24"],
+		["/fresh-ink", "fresh-ink?limit=24"],
+	]) {
+		apiLog.length = 0;
+		page = await get(path);
+		expect(
+			page.status === 404 &&
+				page.body.includes("Page not found") &&
+				page.cacheControl === "public, max-age=0, s-maxage=60" &&
+				!page.body.includes(CANARY),
+			`${path} with nothing to show is ${page.status} (Cache-Control "${page.cacheControl}"), not the cached 404 page.`,
+		);
+		expect(
+			apiLog
+				.map((call) => call.url)
+				.sort()
+				.join(",") ===
+				[
+					`/api/v1/tenants/${SLUG}`,
+					`/api/v1/tenants/${SLUG}/artists`,
+					`/api/v1/tenants/${SLUG}/${read}`,
+				].join(","),
+			`${path} asked the API for ${apiLog.map((call) => call.url).join(", ")} instead of the lookup, the list and the first page.`,
+		);
+	}
+
 	// One tattoo's page (Prompt 5): an id that is not a UUID is the not-found
 	// with no call but the lookup.
 	apiLog.length = 0;
@@ -779,5 +824,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 console.log(
-	"Page check passed: the key is in no page, header or log line; the photos are shown from MEDIA_URL's origin only; one keyed lookup and one artists read per page (the studio page, an artist's page and /gallery add one gallery read, /flash and an artist's page one flash read), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
+	"Page check passed: the key is in no page, header or log line; the photos are shown from MEDIA_URL's origin only; one keyed lookup and one artists read per page (the studio page, an artist's page and /gallery add one gallery read, /flash and an artist's page one flash read, the studio page one Fresh ink and one reviews read; /reviews and /fresh-ink with nothing to show are the cached 404), each carrying the visitor's address; a failed read is an uncached error page (a failed gallery read only leaves the photos out), a failed lookup a 503; the deposit page is an uncached, unindexed shell from the lookup alone; the public site key is in the page.",
 );

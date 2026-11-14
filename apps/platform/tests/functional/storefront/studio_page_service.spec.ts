@@ -63,7 +63,15 @@ const DEFAULT_LOOK = {
 	accent: null,
 	accentDark: null,
 	font: "eczar",
-	sections: ["work", "artists", "flash", "info", "inquiry"],
+	sections: [
+		"work",
+		"artists",
+		"flash",
+		"fresh_ink",
+		"reviews",
+		"info",
+		"inquiry",
+	],
 };
 
 const PROFILE: TenantProfile = {

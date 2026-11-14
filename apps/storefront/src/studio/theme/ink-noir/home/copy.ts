@@ -37,6 +37,14 @@ export const inkNoirHomeCopy = {
 		meetArtists: "Meet the artists",
 		meetArtist: "Meet the artist",
 	},
+	/** Fresh ink (Reviews and Fresh ink, slice 3): clients' healed tattoos. */
+	freshInk: {
+		eyebrow: "Healed and shared",
+	},
+	/** Reviews (slice 3): clients' own words. */
+	reviews: {
+		eyebrow: "In their words",
+	},
 	work: {
 		eyebrow: "Portfolio",
 		title: "Selected work",

@@ -21,6 +21,21 @@ export const NO_STORE = "no-store";
  */
 export const ANGLE_REDIRECT_CACHE = "public, max-age=60";
 
+/**
+ * `/reviews` and `/fresh-ink` (Reviews and Fresh ink, slice 3): a minute at
+ * the CDN and a minute more while it refreshes, so a review or post TattooDrip
+ * took down leaves them within 2 minutes (the home page keeps PAGE_CACHE).
+ */
+export const CLIENT_PAGE_CACHE =
+	"public, max-age=0, s-maxage=60, stale-while-revalidate=60";
+
+/** The client pages' Cache-Control: CLIENT_PAGE_CACHE for a page, else as every page. */
+export function clientPageCacheHeaders(status: string): Record<string, string> {
+	return status === "success"
+		? { "Cache-Control": CLIENT_PAGE_CACHE }
+		: pageCacheHeaders(status);
+}
+
 export function pageCacheHeaders(status: string): Record<string, string> {
 	if (status === "success") return { "Cache-Control": PAGE_CACHE };
 	if (status === "notFound") return { "Cache-Control": NOT_FOUND_CACHE };

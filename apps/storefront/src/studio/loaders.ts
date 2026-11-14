@@ -43,6 +43,14 @@ import {
 	homeFlashCount,
 } from "./flash.ts";
 import {
+	FRESH_INK_PAGE_SIZE,
+	type FreshInkSearch,
+	type FreshInkView,
+	freshInkQuery,
+	freshInkView,
+	HOME_FRESH_INK_COUNT,
+} from "./fresh-ink.ts";
+import {
 	filterStyles,
 	type GalleryPhotoView,
 	type GalleryView,
@@ -79,14 +87,24 @@ import {
 	requestLink,
 } from "./request.ts";
 import {
+	HOME_REVIEWS_COUNT,
+	REVIEWS_PAGE_SIZE,
+	type ReviewsSearch,
+	type ReviewsView,
+	reviewsQuery,
+	reviewsView,
+} from "./reviews.ts";
+import {
 	artistPageSeo,
 	artistsPageSeo,
 	artworkPageSeo,
 	flashDesignSeo,
 	flashPageSeo,
+	freshInkPageSeo,
 	infoPageSeo,
 	type PageSeo,
 	requestPageSeo,
+	reviewsPageSeo,
 	studioPageSeo,
 	workPageSeo,
 } from "./seo.ts";
@@ -148,6 +166,18 @@ export interface StudioPageData {
 	 * or the read failed, which leaves the section out.
 	 */
 	readonly flash: FlashListView;
+	/**
+	 * The newest Fresh ink posts for the Fresh ink section (Reviews and Fresh
+	 * ink, slice 3), at most HOME_FRESH_INK_COUNT. Empty when there are none,
+	 * reviews are off, the page hides the section or the read failed, which
+	 * leaves the section out.
+	 */
+	readonly freshInk: FreshInkView;
+	/**
+	 * The newest reviews and the average from 3 for the Reviews section
+	 * (slice 3), at most HOME_REVIEWS_COUNT. Empty as Fresh ink is.
+	 */
+	readonly reviews: ReviewsView;
 	/** The Good to know section's parts (TAT-128); empty when the studio filled in nothing. */
 	readonly goodToKnow: GoodToKnowView;
 	/** The cover's state line (TAT-128), or null when the studio set no hours or closed days. */
@@ -300,6 +330,32 @@ export interface FlashPageData {
 	readonly list: FlashListView;
 }
 
+/** `/reviews` (Reviews and Fresh ink, slice 3): every shown review, newest first, a page at a time. */
+export interface ReviewsPageData {
+	readonly studio: StudioView;
+	readonly theme: ThemeConfig;
+	/** The header's Request button: the studio's general one, or none while it is closed. */
+	readonly requestLink: RequestLink | null;
+	readonly chat: ChatLinks | null;
+	readonly seo: PageSeo;
+	/** Whether any artist is visible: the navigation's Artists link has somewhere to land. */
+	readonly hasArtists: boolean;
+	readonly search: ReviewsSearch;
+	readonly view: ReviewsView;
+}
+
+/** `/fresh-ink` (slice 3): every shown Fresh ink post, newest first, a page at a time. */
+export interface FreshInkPageData {
+	readonly studio: StudioView;
+	readonly theme: ThemeConfig;
+	readonly requestLink: RequestLink | null;
+	readonly chat: ChatLinks | null;
+	readonly seo: PageSeo;
+	readonly hasArtists: boolean;
+	readonly search: FreshInkSearch;
+	readonly view: FreshInkView;
+}
+
 /** One flash design's page (TAT-129). */
 export interface FlashDesignPageData {
 	readonly studio: StudioView;
@@ -372,6 +428,7 @@ export function studioPageData(
 	recentWork: unknown = null,
 	flash: unknown = null,
 	theme: ThemeConfig = parseThemeConfig(storefrontInput(studio), imageOrigin),
+	clients: { readonly freshInk?: unknown; readonly reviews?: unknown } = {},
 ): StudioPageData {
 	const studioView = studioViewModel(studio);
 	const artistViews = artistViewModels(artists, imageOrigin);
@@ -385,6 +442,8 @@ export function studioPageData(
 		theme,
 		recentWork: galleryView(recentWork, imageOrigin),
 		flash: flashListView(flash, imageOrigin),
+		freshInk: freshInkView(clients.freshInk ?? null, imageOrigin),
+		reviews: reviewsView(clients.reviews ?? null),
 		goodToKnow: goodToKnowView(studio),
 		// No clock here (pure, deterministic): loadStudioPage sets the server's.
 		openNow: openNowView(studio, null),
@@ -908,7 +967,9 @@ export async function loadArtistsPage(
  * (loadRecentWork: a failed read leaves the section out, never the page), and
  * likewise, when they include Flash, its newest 6 flash designs
  * (loadHomeFlash; 12 for Flash Parlour's wall, homeFlashCount). A studio that hid Recent work costs the API no `/work`
- * read, and one that hid Flash no `/flash` read.
+ * read, and one that hid Flash no `/flash` read. Fresh ink and Reviews
+ * (slice 3) are read the same way, only while the page shows them, their
+ * newest 6 each; a failed read leaves the section out.
  */
 export async function loadStudioPage(
 	context: PageContext,
@@ -916,12 +977,14 @@ export async function loadStudioPage(
 	const studio = await loadPageStudio(context);
 	const imageOrigin = context.tattoo.connection.mediaUrl;
 	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
-	const [artists, recentWork, flash] = await Promise.all([
+	const [artists, recentWork, flash, freshInk, reviews] = await Promise.all([
 		loadArtists(context),
 		theme.sections.includes("work") ? loadRecentWork(context) : null,
 		theme.sections.includes("flash")
 			? loadHomeFlash(context, homeFlashCount(theme.key))
 			: null,
+		theme.sections.includes("fresh_ink") ? loadHomeFreshInk(context) : null,
+		theme.sections.includes("reviews") ? loadHomeReviews(context) : null,
 	]);
 	const data = studioPageData(
 		studio,
@@ -931,6 +994,7 @@ export async function loadStudioPage(
 		recentWork,
 		flash,
 		theme,
+		{ freshInk, reviews },
 	);
 	// Today's state at this server's clock, only when it holds for the page's
 	// cache life (TAT-128); the browser recomputes the rest. The studio it is
@@ -1126,6 +1190,114 @@ export async function loadFlashPage(
 }
 
 /**
+ * `/reviews`' data (slice 3). `page` is the reviews read for `search`, as
+ * the API sent it; null when the page has nothing to show (no review, reviews
+ * off, or the studio hides the section), which the loader makes the
+ * not-found page.
+ */
+export function reviewsPageData(
+	studio: Studio,
+	artists: readonly Artist[],
+	page: unknown,
+	search: ReviewsSearch,
+	origin: string,
+	imageOrigin: string | null = null,
+): ReviewsPageData | null {
+	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
+	const view = reviewsView(page);
+	if (!theme.sections.includes("reviews") || view.reviews.length === 0) {
+		return null;
+	}
+	const studioView = studioViewModel(studio);
+	return {
+		studio: studioView,
+		theme,
+		requestLink: requestLink(studioView, null),
+		chat: chatLinks(studioView, null),
+		seo: reviewsPageSeo(studioView, origin),
+		hasArtists: artists.length > 0,
+		search,
+		view,
+	};
+}
+
+/** `/fresh-ink`'s data (slice 3), or null when it has nothing to show, as `/reviews`. */
+export function freshInkPageData(
+	studio: Studio,
+	artists: readonly Artist[],
+	page: unknown,
+	search: FreshInkSearch,
+	origin: string,
+	imageOrigin: string | null = null,
+): FreshInkPageData | null {
+	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
+	const view = freshInkView(page, imageOrigin);
+	if (!theme.sections.includes("fresh_ink") || view.posts.length === 0) {
+		return null;
+	}
+	const studioView = studioViewModel(studio);
+	return {
+		studio: studioView,
+		theme,
+		requestLink: requestLink(studioView, null),
+		chat: chatLinks(studioView, null),
+		seo: freshInkPageSeo(studioView, origin),
+		hasArtists: artists.length > 0,
+		search,
+		view,
+	};
+}
+
+/**
+ * `/reviews` (slice 3): the studio, its artists and a page of reviews, read
+ * together. A cursor the API refuses, a page with nothing on it, reviews off
+ * and a studio that hides the section are the not-found page: nothing links
+ * there then.
+ */
+export async function loadReviewsPage(
+	context: PageContext,
+	search: ReviewsSearch,
+): Promise<ReviewsPageData> {
+	const [studio, artists, page] = await Promise.all([
+		loadPageStudio(context),
+		loadArtists(context),
+		loadReviews(context, search),
+	]);
+	const data = reviewsPageData(
+		studio,
+		artists,
+		page,
+		search,
+		context.site.origin,
+		context.tattoo.connection.mediaUrl,
+	);
+	if (!data) throw notFound();
+	return data;
+}
+
+/** `/fresh-ink` (slice 3), as `/reviews`. */
+export async function loadFreshInkPage(
+	context: PageContext,
+	search: FreshInkSearch,
+): Promise<FreshInkPageData> {
+	const [studio, artists, page] = await Promise.all([
+		loadPageStudio(context),
+		loadArtists(context),
+		loadFreshInk(context, search),
+	]);
+	const data = freshInkPageData(
+		studio,
+		artists,
+		page,
+		search,
+		context.site.origin,
+		context.tattoo.connection.mediaUrl,
+	);
+	if (!data) throw notFound();
+	return data;
+}
+
+/**
  * `/flash/<id>` (TAT-129): the studio, its artists and the design, read
  * together. An id that can't be a design's is a not-found before any API
  * call; the API not knowing the design (hidden, an artist hidden, unknown) is
@@ -1313,6 +1485,90 @@ async function loadHomeFlash(
 		logReadFailed("Flash", context, error);
 		return null;
 	}
+}
+
+/** The home page's Fresh ink (slice 3): the newest few, or null after a failed read (logged), which leaves the section out. */
+async function loadHomeFreshInk(context: ApiContext): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.freshInk(
+				context.tattoo.client,
+				freshInkQuery({}, HOME_FRESH_INK_COUNT),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		logReadFailed("Fresh ink", context, error);
+		return null;
+	}
+}
+
+/** The home page's Reviews (slice 3): the newest few and the average, or null after a failed read (logged). */
+async function loadHomeReviews(context: ApiContext): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.studioReviews(
+				context.tattoo.client,
+				reviewsQuery({}, HOME_REVIEWS_COUNT),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		logReadFailed("Reviews", context, error);
+		return null;
+	}
+}
+
+/** A page of `/reviews` (slice 3), as the API sent it; see pagedReadFailed. */
+async function loadReviews(
+	context: ApiContext,
+	search: ReviewsSearch,
+): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.studioReviews(
+				context.tattoo.client,
+				reviewsQuery(search, REVIEWS_PAGE_SIZE),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		return pagedReadFailed(context, error);
+	}
+}
+
+/** A page of `/fresh-ink` (slice 3), as the API sent it; see pagedReadFailed. */
+async function loadFreshInk(
+	context: ApiContext,
+	search: FreshInkSearch,
+): Promise<unknown> {
+	try {
+		return await context.queryClient.query({
+			...tattooQueries.freshInk(
+				context.tattoo.client,
+				freshInkQuery(search, FRESH_INK_PAGE_SIZE),
+			),
+			staleTime: "static",
+		});
+	} catch (error) {
+		return pagedReadFailed(context, error);
+	}
+}
+
+/**
+ * A failed page read of `/reviews` or `/fresh-ink`: a cursor the API refuses
+ * (422) is the not-found page, as `/flash`'s; anything else goes the way of
+ * every page's read (rethrowAsNotFound).
+ */
+function pagedReadFailed({ tattoo }: ApiContext, error: unknown) {
+	if (
+		isTattooApiError(error) &&
+		error.status === 422 &&
+		error.code === "validation_failed"
+	) {
+		throw notFound();
+	}
+	return rethrowAsNotFound(error, tattoo.connection.tenant);
 }
 
 /**

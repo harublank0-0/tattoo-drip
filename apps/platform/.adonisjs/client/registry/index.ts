@@ -1128,6 +1128,18 @@ const routes = {
     tokens: [{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":0,"val":"flash","end":""},{"old":"/api/v1/tenants/:tenant/flash/:design","type":1,"val":"design","end":""}],
     types: placeholder as Registry['api.v1.flash.show']['types'],
   },
+  'api.v1.reviews.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/reviews',
+    tokens: [{"old":"/api/v1/tenants/:tenant/reviews","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/reviews","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/reviews","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/reviews","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/reviews","type":0,"val":"reviews","end":""}],
+    types: placeholder as Registry['api.v1.reviews.index']['types'],
+  },
+  'api.v1.fresh_ink.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/tenants/:tenant/fresh-ink',
+    tokens: [{"old":"/api/v1/tenants/:tenant/fresh-ink","type":0,"val":"api","end":""},{"old":"/api/v1/tenants/:tenant/fresh-ink","type":0,"val":"v1","end":""},{"old":"/api/v1/tenants/:tenant/fresh-ink","type":0,"val":"tenants","end":""},{"old":"/api/v1/tenants/:tenant/fresh-ink","type":1,"val":"tenant","end":""},{"old":"/api/v1/tenants/:tenant/fresh-ink","type":0,"val":"fresh-ink","end":""}],
+    types: placeholder as Registry['api.v1.fresh_ink.index']['types'],
+  },
   'api.v1.inquiries.store': {
     methods: ["POST"],
     pattern: '/api/v1/tenants/:tenant/inquiries',

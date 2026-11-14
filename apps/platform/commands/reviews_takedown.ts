@@ -10,8 +10,14 @@ import {
 
 /**
  * TattooDrip's takedown of a client's review, the studio's reply to it, or a
- * Fresh ink post (Reviews and Fresh ink, ruling 12): off every public
- * surface at once, a post's public copies deleted. The client's page says
+ * Fresh ink post (Reviews and Fresh ink, ruling 12), off every public
+ * surface. A post's photos and videos go at once: its public files are
+ * deleted in the same step. Text (a review, a reply, a post's caption and
+ * name) leaves the database at once but can stay in caches for a few
+ * minutes: up to 2 minutes in the API's answers and on the studio's
+ * /reviews and /fresh-ink pages (60 s fresh plus 60 s stale), and up to 11
+ * minutes on the studio's home page (60 s fresh plus 600 s stale, TAT-48).
+ * The client's page says
  * it was taken down, in the reason's fixed sentence; the note is for
  * operators only. Nothing is deleted, and neither the studio nor the client
  * can lift it (`reviews:restore` does). Taking a reported review down
@@ -30,9 +36,11 @@ export default class ReviewsTakedown extends BaseCommand {
 		"Take a client's review, the studio's reply or a Fresh ink post off every public surface";
 	static options: CommandOptions = { startApp: true };
 	static help = [
-		"A post's takedown deletes its public copies in the same step. While storage",
-		"can't delete them the takedown fails and changes nothing: run it again once",
-		"storage recovers.",
+		"A post's takedown deletes its public copies in the same step: its photos and",
+		"videos go at once. While storage can't delete them the takedown fails and",
+		"changes nothing: run it again once storage recovers.",
+		"Text can stay in caches for a few minutes: up to 2 minutes in the API and on",
+		"the studio's /reviews and /fresh-ink pages, up to 11 minutes on its home page.",
 	];
 
 	@args.string({ description: "review, reply (the review's id) or post" })

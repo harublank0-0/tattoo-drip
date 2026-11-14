@@ -16,6 +16,8 @@ export const DEFAULT_STOREFRONT: Studio["storefront"] = {
 		{ type: "work" },
 		{ type: "artists" },
 		{ type: "flash" },
+		{ type: "fresh_ink" },
+		{ type: "reviews" },
 		{ type: "info" },
 		{ type: "inquiry" },
 	],

@@ -920,6 +920,91 @@
 	padding-block-start: clamp(5.5rem, 3rem + 8vw, 10rem);
 }
 
+/* ---- Fresh ink and Reviews (Reviews and Fresh ink, slice 3) --------- */
+
+/*
+ * Fresh ink: portrait tiles on the raised black, the featured work's facts
+ * on the foot (./fresh-ink.tsx). Reviews: raised cards opened by an accent
+ * quotation mark, the average large in the display face (./client-reviews.tsx).
+ */
+.ink-fresh-intro {
+	margin: -1rem 0 2rem;
+	max-inline-size: 36rem;
+	color: var(--ink-muted);
+}
+.ink-fresh-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ink-fresh-tile {
+	position: relative;
+	min-inline-size: 0;
+	aspect-ratio: 4 / 5;
+}
+.ink-reviews .client-review-summary {
+	display: grid;
+	justify-items: start;
+	gap: 0.5rem;
+	margin: 0;
+}
+.ink-reviews .client-review-summary-text {
+	font-family: var(--display-face);
+	font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
+	line-height: 1.1;
+}
+.ink-review-list {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	max-inline-size: none;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ink-reviews .client-review {
+	position: relative;
+	gap: 0.75rem;
+	padding: 3.25rem 1.5rem 1.5rem;
+	border: 0;
+	border-radius: 0;
+	background: var(--paper-raised);
+	box-shadow: none;
+}
+.ink-reviews .client-review::before {
+	content: "\201C";
+	position: absolute;
+	inset-block-start: 0.5rem;
+	inset-inline-start: 1.25rem;
+	color: var(--stencil);
+	font-family: var(--display-face);
+	font-size: 3.5rem;
+	line-height: 1;
+}
+.ink-reviews .client-review-artist .text-link {
+	color: var(--ink);
+	text-decoration-color: var(--stencil);
+}
+.ink-reviews-all {
+	margin-block-start: 2rem;
+}
+@media (min-width: 48rem) {
+	.ink-fresh-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+	.ink-review-list {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+@media (min-width: 64rem) {
+	.ink-review-list {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
 /* ---- 6. The visit ---------------------------------------------------- */
 
 .ink-visit-grid {
@@ -1166,4 +1251,16 @@
 	.ink-style:hover .ink-style-link {
 		translate: none;
 	}
+}
+
+/*
+ * `/reviews` and `/fresh-ink` in Ink Noir (./home/fresh-ink.tsx,
+ * INK_NOIR_CLIENT_PAGES): the directory's head, then the column, the raised
+ * cards and portrait tiles of the home sections.
+ */
+.ink-client-body {
+	padding-block: clamp(2rem, 1.5rem + 2vw, 3rem) clamp(4rem, 3rem + 4vw, 6rem);
+}
+.ink-client-body .client-review-summary {
+	margin-block-end: 2rem;
 }

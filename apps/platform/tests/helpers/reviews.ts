@@ -205,11 +205,125 @@ export async function seedPost(
 	return { post, photo };
 }
 
+/** One item of a seeded published post: a photo, or a video in one of its states. */
+export type SeededMedia =
+	| "photo"
+	| "video-ready"
+	| "video-processing"
+	| "video-failed";
+
+/**
+ * A Fresh ink post as publishing leaves it (Reviews and Fresh ink, slice 3):
+ * approved, allowed on the studio's page and published (`published_at`),
+ * with `media` in order (a photo leads), all of made-up keys: the public
+ * reads build URLs without I/O, and a withdrawal counts a missing file as
+ * deleted. `over` changes the post itself (a check of the database's still
+ * holds: published only while approved, allowed somewhere and not taken
+ * down). Call it in the tenant's context.
+ */
+export async function seedShownPost(
+	tenant: TenantRef,
+	project: Pick<TattooProject, "id" | "clientId" | "artistId">,
+	over: Partial<{
+		media: SeededMedia[];
+		caption: string | null;
+		styles: string[];
+		placement: string | null;
+		shownName: string;
+		status: PostStatus;
+		consentStudioPage: boolean;
+		consentDiscover: boolean;
+		published: boolean;
+		publishedAt: DateTime;
+		takenDown: boolean;
+	}> = {},
+) {
+	const at = over.publishedAt ?? DateTime.now();
+	const status = over.status ?? "approved";
+	const post = await ClientPost.create({
+		tenantId: tenant.id,
+		projectId: project.id,
+		clientId: project.clientId,
+		artistId: project.artistId as string,
+		caption:
+			over.caption === undefined ? "Healed after six weeks." : over.caption,
+		styles: over.styles ?? ["fine-line"],
+		placement: over.placement === undefined ? "Left forearm" : over.placement,
+		status,
+		submittedAt: at.minus({ days: 2 }),
+		waitingRound: 1,
+		waitingSince: at.minus({ days: 2 }),
+		decidedAt: status === "waiting" ? null : at,
+		decidedBy: null,
+		shownName: over.shownName ?? "Sita R.",
+		consentStudioPage: over.consentStudioPage ?? true,
+		consentDiscover: over.consentDiscover ?? false,
+		publishedAt: (over.published ?? true) ? at : null,
+		takenDownAt: over.takenDown ? at : null,
+		takedownReason: over.takenDown ? "other" : null,
+	});
+	const items = [];
+	for (const [position, kind] of (over.media ?? ["photo"]).entries()) {
+		items.push(await seedMedia(tenant, post.id, position, kind));
+	}
+	return { post, media: items };
+}
+
+async function seedMedia(
+	tenant: TenantRef,
+	postId: string,
+	position: number,
+	kind: SeededMedia,
+) {
+	const base = { tenantId: tenant.id, postId, position, alt: null };
+	if (kind === "photo") {
+		return ClientPostMedia.create({
+			...base,
+			kind: "photo",
+			imageKey: `tenants/${tenant.id}/client_post_photo/${randomUUID()}.320-640-1280.jpg`,
+			width: 2048,
+			height: 1536,
+		});
+	}
+	const staging = `client_video_upload/tenants/${tenant.id}/${randomUUID()}`;
+	if (kind === "video-ready") {
+		const name = randomUUID();
+		return ClientPostMedia.create({
+			...base,
+			kind: "video",
+			videoState: "ready",
+			videoStagingKey: staging,
+			imageKey: `tenants/${tenant.id}/client_post_video/${name}.320-640-1280.jpg`,
+			width: 1080,
+			height: 1920,
+			videoDurationMs: 12_000,
+			videoKeys: [
+				`tenants/${tenant.id}/client_post_video/${name}.720x1280.mp4`,
+				`tenants/${tenant.id}/client_post_video/${name}.1080x1920.mp4`,
+			],
+		});
+	}
+	return ClientPostMedia.create({
+		...base,
+		kind: "video",
+		videoState: kind === "video-failed" ? "failed" : "processing",
+		videoFailure: kind === "video-failed" ? "The video is too long." : null,
+		videoStagingKey: staging,
+	});
+}
+
 /** A live review of `project` (five stars, the studio page allowed). Call it in the tenant's context. */
 export async function seedReview(
 	tenant: TenantRef,
 	project: Pick<TattooProject, "id" | "clientId" | "artistId">,
-	over: Partial<{ rating: number; body: string; reply: string }> = {},
+	over: Partial<{
+		rating: number;
+		body: string;
+		reply: string;
+		shownName: string;
+		consentStudioPage: boolean;
+		createdAt: DateTime;
+	}> = {},
 ) {
 	return ClientReview.create({
 		tenantId: tenant.id,
@@ -218,11 +332,12 @@ export async function seedReview(
 		artistId: project.artistId as string,
 		rating: over.rating ?? 5,
 		body: over.body ?? "Healed beautifully, the lines are crisp and even.",
-		shownName: "Sita R.",
-		consentStudioPage: true,
+		shownName: over.shownName ?? "Sita R.",
+		consentStudioPage: over.consentStudioPage ?? true,
 		consentDiscover: false,
 		reply: over.reply ?? null,
 		repliedAt: over.reply ? DateTime.now() : null,
+		...(over.createdAt ? { createdAt: over.createdAt } : {}),
 	});
 }
 

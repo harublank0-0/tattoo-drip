@@ -95,6 +95,13 @@ function listing(
 		if (url.endsWith("/artists")) return json(200, { data: artists });
 		if (url.includes("/work?")) return json(200, work);
 		if (url.includes("/flash?")) return json(200, flash);
+		// Reviews and Fresh ink (slice 3): none to show, as for most studios.
+		if (url.includes("/reviews?")) {
+			return json(200, { data: [], nextCursor: null, rating: null });
+		}
+		if (url.includes("/fresh-ink?")) {
+			return json(200, { data: [], nextCursor: null });
+		}
 		if (url.includes("/flash/")) {
 			return design === null
 				? json(404, NOT_FOUND)
@@ -158,6 +165,8 @@ describe("loadStudioPage", () => {
 		assert.deepEqual(calls.map((call) => call.url).sort(), [
 			`${TENANT}/artists`,
 			`${TENANT}/flash?available=true&limit=6`,
+			`${TENANT}/fresh-ink?limit=6`,
+			`${TENANT}/reviews?limit=6`,
 			`${TENANT}/work?limit=9`,
 		]);
 	});
@@ -220,6 +229,8 @@ describe("loadStudioPage", () => {
 		assert.deepEqual(calls.map((call) => call.url).sort(), [
 			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/artists`,
 			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/flash?available=true&limit=6`,
+			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/fresh-ink?limit=6`,
+			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/reviews?limit=6`,
 			`${IMAGE_ORIGIN}/api/v1/tenants/${STUDIO.slug}/work?limit=9`,
 		]);
 		assert.equal(data.recentWork.photos.length, 9);
@@ -394,7 +405,9 @@ describe("loadStudioPage", () => {
 					? json(200, { data: [SITA, ARJUN] })
 					: url.includes("/flash?")
 						? json(200, EMPTY_FLASH_PAGE)
-						: respondToWork(),
+						: url.includes("/reviews?") || url.includes("/fresh-ink?")
+							? json(200, { data: [], nextCursor: null, rating: null })
+							: respondToWork(),
 			);
 
 		for (const { name, respond, logged } of FAILURES) {
@@ -492,11 +505,13 @@ describe("loadStudioPage", () => {
 			"artists",
 			"chat",
 			"flash",
+			"freshInk",
 			"goodToKnow",
 			"inquiry",
 			"openNow",
 			"recentWork",
 			"requestLink",
+			"reviews",
 			"seo",
 			"studio",
 			"theme",

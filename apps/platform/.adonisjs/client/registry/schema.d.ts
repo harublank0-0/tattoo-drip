@@ -2251,6 +2251,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_flash_controller').default['show']>>>
     }
   }
+  'api.v1.reviews.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/reviews'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_studio_reviews_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_studio_reviews_controller').default['index']>>>
+    }
+  }
+  'api.v1.fresh_ink.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/tenants/:tenant/fresh-ink'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/public_studio_reviews_controller').default['freshInk']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/public_studio_reviews_controller').default['freshInk']>>>
+    }
+  }
   'api.v1.inquiries.store': {
     methods: ["POST"]
     pattern: '/api/v1/tenants/:tenant/inquiries'

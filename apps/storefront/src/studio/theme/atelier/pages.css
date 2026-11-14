@@ -841,3 +841,93 @@
 	border-radius: 0;
 	background: var(--atl-mat);
 }
+
+/*
+ * Fresh ink and Reviews (Reviews and Fresh ink, slice 3; ./clients.tsx).
+ * Fresh ink is a numbered collection like the work. Reviews are centred
+ * testimonials in Bodoni's italic (never a made-up slant), divided by brass
+ * hairlines (brass stays decoration, never text), the stars in bronze.
+ */
+.atl-fresh-intro {
+	margin: 0;
+	max-inline-size: 32rem;
+	color: var(--ink-muted);
+	font-family: var(--atl-italic);
+	font-size: 1.125rem;
+	font-style: italic;
+	font-synthesis-style: none;
+}
+.atl-reviews .client-review-summary {
+	display: grid;
+	justify-items: center;
+	gap: 0.5rem;
+	margin: 0;
+	font-family: var(--display-face);
+	font-size: 1.25rem;
+	font-weight: 500;
+}
+.atl-review-list {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	max-inline-size: 44rem;
+	margin: 0 auto;
+	padding: 0;
+	list-style: none;
+}
+.atl-review-list > li + li {
+	border-block-start: 1px solid var(--atl-brass);
+}
+.atl-reviews .client-review {
+	justify-items: center;
+	gap: 0.75rem;
+	padding: 2.5rem 0;
+	border: 0;
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+	text-align: center;
+}
+.atl-reviews .client-review-stars {
+	color: var(--stencil);
+}
+.atl-reviews .client-review-body {
+	font-family: var(--atl-italic);
+	font-size: clamp(1.25rem, 1.1rem + 0.8vw, 1.625rem);
+	font-style: italic;
+	font-synthesis-style: none;
+	line-height: 1.5;
+}
+.atl-reviews .client-review-reply {
+	justify-items: center;
+	max-inline-size: 34rem;
+	margin-block-start: 0.5rem;
+	padding: 1rem 0 0;
+	border: 0;
+	border-block-start: 1px solid var(--line);
+}
+.atl-reviews .client-review-artist .text-link {
+	color: var(--ink);
+	text-decoration-color: var(--line-strong);
+}
+.atl-reviews-all {
+	margin: 1rem 0 0;
+	text-align: center;
+}
+
+/*
+ * `/reviews` and `/fresh-ink` in Atelier (./clients.tsx, AtelierReviewsPage
+ * and AtelierFreshInkPage): the gallery's head, then the body centred like
+ * the theme's other pages, its cards the home section's (`.atl-reviews`).
+ */
+.atl-client-body {
+	padding-block-start: 0;
+}
+.atl-client-body .client-review-summary {
+	margin-block-end: 1rem;
+}
+.atl-client-body .work-newest,
+.atl-client-body .flash-more-bar {
+	display: grid;
+	justify-items: center;
+	text-align: center;
+}

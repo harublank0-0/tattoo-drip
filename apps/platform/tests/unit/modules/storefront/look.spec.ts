@@ -11,16 +11,19 @@ import {
 	DEFAULT_THEME,
 	FONT_KEYS,
 	FONTS,
+	keepSections,
 	LIGHT_PAPER,
 	LOGO_TILE_COLOURS,
 	LOGO_TILES,
 	logoTileOf,
 	lookOf,
 	MIN_TEXT_CONTRAST,
+	REVIEW_SECTIONS,
 	readsOn,
 	SECTION_KEYS,
 	sectionList,
 	sectionsOf,
+	sectionsShown,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEME_KEYS,
@@ -241,12 +244,104 @@ test.group("lookOf", () => {
 });
 
 test.group("sections", () => {
-	test("the default is Recent work, the artists, Flash, Good to know, then the form", ({
+	test("the default is Recent work, the artists, Flash, Fresh ink, Reviews, Good to know, then the form", ({
 		assert,
 	}) => {
-		const all = ["work", "artists", "flash", "info", "inquiry"];
+		const all = [
+			"work",
+			"artists",
+			"flash",
+			"fresh_ink",
+			"reviews",
+			"info",
+			"inquiry",
+		];
 		assert.deepEqual([...SECTION_KEYS], all);
 		assert.deepEqual([...DEFAULT_SECTIONS], all);
+		assert.deepEqual([...REVIEW_SECTIONS], ["fresh_ink", "reviews"]);
+	});
+
+	test("sectionList keeps Fresh ink and Reviews once, where they were put (slice 3)", ({
+		assert,
+	}) => {
+		assert.deepEqual(sectionList(["reviews", "work", "fresh_ink", "reviews"]), [
+			"reviews",
+			"work",
+			"fresh_ink",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsOf("work,fresh_ink,reviews,inquiry"), [
+			"work",
+			"fresh_ink",
+			"reviews",
+			"inquiry",
+		]);
+	});
+
+	test("sectionsShown leaves out Fresh ink and Reviews only while the feature is off", ({
+		assert,
+	}) => {
+		assert.deepEqual(sectionsShown(DEFAULT_SECTIONS, true), [
+			...DEFAULT_SECTIONS,
+		]);
+		assert.deepEqual(sectionsShown(DEFAULT_SECTIONS, false), [
+			"work",
+			"artists",
+			"flash",
+			"info",
+			"inquiry",
+		]);
+		assert.deepEqual(sectionsShown(["reviews", "inquiry"], false), ["inquiry"]);
+	});
+
+	test("keepSections puts back what the form could not show, where the stored list had it", ({
+		assert,
+	}) => {
+		const stored = sectionsOf(
+			"work,artists,flash,fresh_ink,reviews,info,inquiry",
+		);
+		// Nothing changed in the form: the list is as it was.
+		assert.deepEqual(
+			keepSections(
+				["work", "artists", "flash", "info", "inquiry"],
+				stored,
+				REVIEW_SECTIONS,
+			),
+			stored,
+		);
+		// Flash hidden and the artists moved last: the two follow the artists,
+		// the nearest section before them that the new list has.
+		assert.deepEqual(
+			keepSections(
+				["work", "info", "inquiry", "artists"],
+				stored,
+				REVIEW_SECTIONS,
+			),
+			["work", "info", "inquiry", "artists", "fresh_ink", "reviews"],
+		);
+		// The artists hidden too: they follow Recent work.
+		assert.deepEqual(
+			keepSections(["work", "info", "inquiry"], stored, REVIEW_SECTIONS),
+			["work", "fresh_ink", "reviews", "info", "inquiry"],
+		);
+		// Leading the stored list, with nothing before them the form kept: first.
+		assert.deepEqual(
+			keepSections(
+				["inquiry", "work"],
+				sectionsOf("reviews,fresh_ink,work,inquiry"),
+				REVIEW_SECTIONS,
+			),
+			["reviews", "fresh_ink", "inquiry", "work"],
+		);
+		// A hidden key the stored list lacks stays out, and one the form sent anyway is dropped.
+		assert.deepEqual(
+			keepSections(
+				["reviews", "work", "inquiry"],
+				sectionsOf("work,inquiry"),
+				REVIEW_SECTIONS,
+			),
+			["work", "inquiry"],
+		);
 	});
 
 	test("sectionList keeps Flash once, where it was put", ({ assert }) => {

@@ -136,16 +136,26 @@ describe("readSections (TAT-54)", () => {
 	const items = (...types: unknown[]) =>
 		types.map((type) => ({ type, props: {} }));
 
-	test("the default order is work, artists, Flash, Good to know, then inquiry", () => {
+	test("the default order is work, artists, Flash, Fresh ink, Reviews, Good to know, then inquiry", () => {
 		assert.deepEqual(SECTION_KEYS, [
 			"work",
 			"artists",
 			"flash",
+			"fresh_ink",
+			"reviews",
 			"info",
 			"inquiry",
 		]);
 		assert.deepEqual(THEME_SECTIONS["stencil-and-ink"], {
-			order: ["work", "artists", "flash", "info", "inquiry"],
+			order: [
+				"work",
+				"artists",
+				"flash",
+				"fresh_ink",
+				"reviews",
+				"info",
+				"inquiry",
+			],
 			required: ["inquiry"],
 		});
 		// A theme changes how the page looks, not what it holds.
@@ -157,6 +167,8 @@ describe("readSections (TAT-54)", () => {
 			"work",
 			"artists",
 			"flash",
+			"fresh_ink",
+			"reviews",
 			"info",
 			"inquiry",
 		]);
@@ -231,7 +243,7 @@ describe("readSections (TAT-54)", () => {
 		]) {
 			assert.deepEqual(
 				readSections(value, "stencil-and-ink"),
-				["work", "artists", "flash", "info", "inquiry"],
+				["work", "artists", "flash", "fresh_ink", "reviews", "info", "inquiry"],
 				String(value),
 			);
 		}
@@ -646,7 +658,15 @@ describe("parseThemeConfig (TAT-54)", () => {
 	test("nothing sent (every studio today) is the default theme", () => {
 		assert.deepEqual(DEFAULT_THEME_CONFIG, {
 			key: "stencil-and-ink",
-			sections: ["work", "artists", "flash", "info", "inquiry"],
+			sections: [
+				"work",
+				"artists",
+				"flash",
+				"fresh_ink",
+				"reviews",
+				"info",
+				"inquiry",
+			],
 			accent: null,
 			accentDark: null,
 			font: "eczar",
@@ -674,7 +694,15 @@ describe("parseThemeConfig (TAT-54)", () => {
 	test("the default theme and the lists it points at can't be changed by whoever holds them", () => {
 		const defaults = {
 			key: "stencil-and-ink",
-			sections: ["work", "artists", "flash", "info", "inquiry"],
+			sections: [
+				"work",
+				"artists",
+				"flash",
+				"fresh_ink",
+				"reviews",
+				"info",
+				"inquiry",
+			],
 			accent: null,
 			accentDark: null,
 			font: "eczar",
@@ -714,6 +742,8 @@ describe("parseThemeConfig (TAT-54)", () => {
 			"work",
 			"artists",
 			"flash",
+			"fresh_ink",
+			"reviews",
 			"info",
 			"inquiry",
 		]);

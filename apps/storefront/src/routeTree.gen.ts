@@ -16,9 +16,11 @@ import { Route as BookRouteImport } from './routes/book'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as FaqRouteImport } from './routes/faq'
+import { Route as FreshInkRouteImport } from './routes/fresh-ink'
 import { Route as PoliciesRouteImport } from './routes/policies'
 import { Route as RequestRouteImport } from './routes/request'
 import { Route as ReviewRouteImport } from './routes/review'
+import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -65,6 +67,11 @@ const FaqRoute = FaqRouteImport.update({
   path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FreshInkRoute = FreshInkRouteImport.update({
+  id: '/fresh-ink',
+  path: '/fresh-ink',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PoliciesRoute = PoliciesRouteImport.update({
   id: '/policies',
   path: '/policies',
@@ -78,6 +85,11 @@ const RequestRoute = RequestRouteImport.update({
 const ReviewRoute = ReviewRouteImport.update({
   id: '/review',
   path: '/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewsRoute = ReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -139,9 +151,11 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
+  '/fresh-ink': typeof FreshInkRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
   '/review': typeof ReviewRoute
+  '/reviews': typeof ReviewsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -161,9 +175,11 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
+  '/fresh-ink': typeof FreshInkRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
   '/review': typeof ReviewRoute
+  '/reviews': typeof ReviewsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -184,9 +200,11 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/deposit': typeof DepositRoute
   '/faq': typeof FaqRoute
+  '/fresh-ink': typeof FreshInkRoute
   '/policies': typeof PoliciesRoute
   '/request': typeof RequestRoute
   '/review': typeof ReviewRoute
+  '/reviews': typeof ReviewsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/services': typeof ServicesRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -208,9 +226,11 @@ export interface FileRouteTypes {
     | '/contact'
     | '/deposit'
     | '/faq'
+    | '/fresh-ink'
     | '/policies'
     | '/request'
     | '/review'
+    | '/reviews'
     | '/robots.txt'
     | '/services'
     | '/sitemap.xml'
@@ -230,9 +250,11 @@ export interface FileRouteTypes {
     | '/contact'
     | '/deposit'
     | '/faq'
+    | '/fresh-ink'
     | '/policies'
     | '/request'
     | '/review'
+    | '/reviews'
     | '/robots.txt'
     | '/services'
     | '/sitemap.xml'
@@ -252,9 +274,11 @@ export interface FileRouteTypes {
     | '/contact'
     | '/deposit'
     | '/faq'
+    | '/fresh-ink'
     | '/policies'
     | '/request'
     | '/review'
+    | '/reviews'
     | '/robots.txt'
     | '/services'
     | '/sitemap.xml'
@@ -275,9 +299,11 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   DepositRoute: typeof DepositRoute
   FaqRoute: typeof FaqRoute
+  FreshInkRoute: typeof FreshInkRoute
   PoliciesRoute: typeof PoliciesRoute
   RequestRoute: typeof RequestRoute
   ReviewRoute: typeof ReviewRoute
+  ReviewsRoute: typeof ReviewsRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   ServicesRoute: typeof ServicesRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -341,6 +367,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/fresh-ink': {
+      id: '/fresh-ink'
+      path: '/fresh-ink'
+      fullPath: '/fresh-ink'
+      preLoaderRoute: typeof FreshInkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/policies': {
       id: '/policies'
       path: '/policies'
@@ -360,6 +393,13 @@ declare module '@tanstack/react-router' {
       path: '/review'
       fullPath: '/review'
       preLoaderRoute: typeof ReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reviews': {
+      id: '/reviews'
+      path: '/reviews'
+      fullPath: '/reviews'
+      preLoaderRoute: typeof ReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -443,9 +483,11 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DepositRoute: DepositRoute,
   FaqRoute: FaqRoute,
+  FreshInkRoute: FreshInkRoute,
   PoliciesRoute: PoliciesRoute,
   RequestRoute: RequestRoute,
   ReviewRoute: ReviewRoute,
+  ReviewsRoute: ReviewsRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   ServicesRoute: ServicesRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

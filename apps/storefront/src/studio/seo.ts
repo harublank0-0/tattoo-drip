@@ -150,6 +150,39 @@ export function flashPageSeo(studio: StudioView, origin: string): PageSeo {
 }
 
 /**
+ * `/reviews`' head (Reviews and Fresh ink, slice 3): what the page is and
+ * the first page as the canonical of every page, as `/gallery` and `/flash`
+ * do. Never review
+ * structured data (no `AggregateRating` or `Review`): Google does not take a
+ * business's reviews of itself on its own site (ruling 10), so `jsonLd` is
+ * null.
+ */
+export function reviewsPageSeo(studio: StudioView, origin: string): PageSeo {
+	return {
+		title: `${studioCopy.reviews.pageTitle} of ${studio.name}`,
+		description: `What clients say about ${studio.name}, in their own words, newest first.`,
+		canonical: `${origin}/reviews`,
+		type: "website",
+		siteName: studio.name,
+		image: null,
+		jsonLd: null,
+	};
+}
+
+/** `/fresh-ink`'s head (slice 3): the first page as the canonical of every page, no JSON-LD. */
+export function freshInkPageSeo(studio: StudioView, origin: string): PageSeo {
+	return {
+		title: `${studioCopy.freshInk.pageTitle} at ${studio.name}`,
+		description: `Healed tattoos from ${studio.name}, shown by the clients who wear them.`,
+		canonical: `${origin}/fresh-ink`,
+		type: "website",
+		siteName: studio.name,
+		image: null,
+		jsonLd: null,
+	};
+}
+
+/**
  * One flash design's head (TAT-129): its name and artist (one name when the
  * studio is named like the artist, as the artist page does), what it is and
  * how to ask. No image (the picture is not the artist's photo) and no JSON-LD.

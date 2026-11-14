@@ -67,12 +67,16 @@ test.group("Reviews page: who sees what", (group) => {
 				posts: { id: string; canUnpublish: boolean; canApprove: boolean }[];
 			}
 		).posts;
+		// Newest decision first: the published post twoStudios seeds for the
+		// studio page's Fresh ink (slice 3), then the approved one.
 		assert.deepEqual(
 			shown.map(({ id }) => id),
-			[a.approvedPost.id],
+			[a.freshInkPost.id, a.approvedPost.id],
 		);
-		assert.isTrue(shown[0].canUnpublish);
-		assert.isFalse(shown[0].canApprove);
+		for (const row of shown) {
+			assert.isTrue(row.canUnpublish);
+			assert.isFalse(row.canApprove);
+		}
 
 		const reviews = await client
 			.get(page(a, "?view=reviews"))
@@ -223,7 +227,11 @@ test.group("Reviews page: who sees what", (group) => {
 		const waiting = await props("");
 		assert.deepEqual(waiting.posts, []);
 		assert.equal(waiting.waitingCount, 0);
-		assert.deepEqual((await props("?status=approved")).posts, []);
+		// Only the post they did not take down (twoStudios' published one) is left.
+		assert.deepEqual(
+			(await props("?status=approved")).posts.map(({ id }) => id),
+			[a.freshInkPost.id],
+		);
 		const declined = await props("?status=declined");
 		assert.sameMembers(
 			declined.posts.map(({ id }) => id),
