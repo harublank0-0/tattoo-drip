@@ -3,7 +3,11 @@ import type {
 	DiscoverArtistSummary,
 	DiscoverArtistsPage,
 	DiscoverArtistsQuery,
+	DiscoverFreshInkPage,
+	DiscoverFreshInkQuery,
 	DiscoverLocation,
+	DiscoverProfilePageQuery,
+	DiscoverReviewsPage,
 	DiscoverSitemapArtist,
 	DiscoverSitemapPage,
 	DiscoverSitemapQuery,
@@ -72,7 +76,8 @@ function searchQuery<T extends { query?: string }>(input?: T) {
 
 /**
  * Discover's public API (`/api/v1/discover`): listed studios, their artists,
- * independent artists, tattoo photos, styles and places. The same transport
+ * independent artists, tattoo photos, styles and places, and (Reviews and
+ * Fresh ink) profiles' reviews and Fresh ink and the Fresh ink feed. The same transport
  * as the studio client (no cookies, a timeout, `{ signal }` to cancel,
  * TattooApiError), and no studio of its own.
  *
@@ -110,6 +115,62 @@ export function createDiscoverClient(options: DiscoverClientOptions) {
 					`${root}/studios/${segment(studioSlug)}/artists/${segment(artistSlug)}`,
 					call,
 				),
+			/**
+			 * A page of a listed studio's reviews on Discover, newest first
+			 * (Reviews and Fresh ink): `{ data, nextCursor, rating }`, `rating`
+			 * null below 3 reviews. Empty while reviews are off on the platform.
+			 */
+			reviews: (
+				slug: string,
+				query?: DiscoverProfilePageQuery,
+				call?: RequestOptions,
+			) =>
+				request<DiscoverReviewsPage>(
+					withQuery(`${root}/studios/${segment(slug)}/reviews`, query),
+					{},
+					call,
+				),
+			/** A page of a listed studio's Fresh ink on Discover, newest published first. */
+			freshInk: (
+				slug: string,
+				query?: DiscoverProfilePageQuery,
+				call?: RequestOptions,
+			) =>
+				request<DiscoverFreshInkPage>(
+					withQuery(`${root}/studios/${segment(slug)}/fresh-ink`, query),
+					{},
+					call,
+				),
+			/** A page of an artist's reviews at a listed studio (the artist's own rating). */
+			artistReviews: (
+				studioSlug: string,
+				artistSlug: string,
+				query?: DiscoverProfilePageQuery,
+				call?: RequestOptions,
+			) =>
+				request<DiscoverReviewsPage>(
+					withQuery(
+						`${root}/studios/${segment(studioSlug)}/artists/${segment(artistSlug)}/reviews`,
+						query,
+					),
+					{},
+					call,
+				),
+			/** A page of an artist's Fresh ink at a listed studio. */
+			artistFreshInk: (
+				studioSlug: string,
+				artistSlug: string,
+				query?: DiscoverProfilePageQuery,
+				call?: RequestOptions,
+			) =>
+				request<DiscoverFreshInkPage>(
+					withQuery(
+						`${root}/studios/${segment(studioSlug)}/artists/${segment(artistSlug)}/fresh-ink`,
+						query,
+					),
+					{},
+					call,
+				),
 		},
 		artists: {
 			/** A page of shown artists, studios' and independent ones. */
@@ -122,6 +183,41 @@ export function createDiscoverClient(options: DiscoverClientOptions) {
 			/** One listed independent artist, by their business's slug. */
 			independent: (slug: string, call?: RequestOptions) =>
 				getData<DiscoverArtistDetail>(`${root}/artists/${segment(slug)}`, call),
+			/** A page of a listed independent artist's reviews, by their business's slug. */
+			independentReviews: (
+				slug: string,
+				query?: DiscoverProfilePageQuery,
+				call?: RequestOptions,
+			) =>
+				request<DiscoverReviewsPage>(
+					withQuery(`${root}/artists/${segment(slug)}/reviews`, query),
+					{},
+					call,
+				),
+			/** A page of a listed independent artist's Fresh ink, by their business's slug. */
+			independentFreshInk: (
+				slug: string,
+				query?: DiscoverProfilePageQuery,
+				call?: RequestOptions,
+			) =>
+				request<DiscoverFreshInkPage>(
+					withQuery(`${root}/artists/${segment(slug)}/fresh-ink`, query),
+					{},
+					call,
+				),
+		},
+		freshInk: {
+			/**
+			 * A page of Discover's Fresh ink feed (clients' healed tattoos),
+			 * newest published first, filtered by `country`, `city` and
+			 * `style`. Empty while reviews are off on the platform.
+			 */
+			list: (query?: DiscoverFreshInkQuery, call?: RequestOptions) =>
+				request<DiscoverFreshInkPage>(
+					withQuery(`${root}/fresh-ink`, query),
+					{},
+					call,
+				),
 		},
 		tattoos: {
 			/** A page of published tattoo photos, newest first (`query`: the gallery's search, D09). */
