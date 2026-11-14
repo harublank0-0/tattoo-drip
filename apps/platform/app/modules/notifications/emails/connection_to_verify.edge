@@ -1,0 +1,9 @@
+@email.layout({ title: 'Payment connection to verify', preheader: 'A studio is waiting for its online deposits to be verified.' })
+  <p style="margin: 0 0 16px;">Hi,</p>
+  <p style="margin: 0 0 16px;">The studio “{{ studioSlug }}” connected a {{ mode }} PayBridgeNP project. It takes no online deposits until a platform admin verifies it.</p>
+  <p style="margin: 0 0 16px;">On the admin Payments page, check that the merchant is the studio's own business, then verify or suspend the connection.</p>
+  @!email.button({ href: url, text: 'Review connections' })
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    You get these emails as a Tattoo Drip platform admin.
+  </p>
+@end
