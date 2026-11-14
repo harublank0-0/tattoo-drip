@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { fill } from "../../../../intake/template.ts";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import { studioCopy } from "../../../copy.ts";
@@ -134,6 +135,7 @@ export function ArtistHero({
 										href={link.href}
 										rel={linkRel(link.href)}
 									>
+										<SocialIcon platform={link.kind} />
 										{link.label}
 									</a>
 								</li>

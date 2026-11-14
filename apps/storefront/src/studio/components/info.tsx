@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { Fill } from "../../intake/components/fill.tsx";
 import { fill } from "../../intake/template.ts";
 import { studioCopy } from "../copy.ts";
@@ -11,7 +12,7 @@ import {
 } from "../info.ts";
 import { isAllowedHref, linkRel } from "../links.ts";
 import type { InfoPageData } from "../loaders.ts";
-import type { StudioView } from "../view-model.ts";
+import type { ContactLink, StudioView } from "../view-model.ts";
 import { contactGroups } from "./contact.tsx";
 import { type Shell, StencilShell } from "./shell.tsx";
 
@@ -301,16 +302,13 @@ export function ContactDetails({
 	);
 }
 
-function LinkList({
-	links,
-}: {
-	links: readonly { readonly href: string; readonly label: string }[];
-}) {
+function LinkList({ links }: { links: readonly ContactLink[] }) {
 	return (
 		<ul className="contact-links">
 			{links.map((link) => (
 				<li key={link.href}>
 					<a className="text-link" href={link.href} rel={linkRel(link.href)}>
+						<SocialIcon platform={link.kind} className="social-link-icon" />
 						{link.label}
 					</a>
 				</li>

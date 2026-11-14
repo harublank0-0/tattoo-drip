@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { HealedFilter } from "../../../components/gallery.tsx";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import { studioCopy } from "../../../copy.ts";
@@ -99,6 +100,7 @@ export function ArtistPortfolio({
 									href={instagram.href}
 									rel={linkRel(instagram.href)}
 								>
+									<SocialIcon platform="instagram" />
 									{copy.follow}
 								</a>
 							</p>

@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { PhotoDialog } from "../../../components/gallery.tsx";
 import { RouterAnchor } from "../../../components/router-anchor.tsx";
 import type { GalleryPhotoView } from "../../../gallery.ts";
@@ -118,6 +119,7 @@ export function FeaturedWork({
 									href={instagram.href}
 									rel={linkRel(instagram.href)}
 								>
+									<SocialIcon platform="instagram" />
 									{copy.follow}
 								</a>
 							</p>

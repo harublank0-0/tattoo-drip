@@ -1,3 +1,4 @@
+import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import { MessageCircle } from "lucide-react";
 import { fill } from "../../intake/template.ts";
 import type { ChatLinks } from "../chat.ts";
@@ -21,8 +22,12 @@ export function ChatButton({
 }) {
 	if (!chat) return null;
 	const links = [
-		{ href: chat.whatsapp, label: studioCopy.chat.whatsapp },
-		{ href: chat.viber, label: studioCopy.chat.viber },
+		{
+			platform: "whatsapp",
+			href: chat.whatsapp,
+			label: studioCopy.chat.whatsapp,
+		},
+		{ platform: "viber", href: chat.viber, label: studioCopy.chat.viber },
 	].filter((link) => isAllowedHref(link.href));
 	if (links.length === 0) return null;
 	const list = (
@@ -38,6 +43,7 @@ export function ChatButton({
 						href={link.href}
 						rel={linkRel(link.href)}
 					>
+						<SocialIcon platform={link.platform} />
 						{link.label}
 					</a>
 				</li>

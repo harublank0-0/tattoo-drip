@@ -108,7 +108,10 @@ describe("D08 profiles on the built server", { skip }, () => {
 		);
 		assert.match(page, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 		// Public links: https only (the stub's javascript: website is dropped).
-		assert.match(page, /href="https:\/\/instagram\.com\/stub-studio-1"/);
+		assert.match(
+			page,
+			/href="https:\/\/instagram\.com\/stub-studio-1"[^>]*><svg[^>]*aria-hidden="true"[^>]*><path[^>]*><\/path><\/svg><span>Instagram<\/span>/,
+		);
 		// (it is in the dehydrated API answer, as data, never as a link).
 		assert.ok(!hrefs(page).some((href) => href.startsWith("javascript:")));
 		// Styles to their pages; artists, work-first, to their profiles; the
