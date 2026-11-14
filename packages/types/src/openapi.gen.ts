@@ -2851,6 +2851,8 @@ export interface components {
                 slug: string;
                 name: string;
             };
+            /** @description Whether the artist takes new requests (their `acceptingInquiries`), as an artwork's. When false, link a studio's general request instead (`bookingUrl` without `artist`), and for an independent artist no request at all. */
+            artistAcceptingInquiries: boolean;
             studio: components["schemas"]["DiscoverStudioRef"];
             location: components["schemas"]["DiscoverLocation"] | null;
             /**

@@ -94,6 +94,8 @@ export type DiscoverFreshInkPost = ShownWorkPhoto & {
 	placement: string | null;
 	date: string;
 	artist: ArtistRef;
+	/** Whether the artist takes new requests (the artwork page's D08 rule). */
+	artistAcceptingInquiries: boolean;
 	studio: DiscoverStudioRef;
 	location: DiscoverLocation | null;
 	storefrontUrl: string;
@@ -132,6 +134,7 @@ type ReviewRow = OwnerRow & {
 };
 type PostRow = OwnerRow & {
 	id: string;
+	accepting_inquiries: boolean;
 	shown_name: string;
 	caption: string | null;
 	styles: string[];
@@ -269,7 +272,7 @@ export default class DiscoverReviewService {
 				client,
 				`select f.id, f.studio_id, f.artist_id, f.shown_name, f.caption, f.styles,
 				        f.placement, f.published_at, ${AT_TEXT("f.published_at")} as cursor_value,
-				        ${OWNER_COLUMNS}
+				        a.accepting_inquiries, ${OWNER_COLUMNS}
 				 from (select f.* from discovery.fresh_ink f where ${where}
 				       order by f.published_at desc, f.id desc limit ?) f
 				 join discovery.artists a on a.id = f.artist_id
@@ -329,6 +332,7 @@ export default class DiscoverReviewService {
 			placement: row.placement,
 			date: dayOf(DateTime.fromJSDate(row.published_at), row.timezone),
 			artist: artistOf(row),
+			artistAcceptingInquiries: row.accepting_inquiries,
 			studio: studioRef(row),
 			storefrontUrl: studioPageUrl(storefrontTemplate(), row.studio_slug),
 			bookingUrl: bookingPageUrl(storefrontTemplate(), row.studio_slug, {

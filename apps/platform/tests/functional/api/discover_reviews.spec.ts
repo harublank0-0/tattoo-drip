@@ -42,6 +42,7 @@ const POST_FIELDS = [
 	"alt",
 	"angles",
 	"artist",
+	"artistAcceptingInquiries",
 	"bookingUrl",
 	"caption",
 	"date",
@@ -593,6 +594,7 @@ test.group("Discover Fresh ink (slice 4)", (group) => {
 			type: "studio",
 		});
 		assert.equal(post.location.slug, "kathmandu");
+		assert.isTrue(post.artistAcceptingInquiries);
 		assert.equal(post.shownName, "Sita R.");
 		assert.deepEqual(post.styles, [{ slug: "fine-line", name: "Fine line" }]);
 		const booking = new URL(post.bookingUrl);
@@ -688,6 +690,28 @@ test.group("Discover Fresh ink (slice 4)", (group) => {
 			404,
 			"not_found",
 		);
+	});
+
+	test("each post says whether its artist takes new requests (the artwork page's rule)", async ({
+		client,
+		assert,
+	}) => {
+		const w = await world();
+		const post = await discoverPost(w.needle.tenant, w.ready.project);
+		await sql(
+			w.needle.tenant,
+			"update artists set accepting_inquiries = false where id = ?",
+			[w.ready.artist.id],
+		);
+		const feed = await client.get("/api/v1/discover/fresh-ink");
+		const shown = (
+			feed.body().data as { id: string; artistAcceptingInquiries: boolean }[]
+		).find((each) => each.id === post.post.id);
+		assert.isFalse(shown?.artistAcceptingInquiries);
+		const profile = await client.get(
+			"/api/v1/discover/studios/dr-black-needle/fresh-ink",
+		);
+		assert.isFalse(profile.body().data[0].artistAcceptingInquiries);
 	});
 
 	test("filters by style and by place, and pages by cursor without repeats", async ({

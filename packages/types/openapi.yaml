@@ -3643,7 +3643,7 @@ components:
         studio site's `/book` naming the artist, with Discover's referral)
         and `storefrontUrl` (the studio's own page). All text is plain text.
         Never the client's full name, phone, email or any id of theirs.
-      required: [id, url, width, height, alt, variants, angles, shownName, caption, styles, placement, date, artist, studio, location, storefrontUrl, bookingUrl]
+      required: [id, url, width, height, alt, variants, angles, shownName, caption, styles, placement, date, artist, artistAcceptingInquiries, studio, location, storefrontUrl, bookingUrl]
       additionalProperties: false
       properties:
         id: { type: string, format: uuid, description: The post's own id (a key for lists). }
@@ -3689,6 +3689,9 @@ components:
             id: { type: string, format: uuid }
             slug: { type: string }
             name: { type: string }
+        artistAcceptingInquiries:
+          type: boolean
+          description: Whether the artist takes new requests (their `acceptingInquiries`), as an artwork's. When false, link a studio's general request instead (`bookingUrl` without `artist`), and for an independent artist no request at all.
         studio: { $ref: "#/components/schemas/DiscoverStudioRef" }
         location:
           oneOf: [{ $ref: "#/components/schemas/DiscoverLocation" }, { type: "null" }]
