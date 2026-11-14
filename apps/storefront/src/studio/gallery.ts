@@ -351,12 +351,30 @@ export function durationText(durationMs: number): string {
 	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+/**
+ * A tattoo-shaped item as the gallery reads one (galleryView's rules: the
+ * brand images' rule for the main photo and its angles, descriptions, the
+ * artist, styles), numbered `n`, its dialog and button ids under `prefix`
+ * (`work` for the gallery; Fresh ink, which shares a page with Recent work,
+ * has its own), or null when its main photo can't be shown. Pure.
+ */
+export function tattooEntry(
+	item: unknown,
+	imageOrigin: string | null,
+	n: number,
+	prefix: string,
+): GalleryPhotoView | null {
+	const image = readBrandImage(item, imageOrigin);
+	return image ? shownPhoto(item, image, n, imageOrigin, prefix) : null;
+}
+
 /** A photo the brand images' rule kept, numbered `n` (the dialog and button ids, the label and the fallback description). */
 function shownPhoto(
 	item: unknown,
 	image: NonNullable<ReturnType<typeof readBrandImage>>,
 	n: number,
 	imageOrigin: string | null,
+	prefix = "work",
 ): GalleryPhotoView {
 	const artist = readArtist(own(item, "artist"));
 	const description = readDescription(own(item, "alt"));
@@ -380,9 +398,9 @@ function shownPhoto(
 					: fill(studioCopy.work.galleryAltNoName, { n })),
 		caption: description,
 		largeSrc: largeSource(image),
-		dialogId: `work-photo-${n}`,
+		dialogId: `${prefix}-photo-${n}`,
 		label: fill(studioCopy.work.photoN, { n }),
-		openId: `work-open-${n}`,
+		openId: `${prefix}-open-${n}`,
 		id,
 		href: id ? galleryPhotoHref(id) : null,
 		artist,

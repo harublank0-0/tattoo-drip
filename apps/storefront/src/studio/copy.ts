@@ -228,6 +228,47 @@ export const studioCopy = {
 		showMore: "Show more",
 		newest: "Back to the newest",
 	},
+	/**
+	 * Client reviews (Reviews and Fresh ink, slice 3): the home section and
+	 * /reviews. Templates hold {average}, {count}, {n}, {name}, {artist} and
+	 * {studio}. Never "best first" and never an average below 3 reviews.
+	 */
+	reviews: {
+		title: "Reviews",
+		pageTitle: "Reviews",
+		intro: "From clients who were tattooed here, newest first.",
+		all: "All reviews",
+		/** The average from 3 reviews (ruling 10). */
+		summary: "{average} from {count} reviews",
+		/** What a screen reader hears for the stars of a review. */
+		stars: "{n} out of 5",
+		/** And for the stars beside the average. */
+		averageStars: "Rated {average} out of 5",
+		tattooBy: "Tattoo by {artist}",
+		reply: "Reply from {studio}",
+		showMore: "Show more",
+		newest: "Back to the newest",
+		/** The list's name, for a screen reader. */
+		list: "Reviews from clients",
+	},
+	/**
+	 * Fresh ink (Reviews and Fresh ink, slice 3): healed tattoos clients posted
+	 * and the studio approved, on the home page and /fresh-ink. Templates hold
+	 * {name} (the client's shown name) and {artist}.
+	 */
+	freshInk: {
+		title: "Fresh ink",
+		pageTitle: "Fresh ink",
+		intro: "Healed tattoos, shown by the clients who wear them.",
+		all: "All Fresh ink",
+		shownBy: "Shown by {name}",
+		alt: "Fresh ink from {name}, tattoo by {artist}",
+		altNoArtist: "Fresh ink from {name}",
+		tattooBy: "Tattoo by {artist}",
+		placement: "Placement",
+		showMore: "Show more",
+		newest: "Back to the newest",
+	},
 	/** The studio's flag in words; a closed artist's own message comes first. */
 	status: {
 		open: "Taking new work",

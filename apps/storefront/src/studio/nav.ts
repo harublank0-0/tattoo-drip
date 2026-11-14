@@ -19,6 +19,8 @@ export type ShellPage =
 	| "work"
 	| "flash"
 	| "flash-design"
+	| "reviews"
+	| "fresh-ink"
 	| "request"
 	| "about"
 	| "services"

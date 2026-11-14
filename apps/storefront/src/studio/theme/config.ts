@@ -34,7 +34,9 @@ export const DEFAULT_THEME_KEY: ThemeKey = "stencil-and-ink";
 
 /**
  * The studio page's sections that a theme can order and hide: the newest
- * photos (Recent work), the artists, Flash (`flash`, TAT-129), Good to know
+ * photos (Recent work), the artists, Flash (`flash`, TAT-129), Fresh ink
+ * (`fresh_ink`) and Reviews (`reviews`) (Reviews and Fresh ink, slice 3:
+ * each renders nothing until the API lists something), Good to know
  * (`info`) and the "Got an idea?" invitation to the request page (`inquiry`). The platform keeps the
  * same list (apps/platform/app/modules/storefront/look.ts, same order;
  * look.spec.ts compares them). A new section is a key here and there, its
@@ -44,6 +46,8 @@ export const SECTION_KEYS = [
 	"work",
 	"artists",
 	"flash",
+	"fresh_ink",
+	"reviews",
 	"info",
 	"inquiry",
 ] as const;
@@ -66,26 +70,66 @@ const sectionList = (...keys: SectionKey[]): readonly SectionKey[] =>
  */
 export const THEME_SECTIONS: Record<ThemeKey, ThemeSections> = Object.freeze({
 	"stencil-and-ink": Object.freeze({
-		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		order: sectionList(
+			"work",
+			"artists",
+			"flash",
+			"fresh_ink",
+			"reviews",
+			"info",
+			"inquiry",
+		),
 		required: sectionList("inquiry"),
 	}),
 	// The same sections: a theme changes how a page looks, not what it holds.
 	"ink-noir": Object.freeze({
-		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		order: sectionList(
+			"work",
+			"artists",
+			"flash",
+			"fresh_ink",
+			"reviews",
+			"info",
+			"inquiry",
+		),
 		required: sectionList("inquiry"),
 	}),
 	irezumi: Object.freeze({
-		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		order: sectionList(
+			"work",
+			"artists",
+			"flash",
+			"fresh_ink",
+			"reviews",
+			"info",
+			"inquiry",
+		),
 		required: sectionList("inquiry"),
 	}),
 	atelier: Object.freeze({
-		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		order: sectionList(
+			"work",
+			"artists",
+			"flash",
+			"fresh_ink",
+			"reviews",
+			"info",
+			"inquiry",
+		),
 		required: sectionList("inquiry"),
 	}),
 	// Its home page leads with the flash itself; `flash` keeps its place in
 	// the list for a studio's own order, and is drawn once.
 	"flash-parlour": Object.freeze({
-		order: sectionList("work", "artists", "flash", "info", "inquiry"),
+		order: sectionList(
+			"work",
+			"artists",
+			"flash",
+			"fresh_ink",
+			"reviews",
+			"info",
+			"inquiry",
+		),
 		required: sectionList("inquiry"),
 	}),
 });

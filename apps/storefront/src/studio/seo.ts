@@ -22,6 +22,11 @@ export interface PageSeo {
 	readonly siteName: string;
 	readonly image: ArtistPhoto | null;
 	readonly jsonLd: Record<string, unknown> | null;
+	/**
+	 * `robots: noindex, follow` (Reviews and Fresh ink, slice 3: the later
+	 * pages of /reviews and /fresh-ink, whose canonical is the first page).
+	 */
+	readonly noindex?: boolean;
 }
 
 export type HeadMeta =
@@ -146,6 +151,48 @@ export function flashPageSeo(studio: StudioView, origin: string): PageSeo {
 		siteName: studio.name,
 		image: null,
 		jsonLd: null,
+	};
+}
+
+/**
+ * `/reviews`' head (Reviews and Fresh ink, slice 3): what the page is, the
+ * first page as the canonical, and `noindex` on a later page. Never review
+ * structured data (no `AggregateRating` or `Review`): Google does not take a
+ * business's reviews of itself on its own site (ruling 10), so `jsonLd` is
+ * null.
+ */
+export function reviewsPageSeo(
+	studio: StudioView,
+	origin: string,
+	later: boolean,
+): PageSeo {
+	return {
+		title: `${studioCopy.reviews.pageTitle} of ${studio.name}`,
+		description: `What clients say about ${studio.name}, in their own words, newest first.`,
+		canonical: `${origin}/reviews`,
+		type: "website",
+		siteName: studio.name,
+		image: null,
+		jsonLd: null,
+		...(later ? { noindex: true } : {}),
+	};
+}
+
+/** `/fresh-ink`'s head (slice 3): the first page as the canonical, `noindex` on a later page, no JSON-LD. */
+export function freshInkPageSeo(
+	studio: StudioView,
+	origin: string,
+	later: boolean,
+): PageSeo {
+	return {
+		title: `${studioCopy.freshInk.pageTitle} at ${studio.name}`,
+		description: `Healed tattoos from ${studio.name}, shown by the clients who wear them.`,
+		canonical: `${origin}/fresh-ink`,
+		type: "website",
+		siteName: studio.name,
+		image: null,
+		jsonLd: null,
+		...(later ? { noindex: true } : {}),
 	};
 }
 
@@ -408,6 +455,7 @@ export function headTags(seo: PageSeo): HeadTags {
 		name: "twitter:card",
 		content: seo.image ? "summary_large_image" : "summary",
 	});
+	if (seo.noindex) meta.push({ name: "robots", content: "noindex, follow" });
 	return {
 		meta,
 		links: [{ rel: "canonical", href: seo.canonical }],

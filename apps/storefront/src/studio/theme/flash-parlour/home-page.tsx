@@ -12,6 +12,7 @@ import { OpenNow } from "../../open-now.tsx";
 import { logoSizes } from "../../srcset.ts";
 import type { SectionKey } from "../config.ts";
 import { ArtistGrid } from "./artist-index.tsx";
+import { FlashParlourFreshInk, FlashParlourReviews } from "./clients.tsx";
 import { flashParlourCopy } from "./copy.ts";
 import { FlashSheet } from "./flash-sheet.tsx";
 import {
@@ -270,6 +271,15 @@ function HomeSection({
 		case "flash":
 			// The wall opened the page; with no wall there is no flash to show.
 			return null;
+		case "fresh_ink":
+			return <FlashParlourFreshInk view={data.freshInk} />;
+		case "reviews":
+			return (
+				<FlashParlourReviews
+					view={data.reviews}
+					studioName={data.studio.name}
+				/>
+			);
 		case "info":
 			// GoodToKnowSection renders nothing for a studio that filled nothing in: then no wrapper either.
 			return goodToKnowIsEmpty(data.goodToKnow) ? null : (

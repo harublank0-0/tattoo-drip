@@ -1316,3 +1316,81 @@
 		translate: none;
 	}
 }
+
+/*
+ * Fresh ink and Reviews (Reviews and Fresh ink, slice 3; ./clients.tsx).
+ * Fresh ink hangs like the work. A review is a ticket pinned to the wall:
+ * the sheet, the 3px ink outline and the offset ink shadow, red stars
+ * outlined in ink, the name in Shrikhand, the studio's reply a stub under a
+ * dashed tear line. Mustard stays a fill (the average's tag carries ink).
+ */
+.fp-fresh-intro {
+	margin: 0 0 1.5rem;
+	max-inline-size: 36rem;
+	color: var(--ink-muted);
+}
+.fp-reviews .client-review-summary {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.75rem;
+	margin: 0 0 2rem;
+	padding: 0.5rem 1rem;
+	border: var(--fp-outline);
+	background: var(--fp-mustard);
+	box-shadow: var(--fp-shadow);
+	color: var(--ink);
+}
+.fp-reviews .client-review-summary .client-review-stars {
+	color: var(--ink);
+}
+.fp-review-list {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	max-inline-size: none;
+	gap: 1.5rem;
+	margin: 0;
+	padding: 0 4px 4px 0;
+	list-style: none;
+}
+.fp-reviews .client-review {
+	gap: 0.625rem;
+	padding: 1.25rem;
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+	background: var(--fp-sheet);
+	box-shadow: var(--fp-shadow);
+}
+.fp-reviews .client-review-stars {
+	color: var(--fp-red);
+}
+.fp-reviews .client-review-stars svg {
+	stroke: var(--ink);
+}
+.fp-reviews .client-review-name {
+	font-family: var(--display-face);
+	font-size: 1.125rem;
+	font-weight: 700;
+}
+.fp-reviews .client-review-artist .text-link {
+	color: var(--fp-red);
+}
+.fp-reviews .client-review-reply {
+	margin-block-start: 0.5rem;
+	padding: 0.75rem 0 0;
+	border: 0;
+	border-block-start: 2px dashed var(--line-strong);
+}
+.fp-reviews-rule {
+	margin-block-start: 2rem;
+}
+@media (min-width: 48rem) {
+	.fp-review-list {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+@media (min-width: 72rem) {
+	.fp-review-list {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}

@@ -13,6 +13,7 @@ import { OpenNow } from "../../open-now.tsx";
 import { logoSizes } from "../../srcset.ts";
 import type { SectionKey } from "../config.ts";
 import { ArtistIndex } from "./artist-index.tsx";
+import { IrezumiFreshInk, IrezumiReviews } from "./clients.tsx";
 import { irezumiCopy } from "./copy.ts";
 import {
 	type IrezumiHome,
@@ -188,6 +189,12 @@ function HomeSection({
 				<div className="irz-container irz-shared">
 					<FlashSection list={data.flash} artists={data.artists} />
 				</div>
+			);
+		case "fresh_ink":
+			return <IrezumiFreshInk view={data.freshInk} />;
+		case "reviews":
+			return (
+				<IrezumiReviews view={data.reviews} studioName={data.studio.name} />
 			);
 		case "info":
 			// GoodToKnowSection renders nothing for a studio that filled nothing in: then no wrapper either.

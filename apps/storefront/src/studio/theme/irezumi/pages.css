@@ -809,3 +809,82 @@
 	border-radius: 0;
 	background: var(--paper);
 }
+
+/*
+ * Fresh ink and Reviews (Reviews and Fresh ink, slice 3; ./clients.tsx).
+ * Fresh ink hangs as the pieces do. A review is a quoted passage: a hairline
+ * above it, the client's words in the serif, the stars in vermilion, the
+ * name as written (never spaced capitals: it may be Devanagari), the
+ * studio's reply indented under a vermilion rule. The tokens follow the
+ * device, light or dark.
+ */
+.irz-fresh-intro {
+	margin: -1rem 0 2rem;
+	max-inline-size: 36rem;
+}
+.irz-reviews .client-review-summary {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.75rem;
+	margin: -0.5rem 0 2.5rem;
+	font-family: var(--irz-serif);
+	font-size: clamp(1.25rem, 1.1rem + 0.8vw, 1.75rem);
+	font-style: italic;
+	font-weight: 400;
+}
+.irz-review-list {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	max-inline-size: none;
+	gap: 2.5rem 3.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.irz-reviews .client-review {
+	display: grid;
+	gap: 0.75rem;
+	align-content: start;
+	min-inline-size: 0;
+	padding: 1.25rem 0 0;
+	border: 0;
+	border-block-start: 1px solid var(--line-strong);
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+}
+.irz-reviews .client-review-stars {
+	color: var(--stencil);
+}
+.irz-reviews .client-review-stars svg {
+	inline-size: 1rem;
+	block-size: 1rem;
+}
+.irz-reviews .client-review-body {
+	font-family: var(--irz-serif);
+	font-size: clamp(1.125rem, 1.05rem + 0.3vw, 1.3125rem);
+	line-height: 1.55;
+}
+.irz-reviews .client-review-artist .text-link {
+	color: var(--ink-muted);
+	text-decoration-color: var(--line-strong);
+}
+.irz-reviews .client-review-artist .text-link:hover {
+	color: var(--ink);
+	text-decoration-color: var(--stencil);
+}
+.irz-reviews .client-review-reply {
+	margin-inline-start: 1.25rem;
+	border-inline-start-width: 1px;
+}
+.irz-reviews .client-review-reply-label {
+	font-family: var(--irz-serif);
+	font-style: italic;
+	font-weight: 400;
+}
+@media (min-width: 48rem) {
+	.irz-review-list {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}

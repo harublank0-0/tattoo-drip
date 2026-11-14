@@ -319,6 +319,9 @@ describe("navItems: the pages a theme's navigation lists", () => {
 			work: ["Gallery=page"],
 			flash: ["Flash=page"],
 			"flash-design": ["Flash=true"],
+			// Reviews and Fresh ink (slice 3) have no item: the nav can't know there is something to show.
+			reviews: [],
+			"fresh-ink": [],
 			request: [],
 			about: [],
 			services: [],

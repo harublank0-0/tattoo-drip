@@ -149,6 +149,16 @@ export function flashHref(search: FlashSearch): string {
 	])}`;
 }
 
+/** The reviews page (Reviews and Fresh ink, slice 3), at `cursor`'s page when given. */
+export function reviewsHref(search: { readonly cursor?: string }): string {
+	return `/reviews${queryOf([["cursor", search.cursor]])}`;
+}
+
+/** The Fresh ink page (Reviews and Fresh ink, slice 3), at `cursor`'s page when given. */
+export function freshInkHref(search: { readonly cursor?: string }): string {
+	return `/fresh-ink${queryOf([["cursor", search.cursor]])}`;
+}
+
 /** One flash design's page (TAT-129); `id` is a checked UUID. */
 export function flashDesignHref(id: string): string {
 	return `/flash/${encodeURIComponent(id)}`;

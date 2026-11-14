@@ -6,7 +6,9 @@ import {
 	ArtworkPage,
 	FlashDesignPage,
 	FlashPage,
+	FreshInkPage,
 	RequestPage,
+	ReviewsPage,
 	StudioPage,
 	WorkPage,
 } from "../components/pages.tsx";
@@ -70,6 +72,10 @@ export interface Theme {
 	readonly FlashDesignPage: ComponentType<
 		ComponentProps<typeof FlashDesignPage>
 	>;
+	/** `/reviews` (Reviews and Fresh ink, slice 3): the shared page in every theme's shell. */
+	readonly ReviewsPage: ComponentType<ComponentProps<typeof ReviewsPage>>;
+	/** `/fresh-ink` (slice 3): the shared page in every theme's shell. */
+	readonly FreshInkPage: ComponentType<ComponentProps<typeof FreshInkPage>>;
 	readonly RequestPage: ComponentType<ComponentProps<typeof RequestPage>>;
 	/** `/about`, `/services`, `/faq`, `/contact`, `/policies`, `/aftercare` (Prompt 7). */
 	readonly InfoPage: ComponentType<ComponentProps<typeof InfoPage>>;
@@ -100,6 +106,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage,
 		FlashPage,
 		FlashDesignPage,
+		ReviewsPage,
+		FreshInkPage,
 		RequestPage,
 		InfoPage,
 	},
@@ -112,6 +120,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: InkNoirArtworkPage,
 		FlashPage,
 		FlashDesignPage,
+		ReviewsPage,
+		FreshInkPage,
 		RequestPage: InkNoirBookPage,
 		InfoPage: InkNoirInfoPage,
 	},
@@ -124,6 +134,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: IrezumiArtworkPage,
 		FlashPage,
 		FlashDesignPage,
+		ReviewsPage,
+		FreshInkPage,
 		RequestPage: IrezumiBookPage,
 		InfoPage,
 	},
@@ -136,6 +148,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: AtelierArtworkPage,
 		FlashPage,
 		FlashDesignPage,
+		ReviewsPage,
+		FreshInkPage,
 		RequestPage: AtelierBookPage,
 		InfoPage,
 	},
@@ -148,6 +162,8 @@ export const THEMES: Record<ThemeKey, Theme> = {
 		ArtworkPage: FlashParlourArtworkPage,
 		FlashPage: FlashParlourFlashPage,
 		FlashDesignPage: FlashParlourFlashDesignPage,
+		ReviewsPage,
+		FreshInkPage,
 		RequestPage: FlashParlourBookPage,
 		InfoPage,
 	},
@@ -213,4 +229,16 @@ export function ThemedInfoPage(props: ComponentProps<typeof InfoPage>) {
 export function ThemedRequestPage(props: ComponentProps<typeof RequestPage>) {
 	const theme = themeFor(props.data.theme.key);
 	return <theme.RequestPage {...props} Shell={theme.Shell} />;
+}
+
+/** `/reviews` in the studio's theme (Reviews and Fresh ink, slice 3). */
+export function ThemedReviewsPage(props: ComponentProps<typeof ReviewsPage>) {
+	const theme = themeFor(props.data.theme.key);
+	return <theme.ReviewsPage {...props} Shell={theme.Shell} />;
+}
+
+/** `/fresh-ink` in the studio's theme (slice 3). */
+export function ThemedFreshInkPage(props: ComponentProps<typeof FreshInkPage>) {
+	const theme = themeFor(props.data.theme.key);
+	return <theme.FreshInkPage {...props} Shell={theme.Shell} />;
 }

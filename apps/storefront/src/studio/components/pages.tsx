@@ -6,10 +6,12 @@ import { studioCopy } from "../copy.ts";
 import { flashDesignAction } from "../flash.ts";
 import {
 	flashHref,
+	freshInkHref,
 	isAllowedHref,
 	linkRel,
 	portfolioHref,
 	requestHref,
+	reviewsHref,
 	workHref,
 } from "../links.ts";
 import type {
@@ -18,7 +20,9 @@ import type {
 	ArtworkPageData,
 	FlashDesignPageData,
 	FlashPageData,
+	FreshInkPageData,
 	RequestPageData,
+	ReviewsPageData,
 	StudioPageData,
 	WorkPageData,
 } from "../loaders.ts";
@@ -37,6 +41,7 @@ import {
 	FlashSection,
 	FlashSummary,
 } from "./flash.tsx";
+import { FreshInkGrid, FreshInkSection } from "./fresh-ink.tsx";
 import {
 	ArtworkFigure,
 	HealedFilter,
@@ -45,6 +50,7 @@ import {
 } from "./gallery.tsx";
 import { GoodToKnowSection } from "./good-to-know.tsx";
 import { InquirySection, RequestInvite } from "./inquiry.tsx";
+import { RatingSummary, ReviewList, ReviewsSection } from "./reviews.tsx";
 import { type Shell, StencilShell } from "./shell.tsx";
 import { BookingStrip } from "./steps.tsx";
 
@@ -139,7 +145,8 @@ export function StudioPage({
 /**
  * One of the studio page's sections, in the order the theme's config gives
  * (TAT-54): Recent work (TAT-126), the artists, Flash (TAT-129, which renders
- * nothing until an artist adds a design), Good to know (TAT-128, which
+ * nothing until an artist adds a design), Fresh ink and Reviews (Reviews and
+ * Fresh ink, slice 3: nothing until something is shown), Good to know (TAT-128, which
  * renders nothing until the studio filled something in) and the inquiry
  * section, which is always one of them (readSections) and, since TAT-127, only
  * invites: the form is on /request.
@@ -163,6 +170,12 @@ function StudioSection({
 			);
 		case "flash":
 			return <FlashSection list={data.flash} artists={data.artists} />;
+		case "fresh_ink":
+			return <FreshInkSection view={data.freshInk} />;
+		case "reviews":
+			return (
+				<ReviewsSection view={data.reviews} studioName={data.studio.name} />
+			);
 		case "info":
 			return <GoodToKnowSection view={data.goodToKnow} />;
 		case "inquiry":
@@ -504,6 +517,118 @@ export function FlashPage({
 						)}
 					</div>
 				)}
+			</section>
+			<StudioAside studio={studio} />
+		</Shell>
+	);
+}
+
+/**
+ * `/reviews` (Reviews and Fresh ink, slice 3), in every theme's shell: the
+ * average from 3 reviews, then the reviews newest first, 24 a page, "Show
+ * more" a plain link to the next page and "Back to the newest" from a later
+ * one, then the studio block. Never review structured data (ruling 10). The
+ * loader makes a page with nothing on it the not-found page, so there is no
+ * empty state here.
+ */
+export function ReviewsPage({
+	data,
+	Shell = StencilShell,
+}: {
+	data: ReviewsPageData;
+	Shell?: Shell;
+}) {
+	const { studio, theme, view, search } = data;
+	return (
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="reviews"
+			artistsShown={data.hasArtists}
+		>
+			<section
+				className="client-page reviews-page"
+				aria-labelledby="reviews-page-title"
+			>
+				<h1 id="reviews-page-title" className="section-title">
+					{studioCopy.reviews.pageTitle}
+				</h1>
+				<p className="client-page-intro measure">{studioCopy.reviews.intro}</p>
+				{view.rating ? <RatingSummary rating={view.rating} /> : null}
+				{search.cursor !== undefined ? (
+					<p className="work-newest">
+						<a className="text-link" href={reviewsHref({})}>
+							{studioCopy.reviews.newest}
+						</a>
+					</p>
+				) : null}
+				<ReviewList reviews={view.reviews} studioName={studio.name} />
+				{view.nextCursor !== null ? (
+					<p className="flash-more-bar">
+						<a
+							className="action action-secondary"
+							href={reviewsHref({ cursor: view.nextCursor })}
+						>
+							{studioCopy.reviews.showMore}
+						</a>
+					</p>
+				) : null}
+			</section>
+			<StudioAside studio={studio} />
+		</Shell>
+	);
+}
+
+/**
+ * `/fresh-ink` (slice 3), in every theme's shell: the posts newest first in
+ * the gallery's grid, each opening its viewer with its angles, 24 a page,
+ * paged like `/reviews`, then the studio block.
+ */
+export function FreshInkPage({
+	data,
+	Shell = StencilShell,
+}: {
+	data: FreshInkPageData;
+	Shell?: Shell;
+}) {
+	const { studio, theme, view, search } = data;
+	return (
+		<Shell
+			studio={studio}
+			theme={theme}
+			requestLink={data.requestLink}
+			chat={data.chat}
+			page="fresh-ink"
+			artistsShown={data.hasArtists}
+		>
+			<section
+				className="client-page fresh-ink-page"
+				aria-labelledby="fresh-ink-page-title"
+			>
+				<h1 id="fresh-ink-page-title" className="section-title">
+					{studioCopy.freshInk.pageTitle}
+				</h1>
+				<p className="client-page-intro measure">{studioCopy.freshInk.intro}</p>
+				{search.cursor !== undefined ? (
+					<p className="work-newest">
+						<a className="text-link" href={freshInkHref({})}>
+							{studioCopy.freshInk.newest}
+						</a>
+					</p>
+				) : null}
+				<FreshInkGrid posts={view.posts} />
+				{view.nextCursor !== null ? (
+					<p className="flash-more-bar">
+						<a
+							className="action action-secondary"
+							href={freshInkHref({ cursor: view.nextCursor })}
+						>
+							{studioCopy.freshInk.showMore}
+						</a>
+					</p>
+				) : null}
 			</section>
 			<StudioAside studio={studio} />
 		</Shell>
