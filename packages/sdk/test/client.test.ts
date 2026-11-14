@@ -1105,6 +1105,43 @@ describe("lists with query parameters", () => {
 		assert.equal(plain[0].url, `${T}/flash`);
 	});
 
+	test("studioReviews.list sends the page like a form and returns the whole page", async () => {
+		const page = { data: [], nextCursor: null, rating: null };
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+
+		const result = await client(fetch).studioReviews.list({
+			cursor: "next page",
+			limit: 6,
+		});
+
+		assert.equal(calls[0].url, `${T}/reviews?cursor=next+page&limit=6`);
+		assert.equal(calls[0].init.credentials, "omit");
+		assert.deepEqual(result, page);
+
+		const { calls: plain, fetch: plainFetch } = fakeFetch(() =>
+			json(200, page),
+		);
+		await client(plainFetch).studioReviews.list();
+		assert.equal(plain[0].url, `${T}/reviews`);
+	});
+
+	test("freshInk.list sends the page like a form and returns the whole page", async () => {
+		const page = { data: [], nextCursor: null };
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+
+		const result = await client(fetch).freshInk.list({ limit: 6 });
+
+		assert.equal(calls[0].url, `${T}/fresh-ink?limit=6`);
+		assert.equal(calls[0].init.credentials, "omit");
+		assert.deepEqual(result, page);
+
+		const { calls: plain, fetch: plainFetch } = fakeFetch(() =>
+			json(200, page),
+		);
+		await client(plainFetch).freshInk.list();
+		assert.equal(plain[0].url, `${T}/fresh-ink`);
+	});
+
 	test("flash.list sends available as true or false", async () => {
 		const page = { data: [], nextCursor: null, filters: { artists: [] } };
 		const { calls, fetch } = fakeFetch(() => json(200, page));

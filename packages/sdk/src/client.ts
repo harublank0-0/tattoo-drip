@@ -5,15 +5,19 @@ import type {
 	DepositPaymentMethod,
 	FlashDesign,
 	FlashPage,
+	FreshInkPage,
 	GalleryPhoto,
 	InquiryInput,
 	InquiryReceipt,
 	ListAvailabilityQuery,
 	ListFlashQuery,
+	ListFreshInkQuery,
+	ListReviewsQuery,
 	ListServicesQuery,
 	ListWorkQuery,
 	ReviewPage,
 	ReviewSubmission,
+	ReviewsPage,
 	ReviewVideoSignInput,
 	ReviewVideoUpload,
 	Service,
@@ -206,6 +210,40 @@ export function createTattooClient(options: TattooClientOptions) {
 			get: (id: string, call?: RequestOptions) =>
 				getData<FlashDesign>(
 					`${tenantRoot}/flash/${encodeURIComponent(id)}`,
+					call,
+				),
+		},
+		studioReviews: {
+			/**
+			 * A page of the studio's client reviews as its own page shows them,
+			 * newest first (Reviews and Fresh ink): the whole body, `{ data,
+			 * nextCursor, rating }`. `rating` (the average and count) is null
+			 * below 3 reviews. Pass `nextCursor` back as `cursor` for the next
+			 * page. Never mark them up as review structured data on the studio's
+			 * own site. While reviews are off on the platform the page is empty.
+			 * A malformed cursor or limit is a 422 TattooApiError
+			 * (`validation_failed`).
+			 */
+			list: (query?: ListReviewsQuery, call?: RequestOptions) =>
+				request<ReviewsPage>(
+					withQuery(`${tenantRoot}/reviews`, query),
+					{},
+					call,
+				),
+		},
+		freshInk: {
+			/**
+			 * A page of the studio's Fresh ink (clients' healed tattoos the studio
+			 * approved), newest published first: the whole body, `{ data,
+			 * nextCursor }`, each post shaped like a gallery tattoo (its main
+			 * photo, with its other photos and ready videos in `angles`). While
+			 * reviews are off on the platform the page is empty. A malformed
+			 * cursor or limit is a 422 TattooApiError (`validation_failed`).
+			 */
+			list: (query?: ListFreshInkQuery, call?: RequestOptions) =>
+				request<FreshInkPage>(
+					withQuery(`${tenantRoot}/fresh-ink`, query),
+					{},
 					call,
 				),
 		},
