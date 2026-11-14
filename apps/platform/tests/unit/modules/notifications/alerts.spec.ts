@@ -567,7 +567,7 @@ test.group("online-payment alerts", () => {
 		);
 		assert.equal(
 			onlinePaymentIntro({ ...base, held: true, yourProject: false }),
-			"Sita paid Black Needle online, but the payment didn't match its checkout, so it wasn't recorded as a deposit.",
+			"Sita paid Black Needle online, but the payment couldn't be recorded as a deposit.",
 		);
 		assert.equal(
 			onlinePaymentIntro({

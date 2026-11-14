@@ -102,6 +102,22 @@ test.group("Online payment services: tenant isolation", (group) => {
 			),
 			a.checkoutId,
 		);
+		const ownTotals = await inTenantAs(a.tenant, a.owner, () =>
+			transactions.totals(a.tenant, filters(), KTM),
+		);
+		assert.isTrue(
+			ownTotals.some((row) => row.gross > 0),
+			JSON.stringify(ownTotals),
+		);
+		const ownDaily = await inTenantAs(a.tenant, a.owner, () =>
+			transactions.daily(a.tenant, filters(), KTM),
+		);
+		assert.isTrue(ownDaily.some(({ collected }) => collected > 0));
+		assert.isNotEmpty(
+			await inTenantAs(a.tenant, a.owner, () =>
+				transactions.export(a.tenant, filters(), KTM),
+			),
+		);
 
 		// B's member, asking for A's records by A's tenant or A's ids.
 		const theirs = await asB(() => transactions.page(a.tenant, filters(), KTM));

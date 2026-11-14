@@ -8,6 +8,8 @@ import StaffAlert from "#modules/notifications/models/staff_alert";
 import OnlinePaymentAlertJob from "#modules/payments/jobs/online_payment_alert_job";
 import type GatewayAccount from "#modules/payments/models/gateway_account";
 import GatewayRefund from "#modules/payments/models/gateway_refund";
+import Payment from "#modules/payments/models/payment";
+import GatewayAccountService from "#modules/payments/services/gateway_account_service";
 import GatewayCheckoutService from "#modules/payments/services/gateway_checkout_service";
 import PaymentService from "#modules/payments/services/payment_service";
 import TattooProject from "#modules/projects/models/tattoo_project";
@@ -250,6 +252,69 @@ test.group("Online payments: staff alerts", (group) => {
 		assert.lengthOf(await alertsOf(other), 0);
 		assert.lengthOf(await alertsOf(a.tenant), 0);
 		assert.lengthOf(mails(fake), 0);
+		// Positive control: the same id under its own studio does alert.
+		await runAlertJob({
+			tenantId: a.tenant.id,
+			gatewayPaymentId: stored?.id as string,
+		});
+		assert.lengthOf(await alertsOf(a.tenant), 2);
+		assert.lengthOf(await alertsOf(other), 0);
+	});
+
+	test("a duplicate payment is held: the owners hear of it once", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner, account, session } = await checkoutOf(
+			client,
+			"online-alert-duplicate",
+		);
+		const fake = queue.fake();
+		const first = paybridge.pay(session.id);
+		const second = paybridge.pay(session.id);
+		await confirm(tenant, account, first.id);
+		const held = await confirm(tenant, account, second.id);
+		assert.equal(held?.reviewReason, "duplicate");
+		for (const { job } of alertJobs(fake)) {
+			await runAlertJob(
+				job.payload as { tenantId: string; gatewayPaymentId: string },
+			);
+		}
+		const review = (await alertsOf(tenant)).filter(
+			({ kind }) => kind === "online_review",
+		);
+		assert.deepEqual(
+			review.map(({ userId, gatewayPaymentId }) => ({
+				userId,
+				gatewayPaymentId,
+			})),
+			[{ userId: owner.id, gatewayPaymentId: held?.id as string }],
+		);
+	});
+
+	test("a recorded deposit whose project was deleted before the job ran alerts nobody", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, account, project, session } = await checkoutOf(
+			client,
+			"online-alert-gone",
+		);
+		const fake = queue.fake();
+		const stored = await confirm(tenant, account, paybridge.pay(session.id).id);
+		assert.isNotNull(stored?.paymentId);
+		await inTenant(tenant, () =>
+			TattooProject.query()
+				.where("tenant_id", tenant.id)
+				.where("id", project.id)
+				.update({ deleted_at: new Date() }),
+		);
+		await runAlertJob({
+			tenantId: tenant.id,
+			gatewayPaymentId: stored?.id as string,
+		});
+		assert.lengthOf(await alertsOf(tenant), 0);
+		assert.lengthOf(mails(fake), 0);
 	});
 });
 
@@ -277,16 +342,47 @@ test.group("Online payments: platform admins", (group) => {
 		assert.equal(message.to?.[0], "admin@platform.example");
 		assert.equal(message.subject, "Studio payment connection to verify");
 		assert.deepInclude(views.html?.data, {
-			studioName: "Black Needle",
-			merchantName: account.providerMerchantName,
-			projectName: account.providerProjectName,
+			studioSlug: "online-admin-mail",
 			mode: "sandbox",
 		});
 		assert.match(String(views.html?.data?.url), /\/admin\/payments$/);
+		// Never the key, nor free text a mail client could make a link of.
 		const everything = JSON.stringify(sent);
-		for (const secret of [key, account.keyHint, account.webhookKey]) {
+		for (const secret of [
+			key,
+			account.keyHint,
+			account.webhookKey,
+			account.providerMerchantName,
+			account.providerProjectName,
+			"Black Needle",
+		]) {
 			assert.notInclude(everything, secret, secret);
 		}
+	});
+
+	test("reconnecting the same project while it waits emails the admins once; a new project or a decided one emails again", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner("online-admin-again");
+		const accounts = await app.container.make(GatewayAccountService);
+		const fake = queue.fake();
+		const key = paybridge.studioKey("online-admin-again");
+		const connect = (secret: string) =>
+			inTenant(tenant, () => accounts.connect(tenant, owner.id, secret));
+
+		await connect(key);
+		await connect(key);
+		await connect(key);
+		assert.lengthOf(mails(fake), 1);
+
+		const other = await connect(paybridge.studioKey("online-admin-other"));
+		assert.lengthOf(mails(fake), 2);
+
+		await inTenant(tenant, () =>
+			accounts.review(tenant, other.id, owner.id, "suspend"),
+		);
+		await connect(key);
+		assert.lengthOf(mails(fake), 3);
 	});
 });
 
@@ -319,20 +415,26 @@ test.group("Online payments: the Payments card", (group) => {
 		);
 		const payments = await app.container.make(PaymentService);
 
+		const ledger = await inTenant(tenant, () =>
+			Payment.query().where("project_id", project.id),
+		);
+		const ledgerIds = ledger.map(({ id }) => id);
+		assert.lengthOf(ledgerIds, 2);
 		const ids = await inTenant(tenant, () =>
-			payments.onlineIds(tenant, project),
+			payments.onlineIds(tenant, ledgerIds),
 		);
 		assert.sameMembers(
 			[...ids],
 			[stored?.paymentId as string, refund.paymentId as string],
 		);
+		assert.equal((await payments.onlineIds(tenant, [])).size, 0);
 		// Asked from another studio's context, or for another studio: nothing.
 		assert.equal(
-			(await inTenant(other, () => payments.onlineIds(tenant, project))).size,
+			(await inTenant(other, () => payments.onlineIds(tenant, ledgerIds))).size,
 			0,
 		);
 		assert.equal(
-			(await inTenant(tenant, () => payments.onlineIds(other, project))).size,
+			(await inTenant(tenant, () => payments.onlineIds(other, ledgerIds))).size,
 			0,
 		);
 	});

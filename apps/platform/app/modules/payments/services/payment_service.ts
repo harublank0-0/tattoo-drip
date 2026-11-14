@@ -224,24 +224,24 @@ export default class PaymentService {
 	/**
 	 * Which of the project's ledger rows PayBridgeNP made: the deposits it
 	 * recorded and the refunds made in PayBridgeNP (no member decided them,
-	 * so their verifier is null). The Payments card says so instead of
-	 * naming a member.
+	 * so their verifier is null), among `paymentIds` (the project's ledger,
+	 * already loaded). The Payments card says so instead of naming a member.
+	 * Both lookups use the unique `payment_id` indexes; no ids, no query.
 	 */
 	async onlineIds(
 		tenant: TenantRef,
-		project: Pick<TattooProject, "id">,
+		paymentIds: string[],
 	): Promise<Set<string>> {
+		if (paymentIds.length === 0) return new Set();
 		const rows = await GatewayPayment.query()
 			.where("tenant_id", tenant.id)
-			.where("project_id", project.id)
-			.whereNotNull("payment_id")
+			.whereIn("payment_id", paymentIds)
 			.select("payment_id")
 			.unionAll((query) =>
 				query
 					.from("gateway_refunds")
 					.where("tenant_id", tenant.id)
-					.where("project_id", project.id)
-					.whereNotNull("payment_id")
+					.whereIn("payment_id", paymentIds)
 					.select("payment_id"),
 			)
 			.pojo<{ payment_id: string }>();

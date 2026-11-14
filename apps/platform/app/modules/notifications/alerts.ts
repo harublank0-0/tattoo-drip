@@ -238,7 +238,8 @@ export function transactionsPath(slug: string): string {
  * The online-payment email's first line: "Sita paid Black Needle's deposit
  * online." (", for your project" when the member is the project's artist),
  * or, held for review, "Sita paid Black Needle online, but the payment
- * didn't match its checkout, so it wasn't recorded as a deposit.".
+ * couldn't be recorded as a deposit." (a mismatch, a duplicate or a
+ * deleted project: the reason is on Transactions).
  */
 export function onlinePaymentIntro({
 	clientName,
@@ -253,7 +254,7 @@ export function onlinePaymentIntro({
 }): string {
 	const who = emailName(clientName);
 	if (held) {
-		return `${who} paid ${studioName} online, but the payment didn't match its checkout, so it wasn't recorded as a deposit.`;
+		return `${who} paid ${studioName} online, but the payment couldn't be recorded as a deposit.`;
 	}
 	const whose = yourProject ? ", for your project" : "";
 	return `${who} paid ${studioName}'s deposit online${whose}.`;

@@ -3,10 +3,8 @@ import { BaseMail } from "@adonisjs/mail";
 /** What the email shows: plain values, because queued mail is JSON until the worker renders it. */
 export type ConnectionToVerifyMailData = {
 	to: string;
-	studioName: string;
-	/** The PayBridgeNP merchant and project names the studio's key belongs to. */
-	merchantName: string;
-	projectName: string;
+	/** The studio's slug: never a name, which is free text (see below). */
+	studioSlug: string;
 	/** "sandbox" or "live". */
 	mode: string;
 	/** The admin Payments page (APP_URL + /admin/payments). */
@@ -16,9 +14,11 @@ export type ConnectionToVerifyMailData = {
 /**
  * Tells a TattooDrip platform admin (PLATFORM_ADMIN_EMAILS) that a studio
  * connected its PayBridgeNP project and waits for a check before taking
- * online deposits. Names the studio and what PayBridgeNP says the key
- * belongs to; never the key, its hint or the webhook address. The subject
- * names no one, because SendMailJob.failed() logs it.
+ * online deposits. Only the studio's slug and the mode: the studio's name
+ * and the PayBridgeNP merchant and project names are free text a mail
+ * client could turn into a link ("verify at evil.example"), and the admin
+ * page shows them. Never the key, its hint or the webhook address. The
+ * subject names no one, because SendMailJob.failed() logs it.
  */
 export default class ConnectionToVerifyMail extends BaseMail {
 	subject = "Studio payment connection to verify";

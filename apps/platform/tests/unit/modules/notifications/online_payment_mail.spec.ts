@@ -48,7 +48,7 @@ test.group("OnlinePaymentMail", () => {
 				recipientName: null,
 				held: true,
 				intro:
-					"Sita paid Black Needle online, but the payment didn't match its checkout, so it wasn't recorded as a deposit.",
+					"Sita paid Black Needle online, but the payment couldn't be recorded as a deposit.",
 				url: TRANSACTIONS,
 			}),
 		);
@@ -65,15 +65,13 @@ test.group("OnlinePaymentMail", () => {
 });
 
 test.group("ConnectionToVerifyMail", () => {
-	test("names the studio and the PayBridgeNP merchant, links to the admin page, escapes the names", async ({
+	test("names the studio by its slug and the mode, and links to the admin page", async ({
 		assert,
 	}) => {
 		const message = await render(
 			new ConnectionToVerifyMail({
 				to: "admin@platform.example",
-				studioName: "Black Needle",
-				merchantName: "<b>Ink</b> Pvt. Ltd.",
-				projectName: "Deposits",
+				studioSlug: "black-needle",
 				mode: "sandbox",
 				url: "https://app.tattoo-drip.test/admin/payments",
 			}),
@@ -82,14 +80,13 @@ test.group("ConnectionToVerifyMail", () => {
 		message.assertTo("admin@platform.example");
 		message.assertSubject("Studio payment connection to verify");
 		assert.isUndefined(message.nodeMailerMessage.from);
-		message.assertHtmlIncludes(
-			"Black Needle connected the PayBridgeNP project",
-		);
-		message.assertHtmlIncludes("&lt;b&gt;Ink&lt;/b&gt; Pvt. Ltd.");
+		message.assertHtmlIncludes("black-needle");
+		message.assertHtmlIncludes("connected a sandbox PayBridgeNP project");
 		message.assertHtmlIncludes(
 			'href="https://app.tattoo-drip.test/admin/payments"',
 		);
-		message.assertTextIncludes("(sandbox)");
-		assert.notInclude(String(message.nodeMailerMessage.html), "<b>Ink</b>");
+		message.assertTextIncludes(
+			"Review connections: https://app.tattoo-drip.test/admin/payments",
+		);
 	});
 });

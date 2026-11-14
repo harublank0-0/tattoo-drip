@@ -110,8 +110,8 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 				: null;
 
 		// The bell's count (TAT-52, TAT-107): the member's own unread alerts
-		// here that no tab counts. An owner's are all on the Inbox and Today,
-		// so no query runs for them.
+		// here that no tab counts (bellKinds): for an owner only the
+		// online-payment alerts, the Inbox, Today and Reviews counting the rest.
 		const alertCount =
 			tenant && membership && auth?.user
 				? await ensureDbContext(

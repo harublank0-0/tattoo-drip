@@ -2,7 +2,7 @@
   <p style="margin: 0 0 16px;">Hi {{ recipientName || 'there' }},</p>
   <p style="margin: 0 0 16px;">{{ intro }}</p>
   @if(held)
-    <p style="margin: 0 0 16px;">Check it on the Transactions page and in your PayBridgeNP dashboard. If the client paid by mistake, refund it in PayBridgeNP.</p>
+    <p style="margin: 0 0 16px;">See why on the Transactions page and check it in your PayBridgeNP dashboard. If the client paid by mistake, refund it in PayBridgeNP.</p>
     @!email.button({ href: url, text: 'Open Transactions' })
   @else
     <p style="margin: 0 0 16px;">It's recorded on the project's Payments card. Nothing to check.</p>

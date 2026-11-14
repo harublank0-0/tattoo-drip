@@ -16,8 +16,8 @@ export type OnlinePaymentMailData = {
 
 /**
  * Tells a member that PayBridgeNP reported a client's online payment:
- * recorded as a deposit, or held for review because it didn't match its
- * checkout. The client's first name and a link; never the amount, the
+ * recorded as a deposit, or held for review (a mismatch, a duplicate or a
+ * deleted project). The client's first name and a link; never the amount, the
  * method, PayBridgeNP's reference or the review reason. The subject has no
  * client data, because SendMailJob.failed() logs it.
  */

@@ -548,7 +548,10 @@ export default class ProjectsController {
 			isOwner,
 			timezone,
 			names,
-			online: await this.payments.onlineIds(tenant, project),
+			online: await this.payments.onlineIds(
+				tenant,
+				money.payments.map(({ id }) => id),
+			),
 			proofUrls,
 			referenceCode: depositLink?.referenceCode ?? null,
 		});

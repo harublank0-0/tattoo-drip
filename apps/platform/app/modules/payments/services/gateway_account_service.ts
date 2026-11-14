@@ -101,7 +101,9 @@ export default class GatewayAccountService {
 	 * connection (which stays on record, disconnected). The new connection
 	 * waits for a platform admin's check before taking payments; each
 	 * PLATFORM_ADMIN_EMAILS address is emailed in the same transaction
-	 * (ALERT_EMAILS off sends none).
+	 * (ALERT_EMAILS off sends none), unless the connection it replaces was
+	 * the same PayBridgeNP project still waiting: an owner reconnecting
+	 * again and again emails the admins once.
 	 */
 	async connect(
 		tenant: TenantRef,
@@ -151,7 +153,10 @@ export default class GatewayAccountService {
 			row.providerWebhookId = endpoint.id.slice(0, 64);
 			row.webhookSecretSealed = sealSecret(endpoint.secret, sealBinding(row));
 			await row.save();
-			await this.tellAdmins(trx, tenant, row);
+			const alreadyTold =
+				previous?.status === "pending" &&
+				previous.providerProjectId === row.providerProjectId;
+			if (!alreadyTold) await this.tellAdmins(trx, tenant, row);
 			logger.info(
 				{ tenantId: tenant.id, accountId: row.id, mode },
 				"Studio payment connection added; waiting for a platform admin's check",
@@ -160,7 +165,12 @@ export default class GatewayAccountService {
 		});
 	}
 
-	/** Emails each platform admin that `account` waits for their check. */
+	/**
+	 * Emails each platform admin that `account` waits for their check. The
+	 * email carries the studio's slug only: names the studio or PayBridgeNP
+	 * holds are free text that a mail client could turn into a link from
+	 * our trusted sender, and the admin page shows them.
+	 */
 	private async tellAdmins(
 		trx: TransactionClientContract,
 		tenant: TenantRef,
@@ -176,9 +186,7 @@ export default class GatewayAccountService {
 			await sendMailInTransaction(
 				new ConnectionToVerifyMail({
 					to,
-					studioName: studio.name,
-					merchantName: account.providerMerchantName,
-					projectName: account.providerProjectName,
+					studioSlug: studio.slug,
 					mode: account.livemode ? "live" : "sandbox",
 					url,
 				}),

@@ -16,7 +16,9 @@ type Payload = { tenantId: string; gatewayPaymentId: string };
  * AlertService.onlinePayment alerts the members in the dashboard and by
  * email, once each however often the job runs. A payment neither recorded
  * nor held needs no alert. A held payment whose project was deleted still
- * alerts the owners: the money arrived.
+ * alerts the owners: the money arrived. A recorded deposit whose project was
+ * deleted since needs none: its Payments card is gone, as
+ * DepositProofAlertJob does.
  */
 export default class OnlinePaymentAlertJob extends TenantJob<Payload> {
 	protected async handle() {
@@ -35,6 +37,7 @@ export default class OnlinePaymentAlertJob extends TenantJob<Payload> {
 		const tenant = { id: tenantId };
 		const projects = await app.container.make(ProjectService);
 		const project = await projects.findLive(tenant, payment.projectId);
+		if (!held && !project) return;
 		const clients = await app.container.make(ClientService);
 		const client = project
 			? await clients.find(tenant, project.clientId)
