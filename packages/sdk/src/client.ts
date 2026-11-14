@@ -221,8 +221,7 @@ export function createTattooClient(options: TattooClientOptions) {
 			 * nextCursor, rating }`. `rating` (the average and count) is null
 			 * below 3 reviews. Pass `nextCursor` back as `cursor` for the next
 			 * page. Never mark them up as review structured data on the studio's
-			 * own site. While reviews are off on the platform the page is empty.
-			 * A malformed cursor or limit is a 422 TattooApiError
+			 * own site. A malformed cursor or limit is a 422 TattooApiError
 			 * (`validation_failed`).
 			 */
 			list: (query?: ListReviewsQuery, call?: RequestOptions) =>
@@ -237,9 +236,9 @@ export function createTattooClient(options: TattooClientOptions) {
 			 * A page of the studio's Fresh ink (clients' healed tattoos the studio
 			 * approved), newest published first: the whole body, `{ data,
 			 * nextCursor }`, each post shaped like a gallery tattoo (its main
-			 * photo, with its other photos and ready videos in `angles`). While
-			 * reviews are off on the platform the page is empty. A malformed
-			 * cursor or limit is a 422 TattooApiError (`validation_failed`).
+			 * photo, with its other photos and ready videos in `angles`). A
+			 * malformed cursor or limit is a 422 TattooApiError
+			 * (`validation_failed`).
 			 */
 			list: (query?: ListFreshInkQuery, call?: RequestOptions) =>
 				request<FreshInkPage>(
@@ -359,9 +358,8 @@ export function createTattooClient(options: TattooClientOptions) {
 		/**
 		 * The client's review page (Reviews and Fresh ink), through the token
 		 * of the link the studio sent (the link's fragment). The token goes in
-		 * the `X-Review-Token` header, never the URL. A link that doesn't work,
-		 * and every call while reviews are off, is a 404 TattooApiError
-		 * (`not_found`). Every write answers with the page as it now is.
+		 * the `X-Review-Token` header, never the URL. A link that doesn't work
+		 * is a 404 TattooApiError (`not_found`). Every write answers with the page as it now is.
 		 */
 		reviews: {
 			get: (token: string, call?: RequestOptions) =>
