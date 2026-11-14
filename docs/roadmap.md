@@ -56,12 +56,12 @@ Only where studios show the pain:
 
 ## Reviews and Fresh ink
 
-Decided by the product owner on 2026-11-12 ([spec](superpowers/specs/2026-11-12-reviews-and-fresh-ink-design.md)): a client tattooed at a studio rates and reviews it and shows the healed tattoo ("Fresh ink"), through a private link the studio sends after the project, with no client account. Four slices:
+Decided by the product owner on 2026-11-12 ([spec](superpowers/specs/2026-11-12-reviews-and-fresh-ink-design.md)): a client tattooed at a studio rates and reviews it and shows the healed tattoo ("Fresh ink"), through a private link the studio sends after the project, with no client account. Four slices, all built and live (the product owner removed the feature's on/off setting; the client content terms, a [draft](legal/client-content-terms.md), are still pending legal review):
 
-1. Data, links and the client's page (`/review#<token>`), behind `REVIEWS_ENABLED` until the client content terms ([draft](legal/client-content-terms.md)) are legally reviewed. Built.
+1. Data, links and the client's page (`/review#<token>`). Built.
 2. The dashboard: Ask for a review, the message template, the Reviews page (approve, decline, reply, report), operator takedowns and the report list. Built.
-3. The studio site's `reviews` and `fresh_ink` sections in every theme, and their public API (`listReviews`, `listFreshInk`). Built, behind the same flag.
-4. Discover: the views, profile sections, the global Fresh ink feed, ratings from three reviews. Built, behind the same flag.
+3. The studio site's `reviews` and `fresh_ink` sections in every theme, and their public API (`listReviews`, `listFreshInk`). Built.
+4. Discover: the views, profile sections, the global Fresh ink feed (in Discover's navigation, and in the sitemap while it has a post), ratings from three reviews. Built.
 
 ## Later, maybe never
 

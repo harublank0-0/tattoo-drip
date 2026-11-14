@@ -1,6 +1,6 @@
 # DRAFT: Terms for client reviews and Fresh ink
 
-> **Draft: not legally reviewed.** Written for the product owner to take to a lawyer (Reviews and Fresh ink, ruling 12). Not published, not linked from any page, and not in force. The review page stays behind `REVIEWS_ENABLED` until a reviewed version replaces this draft.
+> **Draft: not legally reviewed.** Written for the product owner to take to a lawyer (Reviews and Fresh ink, ruling 12). These terms are not linked from any page and not in force. Reviews and Fresh ink, the review page included, is live while these terms are still a draft pending legal review; a reviewed version will replace this draft.
 
 These terms cover what a client posts through a studio's review link on TattooDrip: a rating and review, and Fresh ink (photos and videos of a tattoo). "We" is TattooDrip. "The studio" is the tattoo studio or independent artist that sent you the link. "You" is the person the link was sent to.
 
