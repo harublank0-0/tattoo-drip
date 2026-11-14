@@ -28,7 +28,12 @@ import {
 	makeSession,
 	seedPipeline,
 } from "#tests/helpers/pipeline";
-import { issueReviewLink, seedPost, seedReview } from "#tests/helpers/reviews";
+import {
+	issueReviewLink,
+	seedPost,
+	seedReview,
+	seedShownPost,
+} from "#tests/helpers/reviews";
 
 /**
  * A fresh studio and its owner. The owner's email comes from the slug, so
@@ -457,7 +462,10 @@ export async function seededStudio(slug: string, name: string) {
 			submitted: true,
 			status: "approved",
 		});
-		return { project, review, post, approved };
+		// Slice 3: a post the studio's page shows (approved, allowed there and
+		// published, one photo of a made-up key), the public Fresh ink read's.
+		const { post: freshInk } = await seedShownPost(tenant, await done(40));
+		return { project, review, post, approved, freshInk };
 	});
 	// A pending invitation and the artist's membership row, for the members
 	// routes (TAT-33).
@@ -539,6 +547,8 @@ export async function seededStudio(slug: string, name: string) {
 		clientReview: reviewed.review,
 		waitingPost: reviewed.post,
 		approvedPost: reviewed.approved,
+		// The studio page's Fresh ink (slice 3): a published post.
+		freshInkPost: reviewed.freshInk,
 		// The members routes' :id resources (TAT-33).
 		invitation,
 		artistMembership,
@@ -604,7 +614,7 @@ export type Studio = Awaited<ReturnType<typeof seededStudio>>;
  * (`paymentMethod` is the first), an artist profile (`artistProfile`), a visible artist who takes no inquiries with a slug only that studio has (`closedArtist`, `<slug>-mira`) and one
  * of each pipeline record (`pipeline`: client, accepted inquiry, project,
  * reference image, quote and a submitted payment), plus a quoted project
- * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. Sunday to Friday hours and one closed day (`closedDay`) are the Good to know settings routes' (TAT-128). A pending invitation (`invitation`) and the artist's membership row (`artistMembership`) are the members routes' (TAT-33). An in-progress project with a done tattoo session and a project in its healing check, both assigned to `artistProfile` and without a quote (`finishProject`, `healingProject`), are the finish routes' resources (TAT-111). A completed project with a done tattoo session, its review link and a draft Fresh ink post with one photo (`reviewProject`, `reviewToken`, `clientPost`, `clientPostPhoto`) are the review page's (Reviews and Fresh ink). A second completed project with a live review (with a reply) and a waiting post, and a third with an approved post (`reviewedProject`, `clientReview`, `waitingPost`, `approvedPost`), are the Reviews page's (slice 2). Later tickets add seed data
+ * (`quotedProject`, `quotedQuote`), a new inquiry with a reference image (`newInquiry`) and a deposit_pending project with its deposit link (`depositProject`, `depositToken`, `depositReferenceCode`) and the eSewa method its page shows (`depositMethod`); `project` is the pipeline's project; a project booked without a price (`pricelessProject`), a booked project holding a verified deposit (`paidProject`, `verifiedPayment`) and a cancelled one holding a deposit without an outcome (`closedPaidProject`); `payment` is the pipeline's submitted payment. A booked project assigned to `artistProfile` with a scheduled tattoo session 60 days out (`sessionProject`, `session`) is the session routes' resource (TAT-85); an unread alert of the owner about the new inquiry (`alert`) is the alerts routes' (TAT-52), and the studio's own aftercare text (`messageTemplate`) is what the messages settings routes' snapshot reads. Sunday to Friday hours and one closed day (`closedDay`) are the Good to know settings routes' (TAT-128). A pending invitation (`invitation`) and the artist's membership row (`artistMembership`) are the members routes' (TAT-33). An in-progress project with a done tattoo session and a project in its healing check, both assigned to `artistProfile` and without a quote (`finishProject`, `healingProject`), are the finish routes' resources (TAT-111). A completed project with a done tattoo session, its review link and a draft Fresh ink post with one photo (`reviewProject`, `reviewToken`, `clientPost`, `clientPostPhoto`) are the review page's (Reviews and Fresh ink). A second completed project with a live review (with a reply) and a waiting post, and a third with an approved post (`reviewedProject`, `clientReview`, `waitingPost`, `approvedPost`), are the Reviews page's (slice 2). A fourth completed project's published post, approved and allowed on the studio's page (`freshInkPost`), is the public Fresh ink read's (slice 3). Later tickets add seed data
  * for their own tables here, so every isolation case sees it.
  */
 export async function twoStudios() {

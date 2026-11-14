@@ -30,6 +30,9 @@ export function publicMarkers(studio: Studio): string[] {
 		studio.depositReferenceCode,
 		// The review page (Reviews and Fresh ink): its draft post's photo.
 		studio.clientPostPhoto.id,
+		// The studio page's reviews and Fresh ink (slice 3): their own ids.
+		studio.clientReview.id,
+		studio.freshInkPost.id,
 		// Carries the studio's name; belt and braces for the public studio read.
 		studio.closedDay.note as string,
 	];

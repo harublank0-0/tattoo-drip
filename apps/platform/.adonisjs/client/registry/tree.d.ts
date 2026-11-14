@@ -327,6 +327,12 @@ export interface ApiDefinition {
         index: typeof routes['api.v1.flash.index']
         show: typeof routes['api.v1.flash.show']
       }
+      reviews: {
+        index: typeof routes['api.v1.reviews.index']
+      }
+      freshInk: {
+        index: typeof routes['api.v1.fresh_ink.index']
+      }
       inquiries: {
         store: typeof routes['api.v1.inquiries.store']
       }

@@ -134,7 +134,10 @@ test.group("TenancyService.updateLook (TAT-56)", (group) => {
 		const row = await reload(a.tenant);
 		assert.equal(row.brandFont, "eczar");
 		assert.isNull(row.brandAccent);
-		assert.equal(row.storefrontSections, "work,artists,flash,info,inquiry");
+		assert.equal(
+			row.storefrontSections,
+			"work,artists,flash,fresh_ink,reviews,info,inquiry",
+		);
 		assert.equal((await reload(b.tenant)).brandFont, "eczar");
 	});
 });

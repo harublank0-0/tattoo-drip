@@ -5,6 +5,7 @@ import type User from "#models/user";
 import {
 	FONTS,
 	SECTION_KEYS,
+	sectionsOf,
 	THEME_ACCENT,
 	THEME_ACCENT_DARK,
 	THEMES,
@@ -16,6 +17,7 @@ import {
 } from "#modules/tenancy/look_messages";
 import Tenant from "#modules/tenancy/models/tenant";
 import { studioLinks } from "#services/studio_links";
+import env from "#start/env";
 import { polyglot, testImages } from "#tests/helpers/images";
 import { failDeletes } from "#tests/helpers/storage_failures";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
@@ -77,7 +79,15 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			accent: null,
 			accentDark: null,
 			font: "eczar",
-			sections: ["work", "artists", "flash", "info", "inquiry"],
+			sections: [
+				"work",
+				"artists",
+				"flash",
+				"fresh_ink",
+				"reviews",
+				"info",
+				"inquiry",
+			],
 			claimedFlash: "show",
 		});
 		assert.deepEqual(props.claimedFlashChoices, ["show", "hide"]);
@@ -140,10 +150,58 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			"work",
 			"artists",
 			"flash",
+			"fresh_ink",
+			"reviews",
 			"info",
 			"inquiry",
 		]);
 		assert.deepEqual(props.look.sections, ["artists", "work", "inquiry"]);
+	});
+
+	test("while reviews are off the page neither lists nor drops Fresh ink and Reviews (slice 3)", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		env.set("REVIEWS_ENABLED", false);
+		try {
+			const props = (await lookPage(client, owner, tenant)).inertiaProps;
+			assert.deepEqual(props.sectionKeys, [
+				"work",
+				"artists",
+				"flash",
+				"info",
+				"inquiry",
+			]);
+			assert.deepEqual(props.look.sections, [
+				"work",
+				"artists",
+				"flash",
+				"info",
+				"inquiry",
+			]);
+			// The form sends what it showed, Flash hidden; a hand-made request
+			// that names Reviews anyway changes nothing about it.
+			await putLook(client, owner, tenant, {
+				...BODY,
+				"sections[]": ["work", "artists", "reviews", "info", "inquiry"],
+			});
+		} finally {
+			env.set("REVIEWS_ENABLED", true);
+		}
+		const stored = await inTenant(tenant, async () =>
+			sectionsOf((await Tenant.findOrFail(tenant.id)).storefrontSections),
+		);
+		assert.deepEqual(stored, [
+			"work",
+			"artists",
+			"fresh_ink",
+			"reviews",
+			"info",
+			"inquiry",
+		]);
+		const props = (await lookPage(client, owner, tenant)).inertiaProps;
+		assert.deepEqual(props.look.sections, stored, "on again: as they were");
 	});
 
 	test("a stored list from before Recent work shows without it", async ({
@@ -164,6 +222,8 @@ test.group("Settings, Page look: the page (TAT-56)", (group) => {
 			"work",
 			"artists",
 			"flash",
+			"fresh_ink",
+			"reviews",
 			"info",
 			"inquiry",
 		]);
@@ -479,7 +539,7 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 			const row = await reload(tenant);
 			assert.equal(
 				row.storefrontSections,
-				"work,artists,flash,info,inquiry",
+				"work,artists,flash,fresh_ink,reviews,info,inquiry",
 				name,
 			);
 			assert.equal(row.brandFont, "eczar", name);
@@ -557,7 +617,7 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 			assert.isNull(row.brandAccentDark, name);
 			assert.equal(
 				row.storefrontSections,
-				"work,artists,flash,info,inquiry",
+				"work,artists,flash,fresh_ink,reviews,info,inquiry",
 				name,
 			);
 		}
@@ -597,7 +657,7 @@ test.group("Settings, Page look: saving (TAT-56)", (group) => {
 		);
 		assert.equal(
 			(await reload(tenant)).storefrontSections,
-			"work,artists,flash,info,inquiry",
+			"work,artists,flash,fresh_ink,reviews,info,inquiry",
 		);
 	});
 

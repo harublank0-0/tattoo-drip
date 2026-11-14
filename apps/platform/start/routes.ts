@@ -932,6 +932,19 @@ router
 					.where("design", router.matchers.uuid())
 					.use(middleware.publicCache())
 					.as("api.v1.flash.show");
+				// What the studio's page shows of its clients' reviews and Fresh ink
+				// (Reviews and Fresh ink, slice 3): what the client allowed there and
+				// TattooDrip has not taken down, newest first, a page at a time. Only
+				// the query string is read. While REVIEWS_ENABLED is off both are
+				// empty pages, never an error, so the page's sections render nothing.
+				router
+					.get("/reviews", [controllers.PublicStudioReviews, "index"])
+					.use(middleware.publicCache())
+					.as("api.v1.reviews.index");
+				router
+					.get("/fresh-ink", [controllers.PublicStudioReviews, "freshInk"])
+					.use(middleware.publicCache())
+					.as("api.v1.fresh_ink.index");
 				// The intake (TAT-51). intakeGuard counts the address, checks the
 				// bot challenge and counts the studio before its multipart body is
 				// read (TAT-55); the controller does the honeypot and the phone count.

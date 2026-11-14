@@ -10,8 +10,10 @@ import type InquiryReceiptTransformer from '#transformers/inquiry_receipt_transf
 import type PublicArtistTransformer from '#transformers/public_artist_transformer'
 import type PublicDepositTransformer from '#transformers/public_deposit_transformer'
 import type PublicFlashDesignTransformer from '#transformers/public_flash_design_transformer'
+import type PublicFreshInkPostTransformer from '#transformers/public_fresh_ink_post_transformer'
 import type PublicGalleryPhotoTransformer from '#transformers/public_gallery_photo_transformer'
 import type PublicReviewPageTransformer from '#transformers/public_review_page_transformer'
+import type PublicStudioReviewTransformer from '#transformers/public_studio_review_transformer'
 import type PublicStudioTransformer from '#transformers/public_studio_transformer'
 import type PublicStyleTransformer from '#transformers/public_style_transformer'
 import type UserTransformer from '#transformers/user_transformer'
@@ -34,6 +36,10 @@ export namespace Data {
   export namespace PublicFlashDesign {
     export type Variants = InferVariants<PublicFlashDesignTransformer>
   }
+  export type PublicFreshInkPost = InferData<PublicFreshInkPostTransformer>
+  export namespace PublicFreshInkPost {
+    export type Variants = InferVariants<PublicFreshInkPostTransformer>
+  }
   export type PublicGalleryPhoto = InferData<PublicGalleryPhotoTransformer>
   export namespace PublicGalleryPhoto {
     export type Variants = InferVariants<PublicGalleryPhotoTransformer>
@@ -41,6 +47,10 @@ export namespace Data {
   export type PublicReviewPage = InferData<PublicReviewPageTransformer>
   export namespace PublicReviewPage {
     export type Variants = InferVariants<PublicReviewPageTransformer>
+  }
+  export type PublicStudioReview = InferData<PublicStudioReviewTransformer>
+  export namespace PublicStudioReview {
+    export type Variants = InferVariants<PublicStudioReviewTransformer>
   }
   export type PublicStudio = InferData<PublicStudioTransformer>
   export namespace PublicStudio {
