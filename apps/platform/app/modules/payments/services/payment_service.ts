@@ -13,6 +13,7 @@ import {
 	settleableDeposit,
 } from "#modules/payments/ledger";
 import DepositOutcome from "#modules/payments/models/deposit_outcome";
+import GatewayPayment from "#modules/payments/models/gateway_payment";
 import Payment, { type DeskKind } from "#modules/payments/models/payment";
 import type { PaymentMethodKind } from "#modules/payments/models/payment_method";
 import { FINISHED_STATUSES, owed } from "#modules/projects/finish";
@@ -218,6 +219,33 @@ export default class PaymentService {
 				depositSettleable > 0 &&
 				outcome === null,
 		};
+	}
+
+	/**
+	 * Which of the project's ledger rows PayBridgeNP made: the deposits it
+	 * recorded and the refunds made in PayBridgeNP (no member decided them,
+	 * so their verifier is null). The Payments card says so instead of
+	 * naming a member.
+	 */
+	async onlineIds(
+		tenant: TenantRef,
+		project: Pick<TattooProject, "id">,
+	): Promise<Set<string>> {
+		const rows = await GatewayPayment.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.whereNotNull("payment_id")
+			.select("payment_id")
+			.unionAll((query) =>
+				query
+					.from("gateway_refunds")
+					.where("tenant_id", tenant.id)
+					.where("project_id", project.id)
+					.whereNotNull("payment_id")
+					.select("payment_id"),
+			)
+			.pojo<{ payment_id: string }>();
+		return new Set(rows.map((row) => row.payment_id));
 	}
 
 	/** The payments of these projects (the client profile), newest first. */

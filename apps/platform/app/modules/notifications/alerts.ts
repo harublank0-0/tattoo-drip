@@ -3,13 +3,17 @@ import { firstName } from "#modules/notifications/messages";
 
 /**
  * What a staff alert is about: a new inquiry (TAT-52), a client's deposit
- * screenshot (TAT-88) or a Fresh ink post waiting for approval (Reviews and
- * Fresh ink, slice 2).
+ * screenshot (TAT-88), a Fresh ink post waiting for approval (Reviews and
+ * Fresh ink, slice 2), or a client's online payment through PayBridgeNP,
+ * recorded as a deposit (`online_deposit`) or held for review
+ * (`online_review`).
  */
 export const ALERT_KINDS = [
 	"new_inquiry",
 	"deposit_proof",
 	"fresh_ink",
+	"online_deposit",
+	"online_review",
 ] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
@@ -29,7 +33,7 @@ const ARTIST_TAB_COUNTED: readonly AlertKind[] = ["fresh_ink"];
  * The unread alert kinds the bell counts for `role` (TAT-107): only what no
  * tab counts, so no number shows twice. An owner's are all on the Inbox,
  * Today and Reviews; an artist's Fresh ink is on Reviews. A new kind counts
- * on the bell until a tab counts it. With reviews off (`reviewsOn` false)
+ * on the bell until a tab counts it: online payments do. With reviews off (`reviewsOn` false)
  * there is no Reviews tab, so an old Fresh ink alert counts on the bell.
  */
 export function bellKinds(role: string, reviewsOn = true): AlertKind[] {
@@ -225,6 +229,46 @@ export function paymentsCardPath(slug: string, projectId: string): string {
 	return `/t/${slug}/projects/${projectId}#${PAYMENTS_CARD}`;
 }
 
+/** The Transactions page: where a held online payment's alert opens (owners only). */
+export function transactionsPath(slug: string): string {
+	return `/t/${slug}/transactions`;
+}
+
+/**
+ * The online-payment email's first line: "Sita paid Black Needle's deposit
+ * online." (", for your project" when the member is the project's artist),
+ * or, held for review, "Sita paid Black Needle online, but the payment
+ * didn't match its checkout, so it wasn't recorded as a deposit.".
+ */
+export function onlinePaymentIntro({
+	clientName,
+	studioName,
+	held,
+	yourProject,
+}: {
+	clientName: string;
+	studioName: string;
+	held: boolean;
+	yourProject: boolean;
+}): string {
+	const who = emailName(clientName);
+	if (held) {
+		return `${who} paid ${studioName} online, but the payment didn't match its checkout, so it wasn't recorded as a deposit.`;
+	}
+	const whose = yourProject ? ", for your project" : "";
+	return `${who} paid ${studioName}'s deposit online${whose}.`;
+}
+
+/** The online-payment subject: no client data, because SendMailJob.failed() logs it. */
+export function onlinePaymentSubject(
+	studioName: string,
+	held: boolean,
+): string {
+	return held
+		? `Online payment to check for ${studioName}`
+		: `Deposit paid online for ${studioName}`;
+}
+
 type AlertLine = { title: string; detail: string };
 
 const LINES: Record<AlertKind, { owner: AlertLine; other: AlertLine }> = {
@@ -253,6 +297,26 @@ const LINES: Record<AlertKind, { owner: AlertLine; other: AlertLine }> = {
 		other: {
 			title: "Fresh ink to approve",
 			detail: "Open it on the Reviews page.",
+		},
+	},
+	online_deposit: {
+		owner: {
+			title: "Deposit paid online",
+			detail: "Recorded on the project's Payments card.",
+		},
+		other: {
+			title: "A deposit was paid online for your project",
+			detail: "It's on the project's Payments card.",
+		},
+	},
+	online_review: {
+		owner: {
+			title: "Online payment to check",
+			detail: "Held for review: open Transactions.",
+		},
+		other: {
+			title: "Online payment to check",
+			detail: "An owner checks it on Transactions.",
 		},
 	},
 };
@@ -346,14 +410,16 @@ export function alertTimeText(
 export type AlertTarget =
 	| { route: "tenant.inbox.show"; id: string }
 	| { route: "tenant.projects.show"; id: string; hash: typeof PAYMENTS_CARD }
-	| { route: "tenant.reviews.index" };
+	| { route: "tenant.reviews.index" }
+	| { route: "tenant.transactions.index" };
 
 /**
  * Where opening an alert goes (TAT-52 ruling 10, TAT-88 ruling 9): an
  * owner's new-inquiry alert opens its inquiry; a deposit-proof alert opens
  * its project at the Payments card, for any role (the project page applies
  * the member's access); a Fresh ink alert opens the Reviews page while
- * reviews are on. Anything
+ * reviews are on; an online deposit opens its project's Payments card, and
+ * an owner's held online payment opens Transactions. Anything
  * else stays on the list. Computed from the
  * row and the member's current role, never from the request.
  */
@@ -369,7 +435,10 @@ export function alertTarget(
 	if (alert.kind === "new_inquiry" && alert.inquiryId && role === "owner") {
 		return { route: "tenant.inbox.show", id: alert.inquiryId };
 	}
-	if (alert.kind === "deposit_proof" && alert.projectId) {
+	if (
+		(alert.kind === "deposit_proof" || alert.kind === "online_deposit") &&
+		alert.projectId
+	) {
 		return {
 			route: "tenant.projects.show",
 			id: alert.projectId,
@@ -380,6 +449,9 @@ export function alertTarget(
 	// own (any role); with reviews off that page is a 404: stay on the list.
 	if (alert.kind === "fresh_ink" && reviewsOn) {
 		return { route: "tenant.reviews.index" };
+	}
+	if (alert.kind === "online_review" && role === "owner") {
+		return { route: "tenant.transactions.index" };
 	}
 	return null;
 }

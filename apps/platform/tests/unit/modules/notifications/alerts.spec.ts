@@ -13,8 +13,11 @@ import {
 	inquiryIntro,
 	inquiryRecipients,
 	newInquirySubject,
+	onlinePaymentIntro,
+	onlinePaymentSubject,
 	paymentsCardPath,
 	proofIntro,
+	transactionsPath,
 } from "#modules/notifications/alerts";
 
 const KTM = "Asia/Kathmandu";
@@ -478,22 +481,31 @@ test.group("alert details (TAT-102)", () => {
 });
 
 test.group("bellKinds (TAT-107)", () => {
-	test("an owner's bell counts nothing a tab already counts: the Inbox has the inquiries, Today the screenshots", ({
+	test("an owner's bell counts nothing a tab already counts: the Inbox has the inquiries, Today the screenshots; online payments count on the bell", ({
 		assert,
 	}) => {
-		assert.deepEqual(bellKinds("owner"), []);
+		assert.deepEqual(bellKinds("owner"), ["online_deposit", "online_review"]);
 	});
 
 	test("an artist's bell counts every kind but Fresh ink, which their Reviews tab counts", ({
 		assert,
 	}) => {
-		assert.deepEqual(bellKinds("artist"), ["new_inquiry", "deposit_proof"]);
+		assert.deepEqual(bellKinds("artist"), [
+			"new_inquiry",
+			"deposit_proof",
+			"online_deposit",
+			"online_review",
+		]);
 	});
 
 	test("with reviews off there is no Reviews tab: Fresh ink counts on the bell again", ({
 		assert,
 	}) => {
-		assert.deepEqual(bellKinds("owner", false), ["fresh_ink"]);
+		assert.deepEqual(bellKinds("owner", false), [
+			"fresh_ink",
+			"online_deposit",
+			"online_review",
+		]);
 		assert.deepEqual(bellKinds("artist", false), [...ALERT_KINDS]);
 	});
 
@@ -503,5 +515,83 @@ test.group("bellKinds (TAT-107)", () => {
 		for (const role of ["constructor", "__proto__", "toString", ""]) {
 			assert.deepEqual(bellKinds(role), [...ALERT_KINDS], role);
 		}
+	});
+});
+
+test.group("online-payment alerts", () => {
+	const at = { inquiryId: null, projectId: "project-1" };
+
+	test("an online deposit opens its project's Payments card for any role", ({
+		assert,
+	}) => {
+		for (const role of ["owner", "artist"]) {
+			assert.deepEqual(
+				alertTarget({ kind: "online_deposit", ...at }, role),
+				{ route: "tenant.projects.show", id: "project-1", hash: "payments" },
+				role,
+			);
+		}
+	});
+
+	test("a held online payment opens Transactions for an owner only", ({
+		assert,
+	}) => {
+		assert.deepEqual(alertTarget({ kind: "online_review", ...at }, "owner"), {
+			route: "tenant.transactions.index",
+		});
+		assert.isNull(alertTarget({ kind: "online_review", ...at }, "artist"));
+	});
+
+	test("the list's fixed lines say what happened and where", ({ assert }) => {
+		assert.deepEqual(alertCopy("online_deposit", true), {
+			title: "Deposit paid online",
+			detail: "Recorded on the project's Payments card.",
+		});
+		assert.deepEqual(alertCopy("online_review", true), {
+			title: "Online payment to check",
+			detail: "Held for review: open Transactions.",
+		});
+	});
+
+	test("the email's first line names the client by first name, never more", ({
+		assert,
+	}) => {
+		const base = { clientName: "Sita Rai", studioName: "Black Needle" };
+		assert.equal(
+			onlinePaymentIntro({ ...base, held: false, yourProject: false }),
+			"Sita paid Black Needle's deposit online.",
+		);
+		assert.equal(
+			onlinePaymentIntro({ ...base, held: false, yourProject: true }),
+			"Sita paid Black Needle's deposit online, for your project.",
+		);
+		assert.equal(
+			onlinePaymentIntro({ ...base, held: true, yourProject: false }),
+			"Sita paid Black Needle online, but the payment didn't match its checkout, so it wasn't recorded as a deposit.",
+		);
+		assert.equal(
+			onlinePaymentIntro({
+				clientName: "evil.example.com",
+				studioName: "Black Needle",
+				held: false,
+				yourProject: false,
+			}),
+			"A client paid Black Needle's deposit online.",
+		);
+	});
+
+	test("the subjects carry no client data", ({ assert }) => {
+		assert.equal(
+			onlinePaymentSubject("Black Needle", false),
+			"Deposit paid online for Black Needle",
+		);
+		assert.equal(
+			onlinePaymentSubject("Black Needle", true),
+			"Online payment to check for Black Needle",
+		);
+		assert.equal(
+			transactionsPath("black-needle"),
+			"/t/black-needle/transactions",
+		);
 	});
 });

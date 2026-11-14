@@ -81,6 +81,7 @@ const card = (
 	isOwner = true,
 	proofUrls = new Map<string, string>(),
 	names = new Map<string, string | null>([[ASHA, "Asha Rai"]]),
+	online: ReadonlySet<string> = new Set(),
 ) =>
 	paymentsCard({
 		money: data,
@@ -88,6 +89,7 @@ const card = (
 		isOwner,
 		timezone: KTM,
 		names,
+		online,
 		proofUrls,
 		referenceCode: "7KQ2MX",
 	});
@@ -472,6 +474,42 @@ test.group("paymentsCard", () => {
 		assert.equal(
 			props.outcome.recorded?.recordedText,
 			"Recorded 18 Oct 2026 by an owner",
+		);
+	});
+
+	test("a deposit and a refund PayBridgeNP made read as online, not as a deleted account", ({
+		assert,
+	}) => {
+		const paid = payment({ method: "esewa", verifiedByUserId: null });
+		const refunded = payment({
+			kind: "refund",
+			amount: -100_000,
+			method: "esewa",
+			verifiedByUserId: null,
+		});
+		// The same null verifier at the desk is still a deleted account.
+		const desk = payment({ method: "esewa", verifiedByUserId: null });
+		const props = card(
+			money([refunded, desk, paid], quote(), "booked"),
+			"booked",
+			true,
+			new Map(),
+			new Map(),
+			new Set([paid.id, refunded.id]),
+		);
+		const row = (id: string) => props.rows.find((r) => r.id === id);
+
+		assert.equal(
+			row(paid.id)?.decisionText,
+			"Paid online through PayBridgeNP, 18 Oct 2026",
+		);
+		assert.equal(
+			row(refunded.id)?.decisionText,
+			"Refunded through PayBridgeNP, 18 Oct 2026",
+		);
+		assert.equal(
+			row(desk.id)?.decisionText,
+			"Recorded by a deleted account, 18 Oct 2026",
 		);
 	});
 

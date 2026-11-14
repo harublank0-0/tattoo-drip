@@ -3,10 +3,14 @@ import { inject } from "@adonisjs/core";
 import logger from "@adonisjs/core/services/logger";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
+import ConnectionToVerifyMail from "#modules/notifications/emails/connection_to_verify_mail";
 import { GatewayRuleError } from "#modules/payments/errors";
 import GatewayAccount from "#modules/payments/models/gateway_account";
 import type Tenant from "#modules/tenancy/models/tenant";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withTransaction } from "#services/db_context";
+import { sendMailInTransaction } from "#services/mail_in_transaction";
 import PaymentProviders, {
 	type GatewayApi,
 	keyHint,
@@ -43,7 +47,10 @@ export const STUDIO_WEBHOOK_PATH = "/api/v1/webhooks/paybridgenp/studios";
  */
 @inject()
 export default class GatewayAccountService {
-	constructor(private providers: PaymentProviders) {}
+	constructor(
+		private providers: PaymentProviders,
+		private tenancy: TenancyService,
+	) {}
 
 	/** The platform's setting: disabled, sandbox or live. */
 	mode() {
@@ -92,7 +99,9 @@ export default class GatewayAccountService {
 	/**
 	 * Connects the studio's own PayBridgeNP project. Replaces any previous
 	 * connection (which stays on record, disconnected). The new connection
-	 * waits for a platform admin's check before taking payments.
+	 * waits for a platform admin's check before taking payments; each
+	 * PLATFORM_ADMIN_EMAILS address is emailed in the same transaction
+	 * (ALERT_EMAILS off sends none).
 	 */
 	async connect(
 		tenant: TenantRef,
@@ -142,12 +151,40 @@ export default class GatewayAccountService {
 			row.providerWebhookId = endpoint.id.slice(0, 64);
 			row.webhookSecretSealed = sealSecret(endpoint.secret, sealBinding(row));
 			await row.save();
+			await this.tellAdmins(trx, tenant, row);
 			logger.info(
 				{ tenantId: tenant.id, accountId: row.id, mode },
 				"Studio payment connection added; waiting for a platform admin's check",
 			);
 			return row;
 		});
+	}
+
+	/** Emails each platform admin that `account` waits for their check. */
+	private async tellAdmins(
+		trx: TransactionClientContract,
+		tenant: TenantRef,
+		account: GatewayAccount,
+	): Promise<void> {
+		if (env.get("ALERT_EMAILS") === false) return;
+		const admins = env.get("PLATFORM_ADMIN_EMAILS");
+		if (admins.length === 0) return;
+		const studio = await this.tenancy.find(tenant.id);
+		if (!studio) return;
+		const url = new URL("/admin/payments", env.get("APP_URL")).toString();
+		for (const to of admins) {
+			await sendMailInTransaction(
+				new ConnectionToVerifyMail({
+					to,
+					studioName: studio.name,
+					merchantName: account.providerMerchantName,
+					projectName: account.providerProjectName,
+					mode: account.livemode ? "live" : "sandbox",
+					url,
+				}),
+				trx,
+			);
+		}
 	}
 
 	/** Stops online deposits for the studio; the connection stays on record. */
