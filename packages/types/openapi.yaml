@@ -2888,7 +2888,12 @@ components:
         date:
           type: string
           format: date
-          description: The day it was published on the studio's page, in the studio's timezone.
+          description: |
+            The day it was published (its public copies made), in the
+            studio's timezone. Not necessarily the day it first showed on
+            this page: a post taken off (by the studio, the client or
+            TattooDrip) and published again carries the later day, and a post
+            published for Discover first carries that day.
 
     Slot:
       type: object
