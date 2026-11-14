@@ -7,12 +7,18 @@ import {
 	decodeDiscoverCursor,
 } from "#modules/discovery/cursor";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import DiscoverReviewService, {
+	type DiscoverSubject,
+} from "#modules/discovery/services/discover_review_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import DiscoveryService from "#modules/discovery/services/discovery_service";
 import {
 	CITY_MESSAGE,
 	CURSOR_MESSAGE,
 	DISCOVER_PAGE_SIZE,
 	listDiscoverArtistsValidator,
+	listDiscoverFreshInkValidator,
+	listDiscoverProfilePageValidator,
 	listDiscoverSitemapValidator,
 	listDiscoverStudiosValidator,
 	listDiscoverTattoosValidator,
@@ -32,7 +38,10 @@ import { ApiException } from "#services/public_api_errors";
  */
 @inject()
 export default class DiscoverController {
-	constructor(private discovery: DiscoveryService) {}
+	constructor(
+		private discovery: DiscoveryService,
+		private reviews: DiscoverReviewService,
+	) {}
 
 	async studios(ctx: HttpContext) {
 		const query = await ctx.request.validateUsing(
@@ -127,6 +136,106 @@ export default class DiscoverController {
 
 	async tattoo({ params }: HttpContext) {
 		return { data: found(await this.discovery.tattoo(params.tattoo)) };
+	}
+
+	/**
+	 * Reviews and Fresh ink (slice 4): a profile's reviews with its rating
+	 * (only from 3) and its Fresh ink, a page each, newest first; the 404 of
+	 * the profile itself for one Discover does not show.
+	 */
+	async studioReviews(ctx: HttpContext) {
+		return this.profileReviews(ctx, {
+			kind: "studio",
+			slug: ctx.params.studio,
+		});
+	}
+
+	async studioArtistReviews(ctx: HttpContext) {
+		return this.profileReviews(ctx, {
+			kind: "studioArtist",
+			studio: ctx.params.studio,
+			artist: ctx.params.artist,
+		});
+	}
+
+	async independentArtistReviews(ctx: HttpContext) {
+		return this.profileReviews(ctx, {
+			kind: "independent",
+			slug: ctx.params.artist,
+		});
+	}
+
+	async studioFreshInk(ctx: HttpContext) {
+		return this.profileFreshInk(ctx, {
+			kind: "studio",
+			slug: ctx.params.studio,
+		});
+	}
+
+	async studioArtistFreshInk(ctx: HttpContext) {
+		return this.profileFreshInk(ctx, {
+			kind: "studioArtist",
+			studio: ctx.params.studio,
+			artist: ctx.params.artist,
+		});
+	}
+
+	async independentArtistFreshInk(ctx: HttpContext) {
+		return this.profileFreshInk(ctx, {
+			kind: "independent",
+			slug: ctx.params.artist,
+		});
+	}
+
+	/** The global Fresh ink feed: filtered by place and style, newest published first. */
+	async freshInk(ctx: HttpContext) {
+		const query = await ctx.request.validateUsing(
+			listDiscoverFreshInkValidator,
+			{ data: ctx.request.qs() },
+		);
+		checkCity(query);
+		const page = found(
+			await this.reviews.freshInk(null, {
+				country: query.country,
+				city: query.city,
+				style: query.style,
+				cursor: cursorOf(query.cursor, "newest"),
+				limit: query.limit ?? DISCOVER_PAGE_SIZE,
+			}),
+		);
+		return { data: page.items, nextCursor: page.nextCursor };
+	}
+
+	private async profileReviews(ctx: HttpContext, subject: DiscoverSubject) {
+		const query = await ctx.request.validateUsing(
+			listDiscoverProfilePageValidator,
+			{ data: ctx.request.qs() },
+		);
+		const page = found(
+			await this.reviews.reviews(subject, {
+				cursor: cursorOf(query.cursor, "newest"),
+				limit: query.limit ?? DISCOVER_PAGE_SIZE,
+			}),
+		);
+		return {
+			data: page.items,
+			nextCursor: page.nextCursor,
+			rating: page.rating,
+		};
+	}
+
+	private async profileFreshInk(ctx: HttpContext, subject: DiscoverSubject) {
+		const query = await ctx.request.validateUsing(
+			listDiscoverProfilePageValidator,
+			{ data: ctx.request.qs() },
+		);
+		const page = found(
+			await this.reviews.freshInk(subject, {
+				cursor: cursorOf(query.cursor, "newest"),
+				limit: query.limit ?? DISCOVER_PAGE_SIZE,
+			}),
+		);
+		return { data: page.items, nextCursor: page.nextCursor };
 	}
 
 	/**

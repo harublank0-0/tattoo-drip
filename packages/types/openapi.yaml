@@ -218,6 +218,101 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
+  /discover/studios/{studio}/reviews:
+    parameters:
+      - $ref: "#/components/parameters/DiscoverStudio"
+    get:
+      operationId: listDiscoverStudioReviews
+      tags: [Discover]
+      summary: A listed studio's client reviews on Discover, newest first
+      description: |
+        Reviews and Fresh ink (slice 4): the reviews the studio's clients
+        wrote through its review link and allowed on Discover, that the
+        client has not deleted and TattooDrip has not taken down, for a
+        tattoo by an artist the studio shows on Discover. Newest first,
+        never "best first", a page at a time. `rating` is the average and
+        count of all of them, only from 3 (ruling 10); below that it is null:
+        list the reviews without an average. A studio that unlists takes
+        every review off at once. While reviews are switched off on the
+        platform the answer is an empty page with a null `rating`. 404 like
+        `getDiscoverStudio`. Cacheable like every Discover read.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200": { $ref: "#/components/responses/DiscoverReviewsPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/studios/{studio}/fresh-ink:
+    parameters:
+      - $ref: "#/components/parameters/DiscoverStudio"
+    get:
+      operationId: listDiscoverStudioFreshInk
+      tags: [Discover]
+      summary: A listed studio's Fresh ink on Discover, newest first
+      description: |
+        Reviews and Fresh ink (slice 4): the studio's Fresh ink posts on
+        Discover (see `listDiscoverFreshInk`), newest published first, a page
+        at a time. 404 like `getDiscoverStudio`; an empty page while reviews
+        are switched off.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200": { $ref: "#/components/responses/DiscoverFreshInkPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/studios/{studio}/artists/{artist}/reviews:
+    parameters:
+      - $ref: "#/components/parameters/DiscoverStudio"
+      - $ref: "#/components/parameters/ArtistSlug"
+    get:
+      operationId: listDiscoverStudioArtistReviews
+      tags: [Discover]
+      summary: The reviews of an artist at a listed studio, newest first
+      description: |
+        As `listDiscoverStudioReviews`, for the reviews of tattoos by this
+        artist; `rating` is the artist's own, only from 3. 404 like
+        `getDiscoverStudioArtist`.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200": { $ref: "#/components/responses/DiscoverReviewsPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/studios/{studio}/artists/{artist}/fresh-ink:
+    parameters:
+      - $ref: "#/components/parameters/DiscoverStudio"
+      - $ref: "#/components/parameters/ArtistSlug"
+    get:
+      operationId: listDiscoverStudioArtistFreshInk
+      tags: [Discover]
+      summary: The Fresh ink of an artist at a listed studio, newest first
+      description: As `listDiscoverStudioFreshInk`, for this artist's tattoos. 404 like `getDiscoverStudioArtist`.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200": { $ref: "#/components/responses/DiscoverFreshInkPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
   /discover/artists:
     get:
       operationId: listDiscoverArtists
@@ -386,6 +481,83 @@ paths:
                   data: { $ref: "#/components/schemas/DiscoverTattooDetail" }
         "304": { $ref: "#/components/responses/NotModified" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/artists/{artist}/reviews:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        description: The independent artist's business slug (their studio page's)
+        schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$" }
+    get:
+      operationId: listDiscoverIndependentArtistReviews
+      tags: [Discover]
+      summary: A listed independent artist's reviews, newest first
+      description: |
+        As `listDiscoverStudioArtistReviews`, for the artist profile
+        `getDiscoverIndependentArtist` answers. 404 like it.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200": { $ref: "#/components/responses/DiscoverReviewsPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/artists/{artist}/fresh-ink:
+    parameters:
+      - name: artist
+        in: path
+        required: true
+        description: The independent artist's business slug (their studio page's)
+        schema: { type: string, pattern: "^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$" }
+    get:
+      operationId: listDiscoverIndependentArtistFreshInk
+      tags: [Discover]
+      summary: A listed independent artist's Fresh ink, newest first
+      description: As `listDiscoverStudioArtistFreshInk`, for the artist profile `getDiscoverIndependentArtist` answers. 404 like it.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200": { $ref: "#/components/responses/DiscoverFreshInkPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        default: { $ref: "#/components/responses/Error" }
+
+  /discover/fresh-ink:
+    get:
+      operationId: listDiscoverFreshInk
+      tags: [Discover]
+      summary: Discover's Fresh ink feed, newest first, a page at a time
+      description: |
+        Reviews and Fresh ink (slice 4): healed tattoos clients of listed
+        businesses posted through the studio's review link, that the studio
+        approved and the client allowed on Discover, published and not
+        taken down, by an artist shown on Discover. Newest published first
+        (never ranked). The filters combine as `listDiscoverTattoos`'s: one
+        that matches nothing is an empty page. Each post names its studio's
+        slug (its Discover profile) and carries the studio's booking link
+        and page, as an artwork does. A studio that unlists takes every post
+        off at once. While reviews are switched off on the platform the
+        answer is an empty page. Cacheable like every Discover read.
+      parameters:
+        - $ref: "#/components/parameters/DiscoverCountry"
+        - $ref: "#/components/parameters/DiscoverCity"
+        - $ref: "#/components/parameters/DiscoverStyle"
+        - $ref: "#/components/parameters/DiscoverCursor"
+        - $ref: "#/components/parameters/DiscoverLimit"
+      responses:
+        "200": { $ref: "#/components/responses/DiscoverFreshInkPage" }
+        "304": { $ref: "#/components/responses/NotModified" }
+        "422": { $ref: "#/components/responses/ValidationError" }
         "429": { $ref: "#/components/responses/RateLimited" }
         default: { $ref: "#/components/responses/Error" }
 
@@ -1696,6 +1868,39 @@ components:
       schema: { type: integer, minimum: 0 }
 
   responses:
+    DiscoverReviewsPage:
+      description: A page of reviews, and the average from 3
+      headers:
+        Cache-Control: { $ref: "#/components/headers/CacheControl" }
+        ETag: { $ref: "#/components/headers/ETag" }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, nextCursor, rating]
+            additionalProperties: false
+            properties:
+              data: { type: array, maxItems: 48, items: { $ref: "#/components/schemas/DiscoverReview" } }
+              nextCursor: { $ref: "#/components/schemas/DiscoverNextCursor" }
+              rating:
+                description: |
+                  The average and count of every review this list holds (not
+                  just this page), the same on every page; null below 3.
+                oneOf: [{ $ref: "#/components/schemas/ReviewRating" }, { type: "null" }]
+    DiscoverFreshInkPage:
+      description: A page of Fresh ink posts
+      headers:
+        Cache-Control: { $ref: "#/components/headers/CacheControl" }
+        ETag: { $ref: "#/components/headers/ETag" }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, nextCursor]
+            additionalProperties: false
+            properties:
+              data: { type: array, maxItems: 48, items: { $ref: "#/components/schemas/DiscoverFreshInkPost" } }
+              nextCursor: { $ref: "#/components/schemas/DiscoverNextCursor" }
     ReviewPageResponse:
       description: The review page as it now is
       headers:
@@ -2840,9 +3045,10 @@ components:
     ReviewRating:
       type: object
       description: |
-        The studio's average rating and how many reviews it comes from
-        (`listReviews`): only from 3 reviews shown on its page. Show it as
-        "4.7 from 12 reviews".
+        The average rating and how many reviews it comes from: a studio's
+        on its own page (`listReviews`, from the reviews shown there), a
+        studio's or an artist's on Discover (from the reviews Discover shows
+        of them). Only from 3 reviews. Show it as "4.7 from 12 reviews".
       required: [average, count]
       additionalProperties: false
       properties:
@@ -3377,3 +3583,114 @@ components:
         which the studio page passes to `createInquiry` as `referral`. Link
         to it as it is.
 
+    DiscoverReview:
+      type: object
+      description: |
+        A client's review on Discover (Reviews and Fresh ink, slice 4). Every
+        property is always there. All text is plain text: render it as text,
+        never as markup, and keep its line breaks. Never the client's full
+        name, phone, email or any id of theirs.
+      required: [id, rating, body, shownName, date, artist, studio, reply]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The review's own id (a key for lists).
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Whole stars. Say it in words too, such as "4 out of 5".
+        body: { type: string, minLength: 20, maxLength: 2000, description: The client's own words. }
+        shownName:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: The name the client chose to show ("Sita R.").
+          examples: [Sita R.]
+        date: { type: string, format: date, description: "The day the client wrote it, in the studio's timezone." }
+        artist:
+          type: object
+          description: The artist who made the tattoo (always shown on Discover).
+          required: [id, slug, name]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            slug: { type: string }
+            name: { type: string }
+        studio: { $ref: "#/components/schemas/DiscoverStudioRef" }
+        reply:
+          description: The studio's public reply, or null when it has none or TattooDrip took it down.
+          oneOf:
+            - type: object
+              required: [body, date]
+              additionalProperties: false
+              properties:
+                body: { type: string, minLength: 1, maxLength: 1000 }
+                date: { type: string, format: date, description: "The day the studio last wrote it, in its timezone." }
+            - type: "null"
+
+    DiscoverFreshInkPost:
+      type: object
+      description: |
+        A Fresh ink post on Discover (Reviews and Fresh ink, slice 4): a
+        healed tattoo a client posted, shaped like `FreshInkPost` (its main
+        photo, always a photo, with its other photos and ready videos in
+        `angles`; only the public copies), with the artist's `id`, the
+        studio (its `slug` is its Discover profile's), the studio's place,
+        and the booking destination fields an artwork has: `bookingUrl` (the
+        studio site's `/book` naming the artist, with Discover's referral)
+        and `storefrontUrl` (the studio's own page). All text is plain text.
+        Never the client's full name, phone, email or any id of theirs.
+      required: [id, url, width, height, alt, variants, angles, shownName, caption, styles, placement, date, artist, studio, location, storefrontUrl, bookingUrl]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: The post's own id (a key for lists). }
+        url: { type: string, format: uri, description: Public and absolute. }
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        alt:
+          type: [string, "null"]
+          maxLength: 200
+          description: A description of the main photo, one line of plain text, or null.
+        variants:
+          type: array
+          maxItems: 8
+          description: Smaller copies, narrowest first (as `FreshInkPost`).
+          items: { $ref: "#/components/schemas/ImageVariant" }
+        angles:
+          type: array
+          maxItems: 7
+          description: The post's other photos and ready videos, in the client's order. Skip an item whose `kind` you do not know.
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/PhotoAngle"
+              - $ref: "#/components/schemas/VideoAngle"
+            discriminator:
+              propertyName: kind
+              mapping:
+                photo: "#/components/schemas/PhotoAngle"
+                video: "#/components/schemas/VideoAngle"
+        shownName: { type: string, minLength: 1, maxLength: 40, examples: [Sita R.] }
+        caption: { type: [string, "null"], maxLength: 280, description: "The client's caption, or null." }
+        styles:
+          type: array
+          maxItems: 3
+          description: The post's styles from the platform's list; [] when none.
+          items: { $ref: "#/components/schemas/TattooStyle" }
+        placement: { type: [string, "null"], maxLength: 120, description: "Where it is on the body, in the client's words, or null." }
+        date: { type: string, format: date, description: "The day it was published (its public copies made), in the studio's timezone." }
+        artist:
+          type: object
+          required: [id, slug, name]
+          additionalProperties: false
+          properties:
+            id: { type: string, format: uuid }
+            slug: { type: string }
+            name: { type: string }
+        studio: { $ref: "#/components/schemas/DiscoverStudioRef" }
+        location:
+          oneOf: [{ $ref: "#/components/schemas/DiscoverLocation" }, { type: "null" }]
+        storefrontUrl: { type: string, format: uri, description: "The studio's own page" }
+        bookingUrl: { $ref: "#/components/schemas/DiscoverBookingUrl" }

@@ -1044,6 +1044,30 @@ const routes = {
     tokens: [{"old":"/api/v1/discover/studios/:studio/artists/:artist","type":0,"val":"api","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist","type":0,"val":"studios","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist","type":1,"val":"studio","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist","type":0,"val":"artists","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist","type":1,"val":"artist","end":""}],
     types: placeholder as Registry['api.v1.discover.studios.artists.show']['types'],
   },
+  'api.v1.discover.studios.reviews.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/discover/studios/:studio/reviews',
+    tokens: [{"old":"/api/v1/discover/studios/:studio/reviews","type":0,"val":"api","end":""},{"old":"/api/v1/discover/studios/:studio/reviews","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/studios/:studio/reviews","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/studios/:studio/reviews","type":0,"val":"studios","end":""},{"old":"/api/v1/discover/studios/:studio/reviews","type":1,"val":"studio","end":""},{"old":"/api/v1/discover/studios/:studio/reviews","type":0,"val":"reviews","end":""}],
+    types: placeholder as Registry['api.v1.discover.studios.reviews.index']['types'],
+  },
+  'api.v1.discover.studios.fresh_ink.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/discover/studios/:studio/fresh-ink',
+    tokens: [{"old":"/api/v1/discover/studios/:studio/fresh-ink","type":0,"val":"api","end":""},{"old":"/api/v1/discover/studios/:studio/fresh-ink","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/studios/:studio/fresh-ink","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/studios/:studio/fresh-ink","type":0,"val":"studios","end":""},{"old":"/api/v1/discover/studios/:studio/fresh-ink","type":1,"val":"studio","end":""},{"old":"/api/v1/discover/studios/:studio/fresh-ink","type":0,"val":"fresh-ink","end":""}],
+    types: placeholder as Registry['api.v1.discover.studios.fresh_ink.index']['types'],
+  },
+  'api.v1.discover.studios.artists.reviews.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/discover/studios/:studio/artists/:artist/reviews',
+    tokens: [{"old":"/api/v1/discover/studios/:studio/artists/:artist/reviews","type":0,"val":"api","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/reviews","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/reviews","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/reviews","type":0,"val":"studios","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/reviews","type":1,"val":"studio","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/reviews","type":0,"val":"artists","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/reviews","type":1,"val":"artist","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/reviews","type":0,"val":"reviews","end":""}],
+    types: placeholder as Registry['api.v1.discover.studios.artists.reviews.index']['types'],
+  },
+  'api.v1.discover.studios.artists.fresh_ink.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/discover/studios/:studio/artists/:artist/fresh-ink',
+    tokens: [{"old":"/api/v1/discover/studios/:studio/artists/:artist/fresh-ink","type":0,"val":"api","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/fresh-ink","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/fresh-ink","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/fresh-ink","type":0,"val":"studios","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/fresh-ink","type":1,"val":"studio","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/fresh-ink","type":0,"val":"artists","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/fresh-ink","type":1,"val":"artist","end":""},{"old":"/api/v1/discover/studios/:studio/artists/:artist/fresh-ink","type":0,"val":"fresh-ink","end":""}],
+    types: placeholder as Registry['api.v1.discover.studios.artists.fresh_ink.index']['types'],
+  },
   'api.v1.discover.artists.index': {
     methods: ["GET","HEAD"],
     pattern: '/api/v1/discover/artists',
@@ -1055,6 +1079,24 @@ const routes = {
     pattern: '/api/v1/discover/artists/:artist',
     tokens: [{"old":"/api/v1/discover/artists/:artist","type":0,"val":"api","end":""},{"old":"/api/v1/discover/artists/:artist","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/artists/:artist","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/artists/:artist","type":0,"val":"artists","end":""},{"old":"/api/v1/discover/artists/:artist","type":1,"val":"artist","end":""}],
     types: placeholder as Registry['api.v1.discover.artists.show']['types'],
+  },
+  'api.v1.discover.artists.reviews.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/discover/artists/:artist/reviews',
+    tokens: [{"old":"/api/v1/discover/artists/:artist/reviews","type":0,"val":"api","end":""},{"old":"/api/v1/discover/artists/:artist/reviews","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/artists/:artist/reviews","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/artists/:artist/reviews","type":0,"val":"artists","end":""},{"old":"/api/v1/discover/artists/:artist/reviews","type":1,"val":"artist","end":""},{"old":"/api/v1/discover/artists/:artist/reviews","type":0,"val":"reviews","end":""}],
+    types: placeholder as Registry['api.v1.discover.artists.reviews.index']['types'],
+  },
+  'api.v1.discover.artists.fresh_ink.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/discover/artists/:artist/fresh-ink',
+    tokens: [{"old":"/api/v1/discover/artists/:artist/fresh-ink","type":0,"val":"api","end":""},{"old":"/api/v1/discover/artists/:artist/fresh-ink","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/artists/:artist/fresh-ink","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/artists/:artist/fresh-ink","type":0,"val":"artists","end":""},{"old":"/api/v1/discover/artists/:artist/fresh-ink","type":1,"val":"artist","end":""},{"old":"/api/v1/discover/artists/:artist/fresh-ink","type":0,"val":"fresh-ink","end":""}],
+    types: placeholder as Registry['api.v1.discover.artists.fresh_ink.index']['types'],
+  },
+  'api.v1.discover.fresh_ink.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/api/v1/discover/fresh-ink',
+    tokens: [{"old":"/api/v1/discover/fresh-ink","type":0,"val":"api","end":""},{"old":"/api/v1/discover/fresh-ink","type":0,"val":"v1","end":""},{"old":"/api/v1/discover/fresh-ink","type":0,"val":"discover","end":""},{"old":"/api/v1/discover/fresh-ink","type":0,"val":"fresh-ink","end":""}],
+    types: placeholder as Registry['api.v1.discover.fresh_ink.index']['types'],
   },
   'api.v1.discover.tattoos.index': {
     methods: ["GET","HEAD"],

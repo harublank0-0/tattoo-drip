@@ -161,7 +161,12 @@ const AT_TEXT = (column: string) =>
  * then id) and the order, all fixed SQL. `name` is the name in lower case,
  * `time` the column of `newest`.
  */
-function sortSql(sort: DiscoverSort, name: string, time: string, id: string) {
+export function sortSql(
+	sort: DiscoverSort,
+	name: string,
+	time: string,
+	id: string,
+) {
 	switch (sort) {
 		case "name":
 			return {
@@ -188,7 +193,7 @@ const STUDIO_COLUMNS = `s.id, s.slug, s.type, s.name, s.intro, s.timezone, s.pla
 	s.cover_image_key, s.cover_image_width, s.cover_image_height,
 	s.logo_image_key, s.logo_image_width, s.logo_image_height, s.logo_tile, s.logo_icon_key,
 	s.instagram_url, s.facebook_url, s.tiktok_url, s.website_url, s.listed_at`;
-const ARTIST_COLUMNS = `a.id, a.studio_id, a.slug, a.name, a.bio, a.photo_key, a.photo_width,
+export const ARTIST_COLUMNS = `a.id, a.studio_id, a.slug, a.name, a.bio, a.photo_key, a.photo_width,
 	a.photo_height, a.styles, a.accepting_inquiries, a.instagram_url, a.facebook_url,
 	a.tiktok_url, a.created_at,
 	s.slug as studio_slug, s.name as studio_name, s.type as studio_type, s.place_id`;
@@ -200,7 +205,7 @@ const TATTOO_FROM = `discovery.artworks w
 	join discovery.artists a on a.id = w.artist_id
 	join discovery.studios s on s.id = w.studio_id`;
 
-type StudioRow = {
+export type StudioRow = {
 	id: string;
 	slug: string;
 	type: "studio" | "independent";
@@ -222,7 +227,7 @@ type StudioRow = {
 	website_url: string | null;
 	cursor_value?: string;
 };
-type ArtistRow = {
+export type ArtistRow = {
 	id: string;
 	studio_id: string;
 	slug: string;
@@ -262,10 +267,10 @@ type TattooRow = {
 };
 
 /** One transaction's connection: its queries run one after another, never in parallel. */
-type Client = TransactionClientContract;
+export type Client = TransactionClientContract;
 
 /** The SQL condition and bindings of a location filter on `s.place_id`. */
-function placeFilter({ country, city }: LocationFilter): {
+export function placeFilter({ country, city }: LocationFilter): {
 	sql: string;
 	bindings: unknown[];
 } {
@@ -822,7 +827,7 @@ export default class DiscoveryService {
 	}
 }
 
-type PlaceRow = {
+export type PlaceRow = {
 	id: string;
 	country_code: string;
 	slug: string;
@@ -830,7 +835,7 @@ type PlaceRow = {
 	region: string | null;
 };
 
-async function rowsOf<T>(
+export async function rowsOf<T>(
 	client: Client,
 	sql: string,
 	bindings: unknown[],
@@ -839,7 +844,7 @@ async function rowsOf<T>(
 }
 
 /** A listed business of `type` by its current slug, else by an old one (tenant_for_slug). */
-async function studioBySlug(
+export async function studioBySlug(
 	client: Client,
 	slug: string,
 	type: "studio" | "independent",
@@ -867,7 +872,7 @@ async function studioBySlug(
 	return row ?? null;
 }
 
-async function placesOf(
+export async function placesOf(
 	client: Client,
 	ids: (string | null)[],
 ): Promise<Map<string, PlaceRow>> {
@@ -922,7 +927,7 @@ function locationFromRow(row: PlaceRow): DiscoverLocation {
 	};
 }
 
-function locationOf(
+export function locationOf(
 	placeId: string | null,
 	places: Map<string, PlaceRow>,
 ): DiscoverLocation | null {
@@ -930,7 +935,7 @@ function locationOf(
 	return place ? locationFromRow(place) : null;
 }
 
-function studioRef(row: {
+export function studioRef(row: {
 	studio_slug: string;
 	studio_name: string;
 	studio_type: "studio" | "independent";
@@ -970,7 +975,7 @@ function sitemapPage<R extends { id: string }, T>(
 }
 
 /** The cursor after a page of `limit` rows when one more row came back. */
-function nextCursorOf(
+export function nextCursorOf(
 	rows: { id: string; cursor_value?: string }[],
 	limit: number,
 	sort: DiscoverSort,

@@ -155,7 +155,8 @@ test.group("Public API routes", () => {
 		const routes = allRoutes().filter(({ pattern }) =>
 			pattern.startsWith("/api/v1/discover/"),
 		);
-		assert.lengthOf(routes, 11);
+		// D03–D10: 11; Reviews and Fresh ink (slice 4): 7 more.
+		assert.lengthOf(routes, 18);
 
 		for (const { pattern, methods, named } of routes) {
 			assert.deepEqual(methods, ["GET"], pattern);
