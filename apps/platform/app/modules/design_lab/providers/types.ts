@@ -9,6 +9,11 @@ import type { OrientationKey } from "#modules/design_lab/prompt";
 
 export type SubmitRequest = {
 	prompt: string;
+	/**
+	 * An opaque, stable id for the studio member asking (never a name or an
+	 * email), for providers that take one for abuse handling.
+	 */
+	endUser?: string;
 	orientation: OrientationKey;
 	width: number;
 	height: number;
@@ -27,7 +32,12 @@ export type Submitted = {
 export type PollResult =
 	| { state: "pending"; providerStatus: string }
 	| { state: "ready"; sampleUrl: string; seed?: number }
-	| { state: "moderated"; code: "request_moderated" | "content_moderated" }
+	| {
+			state: "moderated";
+			code: "request_moderated" | "content_moderated";
+			/** The provider's category names (e.g. "Violence"), when it gives them. */
+			reasons?: string[];
+	  }
 	| { state: "error"; providerStatus: string }
 	| { state: "not_found" };
 

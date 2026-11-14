@@ -79,7 +79,27 @@ type Generation = {
 	} | null;
 };
 
-type Notice = { title: string; points: string[]; acknowledgement: string };
+type Notice = {
+	title: string;
+	points: string[];
+	acknowledgement: string;
+	policyUrl: string | null;
+};
+
+/** The provider's usage policy, linked under the notice's points. */
+function PolicyLink({ url }: { url: string | null }) {
+	if (!url) return null;
+	return (
+		<a
+			href={url}
+			target="_blank"
+			rel="noreferrer"
+			className="-my-3 flex min-h-11 w-fit items-center underline underline-offset-4"
+		>
+			Read BFL's usage policy
+		</a>
+	);
+}
 
 const selectClass =
 	"min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm lg:min-h-9";
@@ -621,6 +641,7 @@ function GenerateForm({
 									<li key={point}>{point}</li>
 								))}
 							</ul>
+							<PolicyLink url={notice.policyUrl} />
 							<Field
 								orientation="horizontal"
 								data-invalid={errors.acknowledged ? true : undefined}
@@ -655,6 +676,7 @@ function GenerateForm({
 									<li key={point}>{point}</li>
 								))}
 							</ul>
+							<PolicyLink url={notice.policyUrl} />
 						</details>
 					)}
 

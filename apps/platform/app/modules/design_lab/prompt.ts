@@ -201,6 +201,35 @@ export function personalDataProblem(text: string): string | null {
 	return null;
 }
 
+/**
+ * TattooDrip's own content screen (BFL's API terms, section 5: screen inputs
+ * before they are sent), checked on all of a request's text together. It is
+ * narrow on purpose: tattoo concepts may be dark, nude or violent art, and
+ * BFL's safety filters still judge every request. Refused here: explicit
+ * sexual content, and anything that puts minors next to sexual or violent
+ * words (the usage policy's minors rule). The words are matched whole.
+ */
+const EXPLICIT =
+	/\b(?:porn\w*|nsfw|intercourse|sex\s+acts?|explicit\s+sex\w*|genitals?|genitalia)\b/i;
+const MINORS =
+	/\b(?:child|children|kids?|minors?|teens?|teenagers?|under-?age|preteens?|toddlers?|schoolgirls?|schoolboys?|lol(?:i|ita)|(?:[1-9]|1[0-7])[\s-]?(?:years?|yrs?)[\s-]?old)\b/i;
+const SEXUAL =
+	/\b(?:nude|naked|nudity|sexy|sexual\w*|erotic\w*|seductive|lingerie|topless|fetish\w*|sensual)\b/i;
+const HARM =
+	/\b(?:gore|gory|mutilat\w*|tortur\w*|abus\w*|dismember\w*|beaten|murder\w*|bloody|wounded)\b/i;
+
+export const POLICY_MESSAGE =
+	"This request can't be generated: it falls under the image service's usage policy (explicit sexual content, or minors with sexual or violent content).";
+
+/** True when the request's words fall under TattooDrip's content screen. */
+export function policyProblem(
+	...texts: (string | null | undefined)[]
+): boolean {
+	const text = texts.filter(Boolean).join(" \n ");
+	if (EXPLICIT.test(text)) return true;
+	return MINORS.test(text) && (SEXUAL.test(text) || HARM.test(text));
+}
+
 /** One line of text: newlines and runs of whitespace become one space. */
 export const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 

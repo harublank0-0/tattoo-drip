@@ -8,8 +8,10 @@ import {
 	type GenerationInputs,
 	LIMITS,
 	oneLine,
+	POLICY_MESSAGE,
 	PROMPT_VERSION,
 	personalDataProblem,
+	policyProblem,
 } from "#modules/design_lab/prompt";
 import { canRetry } from "#modules/design_lab/rules";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
@@ -523,11 +525,15 @@ export default class DesignLabService {
 			request.style === "lettering"
 				? text("lettering", request.lettering, LIMITS.lettering.max)
 				: null;
+		const subject = text("subject", request.subject, LIMITS.subject.max);
+		if (policyProblem(concept, subject, customStyle, lettering)) {
+			throw new DesignLabRuleError("concept", POLICY_MESSAGE);
+		}
 		return {
 			concept,
 			style: request.style,
 			customStyle,
-			subject: text("subject", request.subject, LIMITS.subject.max),
+			subject,
 			lettering,
 			palette: request.palette,
 			orientation: request.orientation,

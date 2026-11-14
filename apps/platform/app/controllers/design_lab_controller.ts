@@ -347,8 +347,11 @@ export default class DesignLabController {
 		generation: DesignGeneration,
 		asset: DesignAsset | null,
 	) {
+		const reasons = generation.providerMeta?.moderationReasons ?? [];
 		const failure = generation.failureCode
-			? FAILURE_MESSAGES[generation.failureCode]
+			? reasons.length > 0
+				? `${FAILURE_MESSAGES[generation.failureCode]} Flagged for: ${reasons.join(", ")}.`
+				: FAILURE_MESSAGES[generation.failureCode]
 			: null;
 		return {
 			id: generation.id,

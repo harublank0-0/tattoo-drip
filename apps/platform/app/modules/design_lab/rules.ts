@@ -113,6 +113,8 @@ export type UsageStatus = (typeof USAGE_STATUSES)[number];
  */
 export type ProviderMeta = {
 	cost?: number;
+	/** The safety filter's category names on a moderated request (e.g. "Violence"). */
+	moderationReasons?: string[];
 	seed?: number;
 	providerStatus?: string;
 };

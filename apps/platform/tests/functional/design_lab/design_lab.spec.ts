@@ -20,6 +20,7 @@ import {
 	generateForm,
 	seedDesignLab,
 } from "#tests/helpers/design_lab";
+import { testImages } from "#tests/helpers/images";
 import {
 	artistIn,
 	inTenant,
@@ -156,6 +157,12 @@ test.group("AI Design Lab", (group) => {
 			);
 		}
 
+		// The provider's files, kept byte for byte (their provenance data too).
+		const delivered = [
+			await testImages.png(832, 1216),
+			await testImages.png(832, 1216),
+		];
+		designProvider.nextDownloads.push(...delivered);
 		for (const row of rows) {
 			const done = await drive(studio.tenant, row.id);
 			assert.equal(done.status, "completed");
@@ -183,7 +190,10 @@ test.group("AI Design Lab", (group) => {
 				asset.imageKey,
 				studio.tenant,
 			);
-			assert.isAbove(file.bytes.byteLength, 100);
+			assert.isTrue(
+				Buffer.from(file.bytes).equals(delivered[rows.indexOf(row)]),
+				"the stored concept is the provider's file as delivered",
+			);
 			const usage = await usageOf(studio.tenant, row.id);
 			assert.deepEqual(
 				usage.map((record) => [record.status, Number(record.actualCredits)]),
@@ -300,8 +310,18 @@ test.group("AI Design Lab", (group) => {
 		designProvider.nextPolls.push({
 			state: "moderated",
 			code: "content_moderated",
+			reasons: ["Violence"],
 		});
 		const moderated = await drive(studio.tenant, queued?.id ?? "");
+		const page = await client
+			.get(`/t/${studio.tenant.slug}/design-lab/${studio.designProject.id}`)
+			.loginAs(studio.artist)
+			.withInertia();
+		const shown = page.inertiaProps.generations.find(
+			(generation: { id: string }) => generation.id === moderated.id,
+		);
+		assert.include(shown.failure, "Flagged for: Violence.");
+		assert.isFalse(shown.canRetry);
 		assert.equal(moderated.status, "moderated");
 		assert.equal(moderated.failureCode, "content_moderated");
 		assert.deepEqual(
@@ -658,6 +678,11 @@ test.group("AI Design Lab", (group) => {
 			],
 			[{ subject: "see https://example.com/ref" }, "subject", "link"],
 			[{ concept: "A rose for @maya.ink" }, "concept", "social media handle"],
+			[
+				{ concept: "a nude figure", subject: "teenager" },
+				"concept",
+				"usage policy",
+			],
 		];
 		for (const [fields, field, message] of cases) {
 			const response = await client

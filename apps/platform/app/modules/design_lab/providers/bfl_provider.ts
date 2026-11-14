@@ -51,6 +51,9 @@ const DEFAULT_TIMEOUTS = { submit: 30_000, poll: 15_000, download: 30_000 };
 /** Models BFL sizes by `aspect_ratio` instead of `width` and `height`. */
 const ASPECT_RATIO_MODELS = /(?:^|-)(?:ultra|kontext)(?:-|$)/;
 
+/** FLUX.2 endpoints, which take `disable_pup` and `user` (BFL's API reference). */
+const FLUX2_MODELS = /^flux-2(?:-|$)/;
+
 export default class BflProvider implements DesignProvider {
 	readonly name = "bfl";
 	readonly model: string;
@@ -74,6 +77,12 @@ export default class BflProvider implements DesignProvider {
 			output_format: "png",
 			safety_tolerance: this.options.safetyTolerance ?? 2,
 		};
+		if (FLUX2_MODELS.test(this.model)) {
+			// FLUX.2 rewrites prompts by default ("prompt upsampling"): use the
+			// server's template exactly as built, and name the asker opaquely.
+			body.disable_pup = true;
+			if (request.endUser) body.user = request.endUser;
+		}
 		if (ASPECT_RATIO_MODELS.test(this.model)) {
 			body.aspect_ratio = request.aspectRatio;
 		} else {
@@ -152,10 +161,11 @@ export default class BflProvider implements DesignProvider {
 				};
 			}
 			case "Request Moderated":
-				return { state: "moderated", code: "request_moderated" };
+				return moderated("request_moderated", json.details);
 			case "Content Moderated":
-				return { state: "moderated", code: "content_moderated" };
+				return moderated("content_moderated", json.details);
 			case "Error":
+			case "Failed":
 				return { state: "error", providerStatus: status };
 			case "Task not found":
 				return { state: "not_found" };
@@ -237,6 +247,33 @@ export default class BflProvider implements DesignProvider {
 		}
 		return url;
 	}
+}
+
+/**
+ * A moderation result with BFL's category names from
+ * `details["Moderation Reasons"]`: short words only, at most five, so
+ * nothing else the provider sends reaches the page.
+ */
+function moderated(
+	code: "request_moderated" | "content_moderated",
+	details: unknown,
+): PollResult {
+	const raw =
+		details && typeof details === "object"
+			? (details as Record<string, unknown>)["Moderation Reasons"]
+			: undefined;
+	const reasons = Array.isArray(raw)
+		? raw
+				.filter(
+					(reason): reason is string =>
+						typeof reason === "string" &&
+						/^[A-Za-z][A-Za-z &/-]{0,39}$/.test(reason),
+				)
+				.slice(0, 5)
+		: [];
+	return reasons.length > 0
+		? { state: "moderated", code, reasons }
+		: { state: "moderated", code };
 }
 
 /** The last two labels of a host name ("api.bfl.ai" → "bfl.ai"). */

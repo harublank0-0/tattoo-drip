@@ -2,22 +2,30 @@ import type { DesignLabProvider } from "#services/design_lab_settings";
 
 /**
  * What the Design Lab tells a member before their first generation
- * (docs/design-lab.md, Privacy). One place, so the words change together.
- * The BFL wording summarises BFL's API terms and usage policy as TattooDrip
- * understood them when this was written; review it against the current
- * terms (https://bfl.ai/legal/flux-api-service-terms) before launch and
- * whenever they change.
+ * (docs/design-lab.md, Privacy and provider terms). One place, so the words
+ * change together. The BFL wording follows BFL's FLUX API Service Terms and
+ * FLUX Usage Policy as revised on 4 August 2026, checked against
+ * https://bfl.ai/legal/flux-api-service-terms and
+ * https://bfl.ai/legal/usage-policy: BFL takes a perpetual licence to inputs
+ * and outputs, including to train its models (section 2b); developers must
+ * screen inputs (section 5) and give end users rules at least as strict as
+ * the usage policy (section 7). Review it whenever those pages change.
  */
 export type ProviderNotice = {
 	title: string;
 	points: string[];
 	acknowledgement: string;
+	/** The provider's usage policy, which members agree to follow; null for the local preview. */
+	policyUrl: string | null;
 };
 
+export const BFL_USAGE_POLICY_URL = "https://bfl.ai/legal/usage-policy";
+
 const ALWAYS = [
-	"Results are AI concepts for you to review and redraw, not finished stencils or designs ready to tattoo.",
+	"Results are AI concepts for you to review and redraw, not finished stencils or designs ready to tattoo. They may not be unique: a concept can resemble existing work.",
 	"TattooDrip sends only your concept text and the options you pick. Client names, contact details, booking notes and photos are never sent.",
-	"Don't describe a real, identifiable person without their consent, never describe a minor, and leave out personal details.",
+	"Don't describe a real, identifiable person without their consent, never describe a minor in a sexual or harmful way, and leave out personal details.",
+	"Don't ask for another artist's design, a brand's logo or a copyrighted character: concepts must not infringe anyone's rights.",
 	"Concepts stay private to your studio unless you share them yourself.",
 ];
 
@@ -27,11 +35,13 @@ export function providerNotice(provider: DesignLabProvider): ProviderNotice {
 			title: "How generation works",
 			points: [
 				"Requests are processed by Black Forest Labs (BFL), the company behind FLUX, which makes the image from your description.",
-				"BFL handles what you send and the images it returns under its API terms and usage policy, and may keep them for a limited time to run and safeguard its service. Requests that break its usage policy are refused by its safety filters.",
+				"Under BFL's terms, BFL may keep and use what you send and the images it returns, including to train and improve its models. Don't send anything you aren't willing to share with BFL.",
+				"BFL's safety filters refuse requests and images that break its usage policy; TattooDrip also refuses clearly prohibited requests before sending them.",
 				...ALWAYS,
 			],
 			acknowledgement:
-				"I understand my requests are processed by BFL, and I won't include personal details, real people without consent, or minors.",
+				"I understand BFL processes and may use my requests and results, and I'll follow BFL's usage policy: no personal details, no real people without consent, nothing harmful involving minors, and no copied designs.",
+			policyUrl: BFL_USAGE_POLICY_URL,
 		};
 	}
 	return {
@@ -41,6 +51,7 @@ export function providerNotice(provider: DesignLabProvider): ProviderNotice {
 			...ALWAYS,
 		],
 		acknowledgement:
-			"I understand results are AI concepts for my review, and I won't include personal details, real people without consent, or minors.",
+			"I understand results are AI concepts for my review, and I won't include personal details, real people without consent, harmful content involving minors, or copied designs.",
+		policyUrl: null,
 	};
 }

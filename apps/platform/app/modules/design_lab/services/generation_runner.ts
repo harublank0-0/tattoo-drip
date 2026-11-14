@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { inject } from "@adonisjs/core";
 import encryption from "@adonisjs/core/services/encryption";
 import logger from "@adonisjs/core/services/logger";
@@ -27,6 +28,7 @@ import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withDbContext } from "#services/db_context";
 import { dispatchInTransaction } from "#services/queue";
+import env from "#start/env";
 
 type TenantRef = Pick<Tenant, "id">;
 
@@ -53,6 +55,18 @@ export const submitDelay = (tries: number) =>
 	Math.min(120_000, 5_000 * 2 ** Math.max(0, tries - 1));
 
 const sealPurpose = (generationId: string) => `design_polling:${generationId}`;
+
+/**
+ * The opaque id a provider may take for the member asking (BFL's `user`):
+ * an HMAC of the studio and member ids under APP_KEY, stable for a member
+ * and meaningless outside TattooDrip. Never a name or an email.
+ */
+export function endUserId(tenant: TenantRef, userId: string | null): string {
+	return createHmac("sha256", env.get("APP_KEY").release())
+		.update(`design_lab:${tenant.id}:${userId ?? "former-member"}`)
+		.digest("hex")
+		.slice(0, 32);
+}
 
 /** The polling URL as stored: encrypted with APP_KEY, bound to its generation. */
 export function sealPollingUrl(generationId: string, url: string): string {
@@ -88,7 +102,7 @@ type Outcome =
 			seed?: number;
 	  }
 	| { kind: "store_retry" }
-	| { kind: "failed"; code: FailureCode };
+	| { kind: "failed"; code: FailureCode; reasons?: string[] };
 
 /**
  * Drives one generation through the provider (docs/design-lab.md, Worker).
@@ -248,6 +262,7 @@ export default class GenerationRunner {
 				const submitted = await provider.submit(
 					{
 						prompt: buildPrompt(generation.inputs),
+						endUser: endUserId(tenant, generation.createdBy),
 						orientation: generation.inputs.orientation,
 						...size,
 					},
@@ -268,7 +283,11 @@ export default class GenerationRunner {
 			case "pending":
 				return { kind: "pending", providerStatus: result.providerStatus };
 			case "moderated":
-				return { kind: "failed", code: result.code };
+				return {
+					kind: "failed",
+					code: result.code,
+					...(result.reasons ? { reasons: result.reasons } : {}),
+				};
 			case "error":
 			case "not_found":
 				return { kind: "failed", code: "provider_error" };
@@ -277,7 +296,8 @@ export default class GenerationRunner {
 		}
 		try {
 			const bytes = await provider.download(result.sampleUrl, signal);
-			const image = await this.images.storeBytes(bytes, {
+			// As delivered: the provider's provenance data stays in the file.
+			const image = await this.images.storeOriginal(bytes, {
 				tenant,
 				purpose: "design_concept",
 			});
@@ -391,6 +411,7 @@ export default class GenerationRunner {
 				return true;
 			}
 			case "failed":
+				if (outcome.reasons) meta.moderationReasons = outcome.reasons;
 				row.providerMeta = meta;
 				await this.finish(tenant, row, outcome.code);
 				return true;

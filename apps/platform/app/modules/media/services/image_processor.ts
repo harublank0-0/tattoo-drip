@@ -45,7 +45,7 @@ const PNG_SIGNATURE = Buffer.from([
  * the data, so no other decoder (SVG, GIF, HEIF, PDF…) ever runs on an
  * upload.
  */
-function sniff(input: Buffer): "jpeg" | "png" | "webp" | null {
+export function sniff(input: Buffer): "jpeg" | "png" | "webp" | null {
 	if (
 		input.length >= 3 &&
 		input[0] === 0xff &&
@@ -75,6 +75,19 @@ function sniff(input: Buffer): "jpeg" | "png" | "webp" | null {
  * Throws InvalidImageError for anything it can't accept. At most
  * MAX_CONCURRENT_DECODES run at once; the format check comes before the wait.
  */
+/**
+ * An image's stored width and height from its header (no decode), after
+ * the same format check: for a file kept as delivered (AI Design Lab).
+ */
+export async function imageSize(
+	input: Buffer,
+): Promise<{ width: number; height: number }> {
+	if (!sniff(input)) throw new InvalidImageError(IMAGE_FORMAT_MESSAGE);
+	const { width, height } = await sharp(input).metadata();
+	if (!width || !height) throw new InvalidImageError(IMAGE_FORMAT_MESSAGE);
+	return { width, height };
+}
+
 export async function processImage(input: Buffer): Promise<ProcessedImage> {
 	const detected = sniff(input);
 	if (!detected) throw new InvalidImageError(IMAGE_FORMAT_MESSAGE);

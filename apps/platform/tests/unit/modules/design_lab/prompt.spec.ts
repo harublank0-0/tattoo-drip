@@ -5,6 +5,7 @@ import {
 	inputsLabel,
 	PROMPT_VERSION,
 	personalDataProblem,
+	policyProblem,
 	sizeOf,
 } from "#modules/design_lab/prompt";
 import {
@@ -74,6 +75,21 @@ test.group("Design Lab prompt", () => {
 		assert.isNull(personalDataProblem("1990-2024"));
 		assert.isNull(personalDataProblem("\u0915\u094D\u200D\u0937 lettering"));
 		assert.include(personalDataProblem("zero\u200Bwidth") ?? "", "hidden");
+	});
+
+	test("the content screen refuses explicit content and minors with sexual or violent words, and nothing else", ({
+		assert,
+	}) => {
+		assert.isTrue(policyProblem("explicit sex scene"));
+		assert.isTrue(policyProblem("porn star portrait"));
+		assert.isTrue(policyProblem("a nude figure", null, "teenager"));
+		assert.isTrue(policyProblem("a 12 year old being beaten"));
+		// Tattoo art that is dark, nude or about children stays allowed.
+		assert.isFalse(policyProblem("memorial piece for my child with roses"));
+		assert.isFalse(policyProblem("pin-up nude in traditional style"));
+		assert.isFalse(policyProblem("bloody dagger through a skull"));
+		assert.isFalse(policyProblem("hardcore punk lettering"));
+		assert.isFalse(policyProblem(null, undefined, ""));
 	});
 
 	test("sizes fit the hosted models' limits and labels read well", ({

@@ -81,6 +81,29 @@ test.group("BFL provider", () => {
 		});
 	});
 
+	test("FLUX.2 models get the prompt as written and the opaque end user; others don't", async ({
+		assert,
+	}) => {
+		const answer = () =>
+			json({ id: "r", polling_url: "https://api.bfl.ai/v1/get_result?id=r" });
+		const flux2 = stubFetch([answer()]);
+		await provider(flux2.fetcher, "flux-2-pro").submit({
+			...request,
+			endUser: "0123456789abcdef0123456789abcdef",
+		});
+		const body = JSON.parse(String(flux2.calls[0].init.body));
+		assert.isTrue(body.disable_pup);
+		assert.equal(body.user, "0123456789abcdef0123456789abcdef");
+		const older = stubFetch([answer()]);
+		await provider(older.fetcher, "flux-pro-1.1").submit({
+			...request,
+			endUser: "0123456789abcdef0123456789abcdef",
+		});
+		const olderBody = JSON.parse(String(older.calls[0].init.body));
+		assert.notProperty(olderBody, "disable_pup");
+		assert.notProperty(olderBody, "user");
+	});
+
 	test("models sized by aspect ratio get aspect_ratio", async ({ assert }) => {
 		const { calls, fetcher } = stubFetch([
 			json({ id: "r", polling_url: "https://api.bfl.ai/v1/get_result?id=r" }),
@@ -150,6 +173,14 @@ test.group("BFL provider", () => {
 			json({ status: "Request Moderated" }),
 			json({ status: "Content Moderated" }),
 			json({ status: "Error" }),
+			json({ status: "Failed" }),
+			json({
+				status: "Content Moderated",
+				result: null,
+				details: {
+					"Moderation Reasons": ["Violence", "<script>", 7, "Self Harm"],
+				},
+			}),
 			json({ status: "Task not found" }),
 			json({
 				status: "Ready",
@@ -177,6 +208,15 @@ test.group("BFL provider", () => {
 		assert.deepEqual(await bfl.poll(url), {
 			state: "error",
 			providerStatus: "Error",
+		});
+		assert.deepEqual(await bfl.poll(url), {
+			state: "error",
+			providerStatus: "Failed",
+		});
+		assert.deepEqual(await bfl.poll(url), {
+			state: "moderated",
+			code: "content_moderated",
+			reasons: ["Violence", "Self Harm"],
 		});
 		assert.deepEqual(await bfl.poll(url), { state: "not_found" });
 		assert.equal((await rejection(bfl.poll(url))).kind, "invalid_response");

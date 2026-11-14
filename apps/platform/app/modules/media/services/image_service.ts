@@ -5,11 +5,13 @@ import logger from "@adonisjs/core/services/logger";
 import drive from "@adonisjs/drive/services/main";
 import { ImageDeleteError } from "#modules/media/errors";
 import {
+	imageSize,
 	logoTile,
 	makeVariants,
 	type ProcessedImage,
 	type ProcessedVariant,
 	processImage,
+	sniff,
 	squareIcon,
 	type TileColours,
 } from "#modules/media/services/image_processor";
@@ -238,6 +240,50 @@ export default class ImageService {
 		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
 	): Promise<StoredImage> {
 		return this.storeProcessed(await processImage(bytes), { tenant, purpose });
+	}
+
+	/**
+	 * Stores generated artwork exactly as its provider delivered it (AI
+	 * Design Lab): the file keeps the provider's content provenance (C2PA
+	 * credentials or watermarks), which BFL's usage policy forbids removing,
+	 * so it is never re-encoded. It still passes processImage's checks (real
+	 * PNG or JPEG by its bytes, at most 40 MP), and the purpose's smaller
+	 * copies are made from that cleaned image, as for any upload. A WebP is
+	 * stored like an upload (re-encoded), since keys name only .png and .jpg.
+	 */
+	async storeOriginal(
+		bytes: Buffer,
+		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
+	): Promise<StoredImage> {
+		const format = sniff(bytes);
+		const processed = await processImage(bytes);
+		if (format !== "png" && format !== "jpeg") {
+			return this.storeProcessed(processed, { tenant, purpose });
+		}
+		const size = await imageSize(bytes);
+		const extension: ImageExtension = format === "png" ? "png" : "jpg";
+		const base = `tenants/${tenant.id}/${purpose}/${randomUUID()}`;
+		const widths = await this.storeVariants(
+			purpose,
+			base,
+			extension,
+			// The copies are made from the cleaned image, in the original's format.
+			{ ...processed, format },
+		);
+		const key = originalKey(base, extension, widths);
+		try {
+			await diskFor(purpose).put(key, bytes, {
+				contentType: `image/${format}`,
+				cacheControl: STORED_CACHE_CONTROL[IMAGE_PURPOSES[purpose].visibility],
+			});
+		} catch (error) {
+			await this.removeAll(purpose, [
+				key,
+				...widths.map((width) => variantKey(base, width, extension)),
+			]);
+			throw error;
+		}
+		return { key, ...size };
 	}
 
 	/** Writes an image processImage has accepted, with the purpose's copies. */
