@@ -73,7 +73,7 @@ export function FreshInkPage({
 	return (
 		<>
 			<PageHeader
-				eyebrow="Fresh ink"
+				eyebrow="Clients' healed tattoos"
 				title="Fresh ink"
 				intro={`Healed tattoos clients of listed studios in ${where} have posted, newest first. Each was posted through the studio's own review link, with the studio's approval. Open one to see every photo and video and who made it.`}
 				breadcrumbs={crumbs.freshInk()}
