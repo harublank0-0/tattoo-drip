@@ -40,10 +40,13 @@ export class DesignLabRuleError extends Error {
 }
 
 export const PROJECTS_PER_PAGE = 24;
-/** The generations a project page lists, newest first. */
-export const GENERATIONS_LISTED = 60;
-/** The images one design project may hold; keeps a page and its signed URLs bounded. */
-export const MAX_GENERATIONS_PER_PROJECT = 200;
+/**
+ * The generations one design project may hold, and so the page's whole list
+ * (every concept stays reachable). Keeps a page and its signed URLs bounded;
+ * a new project continues the idea.
+ */
+export const MAX_GENERATIONS_PER_PROJECT = 100;
+export const GENERATIONS_LISTED = MAX_GENERATIONS_PER_PROJECT;
 
 export type GenerationRequest = {
 	requestId: string;

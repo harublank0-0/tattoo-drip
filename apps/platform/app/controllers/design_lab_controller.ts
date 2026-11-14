@@ -28,6 +28,7 @@ import DesignLabService, {
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import DesignUsageService, {
 	AllowanceError,
+	UsageLimitError,
 } from "#modules/design_lab/services/design_usage_service";
 import {
 	designLabEnabled,
@@ -53,7 +54,10 @@ const pageNumber = (value: unknown) =>
 	typeof value === "string" && /^[1-9]\d{0,7}$/.test(value) ? Number(value) : 1;
 
 /** A service refusal as the form's field error (the request still fails and rolls back). */
-async function asFieldErrors<T>(work: () => Promise<T>) {
+async function asFieldErrors<T>(
+	work: () => Promise<T>,
+	usageField = "variations",
+) {
 	try {
 		return await work();
 	} catch (error) {
@@ -62,9 +66,14 @@ async function asFieldErrors<T>(work: () => Promise<T>) {
 				{ field: error.field, message: error.message, rule: "design_lab" },
 			]);
 		}
+		if (error instanceof UsageLimitError) {
+			throw new errors.E_VALIDATION_ERROR([
+				{ field: usageField, message: error.message, rule: "usage" },
+			]);
+		}
 		if (error instanceof AllowanceError) {
 			throw new errors.E_VALIDATION_ERROR([
-				{ field: "variations", message: error.message, rule: "allowance" },
+				{ field: usageField, message: error.message, rule: "allowance" },
 			]);
 		}
 		throw error;
@@ -265,8 +274,9 @@ export default class DesignLabController {
 		const { attempt } = await ctx.request.validateUsing(
 			retryGenerationValidator,
 		);
-		const retried = await asFieldErrors(() =>
-			this.lab.retry(tenant, membership, ctx.params.id, attempt),
+		const retried = await asFieldErrors(
+			() => this.lab.retry(tenant, membership, ctx.params.id, attempt),
+			"attempt",
 		);
 		ctx.session.flash(
 			"success",

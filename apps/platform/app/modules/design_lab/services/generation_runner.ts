@@ -472,6 +472,7 @@ function submitFailure(error: unknown, generation: DesignGeneration): Outcome {
 				: { kind: "failed", code: "submit_unconfirmed" };
 		case "credits":
 		case "auth":
+		case "config":
 			return { kind: "failed", code: "provider_unavailable" };
 		case "rejected":
 			return { kind: "failed", code: "provider_rejected" };
@@ -483,7 +484,11 @@ function submitFailure(error: unknown, generation: DesignGeneration): Outcome {
 
 function pollFailure(error: unknown, generation: DesignGeneration): Outcome {
 	if (error instanceof DesignProviderError) {
-		if (error.kind === "auth" || error.kind === "credits") {
+		if (
+			error.kind === "auth" ||
+			error.kind === "credits" ||
+			error.kind === "config"
+		) {
 			return { kind: "failed", code: "provider_unavailable" };
 		}
 		if (error.kind === "invalid_response") {

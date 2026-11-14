@@ -20,6 +20,19 @@ export class AllowanceError extends Error {
 	}
 }
 
+/**
+ * A member's burst limit: generation attempts (submits and retries alike) one
+ * member may start in a short window. Released attempts still reach the
+ * provider, so the monthly allowance alone does not bound provider calls.
+ */
+export const BURST_LIMIT = { attempts: 12, minutes: 10 };
+
+/** Refused attempts a studio may have each month before new ones are refused, when the limit is lower. */
+export const RELEASED_CAP = 10;
+
+/** Another refusal of `reserve`, with words for the form. */
+export class UsageLimitError extends Error {}
+
 export type Allowance = {
 	limit: number;
 	/** Settled (stored images) this month. */
@@ -82,6 +95,33 @@ export default class DesignUsageService {
 			const remaining = Math.max(0, limit - counts.settled - counts.reserved);
 			if (attempts.length > remaining) {
 				throw new AllowanceError(remaining, limit);
+			}
+			// Failed and declined attempts give their unit back but were still
+			// sent to the provider: at most RELEASED_CAP (or the limit, if higher)
+			// of them a month, so a stream of refused requests can't run up
+			// provider calls while still letting an artist rephrase.
+			if (counts.released >= Math.max(limit, RELEASED_CAP)) {
+				throw new UsageLimitError(
+					"Too many generations failed or were declined by the safety filter this month. Contact TattooDrip if you need more.",
+				);
+			}
+			const recent = await DesignUsageRecord.query()
+				.where("tenant_id", tenant.id)
+				.where("user_id", userId)
+				.where(
+					"reserved_at",
+					">=",
+					now.minus({ minutes: BURST_LIMIT.minutes }).toJSDate(),
+				)
+				.count("* as total")
+				.first();
+			if (
+				Number(recent?.$extras.total ?? 0) + attempts.length >
+				BURST_LIMIT.attempts
+			) {
+				throw new UsageLimitError(
+					`You've started ${BURST_LIMIT.attempts} generations in the last ${BURST_LIMIT.minutes} minutes. Wait a few minutes and try again.`,
+				);
 			}
 			for (const attempt of attempts) {
 				await DesignUsageRecord.create({
@@ -156,7 +196,6 @@ export default class DesignUsageService {
 		const rows = (await DesignUsageRecord.query()
 			.where("tenant_id", tenant.id)
 			.where("reserved_at", ">=", monthStart(now).toJSDate())
-			.whereIn("status", ["reserved", "settled"])
 			.groupBy("status")
 			.select("status")
 			.sum("units as total_units")) as unknown as {
@@ -167,7 +206,11 @@ export default class DesignUsageService {
 			Number(
 				rows.find((row) => row.status === status)?.$extras.total_units ?? 0,
 			);
-		return { reserved: count("reserved"), settled: count("settled") };
+		return {
+			reserved: count("reserved"),
+			settled: count("settled"),
+			released: count("released"),
+		};
 	}
 }
 

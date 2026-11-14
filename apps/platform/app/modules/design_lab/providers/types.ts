@@ -44,13 +44,16 @@ export interface DesignProvider {
  * What went wrong talking to the provider, sorted by what the worker does:
  *
  * - `rate_limited`: too busy (HTTP 429); not accepted, try again later.
- * - `unavailable`: a server error or the network; for a submit with an HTTP
- *   answer it was not accepted; for a poll, poll again.
+ * - `unavailable`: busy (503) or the network; for a submit with this kind
+ *   and a status it was not accepted; for a poll, poll again.
  * - `uncertain`: a submit whose outcome is unknown (timeout, cut connection,
- *   unreadable answer). Never resubmitted: it may have been charged.
+ *   unreadable answer, a server error other than 503). Never resubmitted:
+ *   it may have been charged.
  * - `credits`: the provider account has no credits left (HTTP 402).
  * - `auth`: the key was refused (401/403).
  * - `rejected`: the request was refused as invalid (400/422).
+ * - `config`: the endpoint does not exist (404/405): BFL_MODEL or
+ *   BFL_API_URL is wrong; an operator must fix it.
  * - `invalid_response`: an answer we must not use (a URL off the provider's
  *   domain, a non-image, too large).
  */
@@ -61,6 +64,7 @@ export type ProviderErrorKind =
 	| "credits"
 	| "auth"
 	| "rejected"
+	| "config"
 	| "invalid_response";
 
 export class DesignProviderError extends Error {

@@ -123,7 +123,11 @@ test.group("BFL provider", () => {
 			[json({ detail: "credits" }, 402), "credits"],
 			[json({ detail: "Not authenticated" }, 403), "auth"],
 			[json({ detail: "bad" }, 422), "rejected"],
-			[json({ detail: "oops" }, 500), "unavailable"],
+			// A server error may come after the task was made: never resubmitted.
+			[json({ detail: "oops" }, 500), "uncertain"],
+			[json({ detail: "gateway" }, 502), "uncertain"],
+			[json({ detail: "busy" }, 503), "unavailable"],
+			[json({ detail: "no such model" }, 404), "config"],
 			[new TypeError("fetch failed"), "uncertain"],
 			[new Response("not json", { status: 200 }), "uncertain"],
 		];

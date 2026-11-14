@@ -7,7 +7,7 @@ import {
 	Sparkles,
 	Star,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { urlFor } from "~/client";
 import {
 	type Allowance,
@@ -121,6 +121,7 @@ export default function DesignLabShow({
 	const archived = project.reviewState === "archived";
 	const [compared, setCompared] = useState<string[]>([]);
 	usePollStatuses(params, generations);
+	useFreshImageUrls(generations);
 
 	const ready = generations.filter((generation) => generation.asset);
 	const comparedConcepts = compared
@@ -177,7 +178,6 @@ export default function DesignLabShow({
 					description={`${allowanceText(allowance)}. ${resetsText(allowance.resetsAt)}.`}
 				>
 					<GenerateForm
-						key={requestId}
 						params={params}
 						requestId={requestId}
 						allowance={allowance}
@@ -246,7 +246,7 @@ export default function DesignLabShow({
 				<Form
 					route="tenant.design_lab.update"
 					routeParams={params}
-					options={{ preserveScroll: true }}
+					options={{ preserveScroll: true, preserveState: true }}
 				>
 					{({ errors, processing }) => (
 						<FieldGroup className="max-w-xl">
@@ -321,7 +321,7 @@ export default function DesignLabShow({
 					route="tenant.design_lab.update"
 					routeParams={params}
 					className="mt-4"
-					options={{ preserveScroll: true }}
+					options={{ preserveScroll: true, preserveState: true }}
 				>
 					{({ processing }) => (
 						<>
@@ -407,6 +407,35 @@ function usePollStatuses(
 	}, [pending, shown, url]);
 }
 
+/** Signed image URLs live 5 minutes; refresh them a little before. */
+const URL_REFRESH_MS = 4 * 60_000;
+
+/**
+ * Keeps the concepts' signed image URLs usable on a page left open: reloads
+ * them every few minutes while the tab is visible, and at once when the tab
+ * comes back after that long.
+ */
+function useFreshImageUrls(generations: Generation[]) {
+	const loadedAt = useRef(Date.now());
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a reload brings new generations and with them new signed URLs: that is the moment to note.
+	useEffect(() => {
+		loadedAt.current = Date.now();
+	}, [generations]);
+	useEffect(() => {
+		const refresh = () => {
+			if (document.hidden) return;
+			if (Date.now() - loadedAt.current < URL_REFRESH_MS) return;
+			router.reload({ only: ["generations"] });
+		};
+		const timer = window.setInterval(refresh, 30_000);
+		document.addEventListener("visibilitychange", refresh);
+		return () => {
+			window.clearInterval(timer);
+			document.removeEventListener("visibilitychange", refresh);
+		};
+	}, []);
+}
+
 function GenerateForm({
 	params,
 	requestId,
@@ -427,6 +456,10 @@ function GenerateForm({
 	const [style, setStyle] = useState("fine_line");
 	const [variations, setVariations] = useState(1);
 	const [acknowledged, setAcknowledged] = useState(false);
+	// The submit's idempotency key, held here so a refused submit (its field
+	// errors) or another form on the page never resets what was typed; the
+	// server's fresh key replaces it once a submit succeeds.
+	const [formRequestId, setFormRequestId] = useState(requestId);
 	const counts = variationChoices(maxVariations, allowance.remaining);
 	const outOfAllowance = allowance.remaining === 0;
 
@@ -434,11 +467,18 @@ function GenerateForm({
 		<Form
 			route="tenant.design_lab.generate"
 			routeParams={params}
-			options={{ preserveScroll: true }}
+			options={{ preserveScroll: true, preserveState: true }}
+			resetOnSuccess
+			onSuccess={(page) => {
+				const next = (page.props as { requestId?: string }).requestId;
+				if (next) setFormRequestId(next);
+				setStyle("fine_line");
+				setVariations(1);
+			}}
 		>
 			{({ errors, processing }) => (
 				<FieldGroup className="gap-5">
-					<input type="hidden" name="requestId" value={requestId} />
+					<input type="hidden" name="requestId" value={formRequestId} />
 					<Field data-invalid={errors.concept ? true : undefined}>
 						<FieldLabel htmlFor="concept">Concept</FieldLabel>
 						<Textarea
@@ -745,7 +785,7 @@ function ConceptCard({
 					<Form
 						route="tenant.design_lab.retry"
 						routeParams={{ tenant, id: generation.id }}
-						options={{ preserveScroll: true }}
+						options={{ preserveScroll: true, preserveState: true }}
 					>
 						{({ processing, errors }) => (
 							<>
@@ -773,7 +813,7 @@ function ConceptCard({
 						<Form
 							route="tenant.design_lab.assets.select"
 							routeParams={{ tenant, id: asset.id }}
-							options={{ preserveScroll: true }}
+							options={{ preserveScroll: true, preserveState: true }}
 						>
 							{({ processing }) => (
 								<>
@@ -827,7 +867,7 @@ function ConceptCard({
 							<Form
 								route="tenant.design_lab.assets.update"
 								routeParams={{ tenant, id: asset.id }}
-								options={{ preserveScroll: true }}
+								options={{ preserveScroll: true, preserveState: true }}
 							>
 								{({ processing, errors }) => (
 									<FieldGroup className="gap-3">

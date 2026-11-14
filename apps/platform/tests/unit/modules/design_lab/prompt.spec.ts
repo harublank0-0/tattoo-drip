@@ -69,6 +69,11 @@ test.group("Design Lab prompt", () => {
 		assert.include(personalDataProblem("www.example.com/ref") ?? "", "link");
 		assert.include(personalDataProblem("by @asha_ink") ?? "", "handle");
 		assert.include(personalDataProblem("rose‮evil") ?? "", "hidden");
+		// Dates, spans of years and joined Devanagari are ordinary design text.
+		assert.isNull(personalDataProblem("Est. 12.05.2019"));
+		assert.isNull(personalDataProblem("1990-2024"));
+		assert.isNull(personalDataProblem("\u0915\u094D\u200D\u0937 lettering"));
+		assert.include(personalDataProblem("zero\u200Bwidth") ?? "", "hidden");
 	});
 
 	test("sizes fit the hosted models' limits and labels read well", ({

@@ -291,10 +291,27 @@ async function httpError(
 			status,
 		);
 	}
+	if (status === 404 || status === 405) {
+		// A model endpoint that doesn't exist: BFL_MODEL or BFL_API_URL is wrong.
+		return new DesignProviderError(
+			"config",
+			`The ${call} endpoint was not found.`,
+			status,
+		);
+	}
 	if (call === "submit" && (status === 400 || status === 422)) {
 		return new DesignProviderError(
 			"rejected",
 			"The provider refused the request.",
+			status,
+		);
+	}
+	if (call === "submit" && status !== 503) {
+		// Any other server error may have come after the task was created (and
+		// charged): unknown, so never resubmitted. A 503 is "not now".
+		return new DesignProviderError(
+			"uncertain",
+			"The submit failed with a server error.",
 			status,
 		);
 	}

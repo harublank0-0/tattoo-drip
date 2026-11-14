@@ -585,6 +585,64 @@ test.group("AI Design Lab", (group) => {
 		assert.equal(failed.failureCode, "timed_out");
 	});
 
+	test("a burst of generations and a month of refused ones are both bounded", async ({
+		client,
+		assert,
+	}) => {
+		const studio = await labStudio("lab-bursts");
+		const url = `/t/${studio.tenant.slug}/design-lab/${studio.designProject.id}/generations`;
+		const send = (form: Record<string, unknown>) =>
+			client
+				.post(url)
+				.loginAs(studio.artist)
+				.withCsrfToken()
+				.redirects(0)
+				.form(form);
+		// The seed's two attempts count toward the 10-minute window too.
+		for (let index = 0; index < 5; index++) {
+			(await send(generateForm({ variations: "2" }))).assertStatus(302);
+		}
+		const burst = await send(generateForm());
+		assertValidationError(burst, "variations", "last 10 minutes");
+		assert.lengthOf(
+			await generationsOf(studio.tenant, studio.designProject.id),
+			12,
+		);
+
+		// Refused attempts are capped too (RELEASED_CAP while the limit is lower).
+		const other = await labStudio("lab-released");
+		const send2 = (form: Record<string, unknown>) =>
+			client
+				.post(
+					`/t/${other.tenant.slug}/design-lab/${other.designProject.id}/generations`,
+				)
+				.loginAs(other.owner)
+				.withCsrfToken()
+				.redirects(0)
+				.form(form);
+		// The seed holds one released attempt; nine more make ten.
+		await inTenant(other.tenant, async () => {
+			for (let attempt = 2; attempt <= 10; attempt++) {
+				await DesignUsageRecord.create({
+					tenantId: other.tenant.id,
+					generationId: other.designGeneration.id,
+					attempt,
+					userId: other.artist.id,
+					provider: "fake",
+					model: "fake-model-1",
+					units: 1,
+					status: "released",
+					releaseReason: "content_moderated",
+					reservedAt: DateTime.utc(),
+					releasedAt: DateTime.utc(),
+				});
+			}
+		});
+		env.set("DESIGN_LAB_MONTHLY_LIMIT", 5);
+		const declined = await send2(generateForm());
+		assertValidationError(declined, "variations", "failed or were declined");
+	});
+
 	test("contact details in the artist's text are refused before anything is queued", async ({
 		client,
 		assert,

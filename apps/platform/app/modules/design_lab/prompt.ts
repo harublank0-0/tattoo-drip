@@ -167,7 +167,9 @@ const PERSONAL_DATA: { pattern: RegExp; message: string }[] = [
 		message: "Remove the link: describe the idea in words instead.",
 	},
 	{
-		pattern: /(?:\+?\d[\s().-]*){7,}/,
+		// Nine or more digits: a phone number (Nepal's mobiles have ten), not a
+		// date such as 12.05.2019 or a span of years such as 1990-2024.
+		pattern: /(?:\+?\d[\s().-]*){9,}/,
 		message:
 			"Remove the phone number: contact details are never sent to the image service.",
 	},
@@ -178,9 +180,14 @@ const PERSONAL_DATA: { pattern: RegExp; message: string }[] = [
 	},
 ];
 
-/** Control, bidi and zero-width characters: refused, they only hide text. */
-// biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to find them.
-const HIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F​-‏‪-‮⁦-⁩﻿]/;
+/**
+ * Control, bidi and zero-width characters: refused, they only hide text.
+ * ZWNJ and ZWJ (U+200C, U+200D) are allowed: Devanagari and other scripts
+ * need them to join letters.
+ */
+const HIDDEN =
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: the point is to find them.
+	/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/;
 
 /**
  * The words to show when `text` must not be sent, else null. Run on every
