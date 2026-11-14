@@ -48,7 +48,7 @@ backup      --> R2 bucket  tattoo-drip-backups
 - Section 4 has the checks for deploy day.
 - The server deploys only what is merged to `main`. Merge first, then run the deploy command.
 
-If you followed the setup in chat on 2026-11-01, these are done: sections 1.1 to 1.11 (server, SSH, firewall, updates, Docker, swap, folders, deploy key, clone) and 3.2 (the three R2 buckets and `media.tattoodrip.app`). Run the quick check in 1.12, then start at section 2. Its first step updates the clone: it was made before the `deploy/` folder was merged to `main`, so it does not have the settings templates yet.
+If you followed the setup in chat on 2026-11-01, these are done: sections 1.1 to 1.11 (server, SSH, firewall, updates, Docker, swap, folders, deploy key, clone) and 3.2's three R2 buckets and `media.tattoodrip.app`. The chat setup did **not** add the private bucket's lifecycle rule and CORS policy (the end of 3.2): on a server that already runs, do them with 5, "Once, before deploying Reviews and Fresh ink". Run the quick check in 1.12, then start at section 2. Its first step updates the clone: it was made before the `deploy/` folder was merged to `main`, so it does not have the settings templates yet.
 
 ---
 
@@ -384,7 +384,7 @@ In the dashboard, open **R2 Object Storage**. The overview shows the **Account I
 
 ### 3.2 The three buckets and the media domain
 
-Done if you followed the chat setup. In **R2 Object Storage**, the buckets:
+The buckets and the media domain are done if you followed the chat setup; the private bucket's lifecycle rule and CORS policy at the end of this section are not. In **R2 Object Storage**, the buckets:
 
 | Bucket | Public access | Location hint |
 |---|---|---|
@@ -394,16 +394,29 @@ Done if you followed the chat setup. In **R2 Object Storage**, the buckets:
 
 On `tattoo-drip-public`, under its settings, connect the custom domain `media.tattoodrip.app` and wait for its status to say active. Leave the `r2.dev` public address off, and give the other two buckets no public access and no custom domain.
 
-On `tattoo-drip-private`, under its settings, add two things before the first deploy. Reviews and Fresh ink is live on every deploy, so both are required ([deploy.md](../apps/platform/docs/deploy.md#r2-and-video-uploads), "R2 and video uploads"):
+On `tattoo-drip-private`, under its settings, add two things before the first deploy (Reviews and Fresh ink is live on every deploy, so both are required; [deploy.md](../apps/platform/docs/deploy.md#r2-and-video-uploads), "R2 and video uploads"):
 
 - **Object lifecycle rules:** prefix `work_video_upload/`, delete objects 1 day after upload. Studios' video angles and clients' Fresh ink videos are both staged there, and a client can start an upload and never finish it.
-- **CORS policy:** the browser uploads videos straight to this bucket, from the dashboard and from the studio pages:
+- **CORS policy:** the browser uploads videos straight to this bucket, from the dashboard (`APP_URL`'s origin: `https://tattoodrip.app` until the D11 cutover moves it to `https://app.tattoodrip.app`) and from the studio pages (`*.tattoodrip.page`). Put `APP_URL`'s origin first:
 
   ```json
-  [{ "AllowedOrigins": ["https://tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
+  [{ "AllowedOrigins": ["<APP_URL's origin>", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
   ```
 
-  The wildcard for the studio pages is unverified on R2 until the first deploy: then send a client's video from a review page and check that it uploads.
+**Check the CORS policy before deploying.** The wildcard for the studio pages is unverified on R2 until this check passes. From your computer, ask the bucket the question a browser asks before a client's video upload, with a real studio's slug and your account ID (3.1):
+
+```bash
+curl -s -o /dev/null -D - -X OPTIONS \
+  -H 'Origin: https://<slug>.tattoodrip.page' \
+  -H 'Access-Control-Request-Method: PUT' \
+  -H 'Access-Control-Request-Headers: content-type' \
+  'https://<account id>.r2.cloudflarestorage.com/tattoo-drip-private/work_video_upload/cors-check' \
+  | grep -i -E '^(HTTP|access-control-allow-origin)'
+```
+
+**You should see:** `200` and an `access-control-allow-origin` line naming `https://<slug>.tattoodrip.page` (or `*`). Run it again with `Origin: <APP_URL's origin>`: the same, naming that origin. The request uploads nothing, so it needs no key.
+
+**If the studio page's origin gets no `access-control-allow-origin` line** (a `403`, or no such line), R2 did not honour the wildcard. Then clients can't upload videos from their review page: the browser stops the upload before any byte is sent. Everything else works: clients' photos go through the API, and studios' video angles come from `APP_URL`'s exact origin. Either list each live studio's origin (`https://<slug>.tattoodrip.page`) in `AllowedOrigins` in place of the wildcard, and add every new studio (or changed slug) by hand from then on, or deploy anyway and record client video uploads as a known blocker for the product owner. Don't add a broader origin such as `*`.
 
 ### 3.3 The token for the photos
 
@@ -724,6 +737,34 @@ docker compose -f deploy/compose.yml exec -T postgres sh -c \
 ```
 
 **You should see:** no `ERROR`. Without it, the migration stops with "the role tattoo_drip_discovery is missing" and the old release keeps running. Details: [Discover database security](../docs/discover/database-security.md).
+
+### Once, before deploying Reviews and Fresh ink
+
+From this release on, Reviews and Fresh ink is always on: clients post reviews, photos and videos through the review links studios send ([deploy.md](../apps/platform/docs/deploy.md#platform-settings), the deploy prerequisites). Before the first `deploy.sh` with it:
+
+1. **R2:** on `tattoo-drip-private`, the lifecycle rule on `work_video_upload/` and the CORS policy at the end of 3.2, then the CORS check there. If the check shows the wildcard isn't honoured, 3.2 says what to do.
+2. **No log line records the review link's token.** It travels in the `X-Review-Token` header, never in a URL, and nginx logs no request headers but the user agent:
+
+   ```bash
+   grep -n 'log_format' /srv/tattoo-drip/app/deploy/nginx/common.conf
+   ```
+
+   **You should see:** one `log_format main` line whose only header variable is `$http_user_agent`. If you log anywhere else (a proxy or a log service in front of the server), it must not record that header either. After the deploy, once a review page has been opened:
+
+   ```bash
+   docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs nginx web worker | grep -ci 'x-review-token'
+   ```
+
+   **You should see:** `0`.
+3. **The video worker with ffmpeg.** Clients' Fresh ink videos are transcoded on its `client_video` queue:
+
+   ```bash
+   docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps video-worker
+   docker compose -f /srv/tattoo-drip/app/deploy/compose.yml exec -T video-worker ffmpeg -version | head -1
+   ```
+
+   **You should see:** `video-worker` running, and a line starting `ffmpeg version`.
+4. **Deploy at a quiet hour** (as every update, 5). A studio owner who opened Settings, Page look before the deploy and saves it after hides the studio page's Fresh ink and Reviews sections: that form didn't list them. Nothing else changes, and the owner can show them again on the same page.
 
 ## 6. Backups
 
