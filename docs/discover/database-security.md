@@ -1,7 +1,7 @@
 # Discover: database security and publication data
 
 How Discover reads public data across studios without loosening tenant isolation (Discover D02).
-- **Migrations:** `apps/platform/database/migrations/1791870000000_add_discovery_publication.ts` (data) and `1791870000001_create_discovery_views.ts` (boundary); `1791900000001_discovery_artworks_leads_only.ts` replaces `discovery.artworks` in place with the lead-only rule (angles), keeping its owner, options, columns and grants, and grants the role `lead_photo_id`.
+- **Migrations:** `apps/platform/database/migrations/1791870000000_add_discovery_publication.ts` (data) and `1791870000001_create_discovery_views.ts` (boundary); `1791900000001_discovery_artworks_leads_only.ts` replaces `discovery.artworks` in place with the lead-only rule (angles), keeping its owner, options, columns and grants, and grants the role `lead_photo_id`; `1791970000000_create_discovery_reviews_and_fresh_ink.ts` (Reviews and Fresh ink, slice 4) adds `discovery.reviews`, `discovery.fresh_ink` and `discovery.fresh_ink_media` the same way (§3, §8).
 - **Role setup:** `apps/platform/database/setup_roles.sql`.
 - **Proof:** `apps/platform/tests/functional/rls/discovery.spec.ts`.
 - **Plan:** [implementation blueprint](implementation-blueprint.md).
@@ -9,7 +9,7 @@ How Discover reads public data across studios without loosening tenant isolation
 
 ## 1. The boundary
 
-The app role (`DB_USER`) sees one tenant at a time: every tenant table has row-level security keyed by `app.tenant_id`. Discover needs the public rows of every listed studio, with no tenant context. It gets them only through views: the three of D02 below, and `discovery.artwork_angles` since angles (`1791900000002`), which maps one of a tattoo's other photos to the tattoo (ids only; §3):
+The app role (`DB_USER`) sees one tenant at a time: every tenant table has row-level security keyed by `app.tenant_id`. Discover needs the public rows of every listed studio, with no tenant context. It gets them only through views: the three of D02 below, `discovery.artwork_angles` since angles (`1791900000002`), which maps one of a tattoo's other photos to the tattoo (ids only; §3), and since Reviews and Fresh ink (slice 4, `1791970000000`) `discovery.reviews`, `discovery.fresh_ink` and `discovery.fresh_ink_media`, which read `client_reviews`, `client_posts` and `client_post_media` the same way (§8):
 
 ```text
 app role ──SELECT──► discovery.studios / artists / artworks   (views, owned by tattoo_drip_discovery,
@@ -22,8 +22,8 @@ app role ──SELECT──► discovery.studios / artists / artworks   (views, 
 |---|---|---|
 | **Role** | `tattoo_drip_discovery`: NOLOGIN, NOSUPERUSER, NOBYPASSRLS, NOINHERIT, NOCREATEDB/ROLE, NOREPLICATION; member of no role and no role is its member. Created and normalised by `setup_roles.sql`. The migration refuses to run if it is missing or has any of those powers | Nobody can log in as it or act as it; the app role cannot `SET ROLE` to it (tested on a real app-role session) |
 | **View ownership** | The views belong to the role, not to the table owner. Views that are not `security_invoker` read their tables with the *owner's* privileges and RLS, so they read as the role, which RLS binds. The role has no USAGE (and, after the migration, no CREATE) on schema `discovery`, so even as owner it cannot rename, alter or replace its views | The classic hole: a view owned by the table owner bypasses RLS and leaves only its WHERE |
-| **Column grants** | The role has column-level SELECT on public columns of `tenants`, `artists` and `artist_work_photos` (with `lead_photo_id`, which the artworks view's lead-only rule reads), plus three `tenant_memberships` columns that a policy reads (§3). Nothing else on any table, no write privilege anywhere, no CREATE on the schema after the migration | Contact details, deposit settings, members, the artist's login, the takedown note, clients, inquiries, money: "permission denied" even through a new view or a mistaken `select *` |
-| **Policies** | `discovery_only` (RESTRICTIVE, the full rule) and `discovery_select` (PERMISSIVE, the row's own flags) on the three tables, `TO tattoo_drip_discovery` only; `discovery_none` (RESTRICTIVE, `false`) on `tenant_memberships` | Unlisted, taken-down, deleted, hidden, opted-out or unpublished rows, whatever tenant or user context a session sets |
+| **Column grants** | The role has column-level SELECT on public columns of `tenants`, `artists` and `artist_work_photos` (with `lead_photo_id`, which the artworks view's lead-only rule reads), of `client_reviews`, `client_posts` and `client_post_media` (slice 4, §8), plus three `tenant_memberships` columns that a policy reads (§3). Nothing else on any table, no write privilege anywhere, no CREATE on the schema after the migration | Contact details, deposit settings, members, the artist's login, the takedown note, clients, inquiries, money: "permission denied" even through a new view or a mistaken `select *` |
+| **Policies** | `discovery_only` (RESTRICTIVE, the full rule) and `discovery_select` (PERMISSIVE, the row's own flags) on the three tables (six since slice 4: the client tables, §8), `TO tattoo_drip_discovery` only; `discovery_none` (RESTRICTIVE, `false`) on `tenant_memberships` | Unlisted, taken-down, deleted, hidden, opted-out or unpublished rows, whatever tenant or user context a session sets |
 | **View WHERE** | Each view repeats the rules and selects explicit columns | Defence in depth; the views' columns are the public contract |
 
 The app role gets `USAGE` on schema `discovery` and `SELECT` on the views. It gets nothing new on any table.
@@ -82,6 +82,9 @@ These decide ranking or whether a profile is "complete", not safety. They are tu
 | `discovery.studios` | `id`, `slug`, `type`, `name`, `intro`, `timezone`, `place_id`, `cover_image_key/_width/_height`, `logo_image_key/_width/_height`, `logo_tile`, `logo_icon_key`, `instagram_url`, `facebook_url`, `tiktok_url`, `website_url`, `listed_at` |
 | `discovery.artists` | `id`, `studio_id`, `slug`, `name`, `bio`, `photo_key/_width/_height`, `styles`, `accepting_inquiries`, `accepting_flash`, `instagram_url`, `facebook_url`, `tiktok_url`, `created_at` |
 | `discovery.artworks` | `id`, `studio_id`, `artist_id`, `image_key`, `width`, `height`, `alt`, `styles`, `healed`, `created_at` (a tattoo's lead only, since angles) |
+| `discovery.reviews` | Slice 4: `id`, `studio_id`, `artist_id`, `rating`, `body`, `shown_name`, `reply` and `replied_at` (both null when TattooDrip took the reply down), `created_at` |
+| `discovery.fresh_ink` | Slice 4: `id`, `studio_id`, `artist_id`, `shown_name`, `caption`, `styles`, `placement`, `published_at` |
+| `discovery.fresh_ink_media` | Slice 4: `id`, `post_id`, `position` (0, the lead, is always a photo), `kind`, `image_key` (the PUBLIC copy's key: a photo's image, a video's poster), `width`, `height`, `alt`, `video_keys` (the public renditions' keys; null for a photo), `video_duration_ms` |
 | `discovery.artwork_angles` | `id` (one of a tattoo's other photos), `artwork_id` (the tattoo's lead, a `discovery.artworks` id): published, not taken down, of a shown artist at a listed business. Only the artwork lookup reads it, so an old link to a photo that has since become another photo's angle lands on the tattoo (the Discover app redirects there, temporarily) |
 
 - **Image keys:** stored keys of *public* images (R2's public bucket). D03 turns them into URLs and variants with `ImageService`, as the storefront API does.
@@ -161,7 +164,7 @@ The style filter is the one slow shape. D03 should measure its real query and ma
 
 ```bash
 cd apps/platform
-node ace test functional --files=discovery.spec.ts      # the boundary, rules and publication changes (25 tests)
+node ace test functional --files=discovery.spec.ts      # the boundary, rules and publication changes (33 tests; two use PostgreSQL 18's MAINTAIN and fail on 16)
 node ace test functional --files=catalog_guard.spec.ts --files=setup_roles.spec.ts --files=policies.spec.ts
 ```
 
@@ -175,3 +178,28 @@ They use a real PostgreSQL. One test plants a volatile, near-free function (it r
 - **Takedowns are per studio and per photo, not per artist.** A studio can hide an artist itself.
 - **A photo takedown follows the photo, not the tattoo (angles).** `discovery_suspended_at` is set on one row. Discover shows a tattoo as its lead, so a taken-down lead takes the tattoo off Discover, and a taken-down angle is never shown (Discover shows no angles, and `discovery.artwork_angles` leaves it out). If the studio then makes another photo of that tattoo its main one, Discover shows that other photo as the tattoo: the suspended image itself never shows, but the tattoo can come back through a sibling. An operator who wants the whole tattoo off Discover takes down each of its photos.
 - **The role name is fixed** (`tattoo_drip_discovery`). One cluster serving several app databases shares it, which is harmless: it holds privileges per database.
+
+## 8. Reviews and Fresh ink (slice 4)
+
+Migration `1791970000000_create_discovery_reviews_and_fresh_ink.ts`; [spec](../superpowers/specs/2026-11-12-reviews-and-fresh-ink-design.md), rulings 8 to 11; the API's reads: [Discover API](api.md#reviews-and-fresh-ink-slice-4).
+
+**Rules** (in the views' WHERE, and the never-leak part in the policies):
+
+| Row | On Discover when |
+|---|---|
+| Review (`client_reviews`) | `consent_discover` and `taken_down_at is null` and `deleted_at is null` (and a rating: a client's delete scrubs it) and its artist is shown (above, which brings the listed studio) |
+| Its reply | as the review, and `reply_taken_down_at is null`; otherwise `reply` and `replied_at` are null in the view (a column rule: the review itself stays) |
+| Post (`client_posts`) | `status = 'approved'` and `published_at is not null` (its public copies exist, `PostPublicationService`) and `consent_discover` and not taken down and not deleted, and its artist is shown |
+| Media (`client_post_media`) | its post is on Discover, and a photo, or a video whose `video_state = 'ready'`; the view also needs the image (or poster) and its size, and every key of the shape `tenants/<the row's tenant>/client_post_photo/<file>` (a video: `client_post_video`) with no `..`; a row whose key isn't is left out |
+
+**Policies** (TO the role only): `discovery_select` on each table checks the row's own flags (above); `discovery_only` (restrictive) adds the artist's rule for reviews and posts (an `exists` on `artists`, whose own restrictive policy brings the studio's) and the post's rule for media (an `exists` on `client_posts`, whose policy brings the rest). A studio that stops listing, is taken down or is deleted takes every review, post and photo off at once; listing again brings them back while the client's consent stands (tested).
+
+**Columns.** The role may read, of `client_reviews`: `id`, `tenant_id`, `artist_id`, `rating`, `body`, `shown_name`, `consent_discover`, `reply`, `replied_at`, `reply_taken_down_at`, `taken_down_at`, `deleted_at`, `created_at`; of `client_posts`: `id`, `tenant_id`, `artist_id`, `shown_name`, `caption`, `styles`, `placement`, `status`, `published_at`, `consent_discover`, `taken_down_at`, `deleted_at`; of `client_post_media`: `id`, `tenant_id`, `post_id`, `kind`, `position`, `image_key`, `width`, `height`, `alt`, `video_state`, `video_keys`, `video_duration_ms`. Never a client's or project's id, `consent_studio_page`, a report (reason, note, who, when, resolution), a takedown's reason or note, a reply takedown's, `submitter_digest`, a decision's author, a video's staging key or failure text: "permission denied", tested. The views select none of the moderation timestamps either.
+
+**Public keys only.** A post's originals are on the private disk under `client_post_photo` / `client_post_video`; its public copies have the same file names under `fresh_ink_photo` / `fresh_ink_video` (`keyUnder`). The view maps the key in SQL (`'tenants/' || tenant_id || '/fresh_ink_photo/' || <file name>`), so no private key leaves the view; the role reads the private column only to compute it. The API then serves the public copy through `ImageService`, whose tenant and purpose check is the second guard.
+
+**Indexes.** `client_reviews_discover_newest (tenant_id, created_at desc, id desc)` and `client_posts_discover_newest (published_at desc, id desc)`, each partial on exactly the rows the views can show of its table (a studio's reviews, newest first; the global feed). Volumes are small (a review and a post per project at most); measure before adding more.
+
+**Setup.** As D02's views: owned by `tattoo_drip_discovery` (the CREATE dance, so a superuser or that role must apply the migration; [Setup](#6-setup-prerequisites-rollback)), not `security_invoker`, no `security_barrier`, the app role SELECT on the views and nothing new on any table, PUBLIC nothing. `down()` drops the indexes, the views, the policies and the role's grants on the three tables.
+
+**Proof.** `discovery.spec.ts` (group "reviews and Fresh ink (slice 4)") seeds reviews, posts and media at every kind of business and checks: only consented, live reviews and approved, published posts of shown artists at listed businesses, whatever context is forged; the discovery role's own reads of the three tables; a reply taken down nulled; media keys mapped to the public copies, nothing named `client_post_`; unlisting and suspension and the way back; an artist opting out; consent withdrawn; and the role's grants, policies and the views' columns with the rest of the catalog.
