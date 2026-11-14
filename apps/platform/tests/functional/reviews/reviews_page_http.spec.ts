@@ -197,6 +197,77 @@ test.group("Reviews page: who sees what", (group) => {
 		assert.lengthOf((foreign.inertiaProps as { posts: unknown[] }).posts, 1);
 	});
 
+	test("a taken-down post leaves Waiting and the count and is listed under Declined, said so", async ({
+		client,
+		assert,
+	}) => {
+		const { a } = await twoStudios();
+		await inTenant(a.tenant, () =>
+			ClientPost.query()
+				.whereIn("id", [a.waitingPost.id, a.approvedPost.id])
+				.update({ taken_down_at: new Date(), takedown_reason: "hate" }),
+		);
+		const props = async (query: string) =>
+			(await client.get(page(a, query)).loginAs(a.owner).withInertia())
+				.inertiaProps as {
+				posts: {
+					id: string;
+					statusText: string;
+					takenDown: string | null;
+					canApprove: boolean;
+					canDecline: boolean;
+					canUnpublish: boolean;
+				}[];
+				waitingCount: number;
+			};
+		const waiting = await props("");
+		assert.deepEqual(waiting.posts, []);
+		assert.equal(waiting.waitingCount, 0);
+		assert.deepEqual((await props("?status=approved")).posts, []);
+		const declined = await props("?status=declined");
+		assert.sameMembers(
+			declined.posts.map(({ id }) => id),
+			[a.waitingPost.id, a.approvedPost.id],
+		);
+		for (const row of declined.posts) {
+			assert.equal(row.statusText, "Taken down by TattooDrip");
+			assert.isString(row.takenDown);
+			assert.isFalse(row.canApprove || row.canDecline || row.canUnpublish);
+		}
+	});
+
+	test("a taken-down review can't be replied to, and its report says it was taken down", async ({
+		client,
+		assert,
+	}) => {
+		const { a } = await twoStudios();
+		await inTenant(a.tenant, () =>
+			ClientReview.query().where("id", a.clientReview.id).update({
+				reported_at: new Date(),
+				report_reason: "hate",
+				taken_down_at: new Date(),
+				takedown_reason: "hate",
+				report_resolved_at: new Date(),
+			}),
+		);
+		const listed = await client
+			.get(page(a, "?view=reviews"))
+			.loginAs(a.owner)
+			.withInertia();
+		const [row] = (
+			listed.inertiaProps as {
+				reviews: {
+					canReply: boolean;
+					canReport: boolean;
+					report: { outcome: string };
+				}[];
+			}
+		).reviews;
+		assert.isFalse(row.canReply);
+		assert.isFalse(row.canReport);
+		assert.equal(row.report.outcome, "removed");
+	});
+
 	test("25 a page, like the portfolio; a page past the last is the last", async ({
 		client,
 		assert,
@@ -424,7 +495,7 @@ test.group("Reviews page: the studio's decisions", (group) => {
 				reviews: {
 					id: string;
 					canReport: boolean;
-					report: { open: boolean };
+					report: { outcome: string };
 				}[];
 			}
 		).reviews;
@@ -433,7 +504,7 @@ test.group("Reviews page: the studio's decisions", (group) => {
 			[a.clientReview.id],
 		);
 		assert.isFalse(rows[0].canReport);
-		assert.isTrue(rows[0].report.open);
+		assert.equal(rows[0].report.outcome, "open");
 	});
 
 	test("a deleted review is gone from the page and its routes", async ({

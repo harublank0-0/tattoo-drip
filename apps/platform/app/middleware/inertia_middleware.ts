@@ -120,7 +120,7 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 							(await ctx.containerResolver.make(AlertService)).unreadCount(
 								tenant,
 								membership.userId,
-								bellKinds(membership.role),
+								bellKinds(membership.role, reviewsEnabled()),
 							),
 					)
 				: null;

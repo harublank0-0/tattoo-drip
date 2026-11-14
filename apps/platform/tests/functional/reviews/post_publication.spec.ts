@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import drive from "@adonisjs/drive/services/main";
 import type { ApiClient } from "@japa/api-client";
@@ -10,7 +11,9 @@ import ClientPostMedia from "#modules/reviews/models/client_post_media";
 import { postPublishable } from "#modules/reviews/rules";
 import { publicKeys } from "#modules/reviews/services/post_publication_service";
 import ReviewOperatorService from "#modules/reviews/services/review_operator_service";
+import StudioReviewService from "#modules/reviews/services/studio_review_service";
 import type Tenant from "#modules/tenancy/models/tenant";
+import { withTransaction } from "#services/db_context";
 import { testImages } from "#tests/helpers/images";
 import {
 	issueReviewLink,
@@ -20,6 +23,7 @@ import {
 	reviewServices,
 	storedFiles,
 } from "#tests/helpers/reviews";
+import { failDeletes } from "#tests/helpers/storage_failures";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 /**
@@ -352,6 +356,117 @@ test.group("Fresh ink publishing: files", (group) => {
 		);
 		assert.equal((await post(s)).status, "waiting");
 		assert.deepEqual(await published(s), []);
+	});
+});
+
+test.group("Fresh ink publishing: storage failures", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	/** A studio whose client's post has a photo, submitted with the studio page allowed. */
+	async function submitted(client: ApiClient, slug: string) {
+		const s = await ready(slug);
+		await addPhoto(client, s);
+		(await submit(client, s)).assertStatus(200);
+		return { s, id: (await post(s)).id };
+	}
+
+	test("a public copy that can't be deleted fails the change: the post stays approved and published", async ({
+		client,
+		assert,
+	}) => {
+		const { s, id } = await submitted(client, "pub-fail-del-2");
+		(await studio(client, s, "approve", id)).assertStatus(302);
+		const before = await published(s);
+		assert.isNotEmpty(before);
+		const broken = failDeletes("public", (key) =>
+			key.includes("/fresh_ink_photo/"),
+		);
+		try {
+			const response = await studio(client, s, "unpublish", id);
+			response.assertFlashMessage(
+				"error",
+				"Couldn't remove the public photos, try again.",
+			);
+		} finally {
+			broken.restore();
+		}
+		const row = await post(s);
+		assert.equal(row.status, "approved");
+		assert.isNotNull(row.publishedAt);
+		assert.deepEqual(await published(s), before);
+		// Once storage is back, the same change goes through.
+		(await studio(client, s, "unpublish", id)).assertFlashMessage(
+			"success",
+			"Unpublished. It's off your page and its public copies are deleted.",
+		);
+		assert.deepEqual(await published(s), []);
+	});
+
+	test("the client's delete removes a public copy even when published_at lost track of it", async ({
+		client,
+		assert,
+	}) => {
+		const { s, id } = await submitted(client, "pub-stray-2");
+		(await studio(client, s, "approve", id)).assertStatus(302);
+		assert.isNotEmpty(await published(s));
+		await inTenant(s.tenant, () =>
+			ClientPost.query().where("id", id).update({ published_at: null }),
+		);
+		(
+			await reviewRequest(client, "DELETE", s.tenant.slug, "/post", s.token)
+		).assertStatus(200);
+		assert.deepEqual(await published(s), []);
+	});
+
+	test("a rollback after a publish removes the copies", async ({
+		client,
+		assert,
+	}) => {
+		const { s, id } = await submitted(client, "pub-roll-pub-2");
+		const service = await app.container.make(StudioReviewService);
+		const owner = { userId: s.owner.id, role: "owner" as const };
+		await assert.rejects(
+			() =>
+				inTenant(s.tenant, () =>
+					withTransaction(async () => {
+						await service.approve(s.tenant, owner, id);
+						assert.isNotEmpty(await published(s));
+						throw new Error("a later step failed");
+					}),
+				),
+			/a later step failed/,
+		);
+		assert.deepEqual(await published(s), []);
+		const row = await post(s);
+		assert.equal(row.status, "waiting");
+		assert.isNull(row.publishedAt);
+	});
+
+	test("a rollback after a withdrawal copies the files back", async ({
+		client,
+		assert,
+	}) => {
+		const { s, id } = await submitted(client, "pub-roll-wd-2");
+		(await studio(client, s, "approve", id)).assertStatus(302);
+		const before = await published(s);
+		assert.isNotEmpty(before);
+		const service = await app.container.make(StudioReviewService);
+		const owner = { userId: s.owner.id, role: "owner" as const };
+		await assert.rejects(
+			() =>
+				inTenant(s.tenant, () =>
+					withTransaction(async () => {
+						await service.unpublish(s.tenant, owner, id);
+						assert.deepEqual(await published(s), []);
+						throw new Error("a later step failed");
+					}),
+				),
+			/a later step failed/,
+		);
+		assert.deepEqual(await published(s), before);
+		const row = await post(s);
+		assert.equal(row.status, "approved");
+		assert.isNotNull(row.publishedAt);
 	});
 });
 

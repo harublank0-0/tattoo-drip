@@ -11,6 +11,7 @@ import FreshInkMail from "#modules/notifications/emails/fresh_ink_mail";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import FreshInkAlertJob from "#modules/reviews/jobs/fresh_ink_alert_job";
 import ClientPost from "#modules/reviews/models/client_post";
+import env from "#start/env";
 import { queuedMails } from "#tests/helpers/accounts";
 import { reviewBody, reviewRequest } from "#tests/helpers/reviews";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
@@ -217,6 +218,19 @@ test.group("Fresh ink alerts", (group) => {
 			.redirects(0);
 		open.assertStatus(302);
 		open.assertHeader("location", `/t/${a.tenant.slug}/reviews`);
+
+		// Reviews turned off later: the alert stays on the list and counts on the bell.
+		env.set("REVIEWS_ENABLED", false);
+		try {
+			const off = await client
+				.post(`/t/${a.tenant.slug}/alerts/${row?.id}/open`)
+				.loginAs(a.owner)
+				.withCsrfToken()
+				.redirects(0);
+			off.assertHeader("location", `/t/${a.tenant.slug}/alerts`);
+		} finally {
+			env.set("REVIEWS_ENABLED", true);
+		}
 	});
 });
 

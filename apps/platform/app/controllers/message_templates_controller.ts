@@ -12,7 +12,10 @@ import {
 } from "#modules/notifications/messages";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import MessageTemplateService from "#modules/notifications/services/message_template_service";
-import { messageTemplatesValidator } from "#modules/notifications/validators/message_templates";
+import {
+	messageTemplatesValidator,
+	messageTemplatesWithoutReviewValidator,
+} from "#modules/notifications/validators/message_templates";
 import { reviewsEnabled } from "#modules/reviews/review_links";
 
 /** The kinds the page shows: the review request only while reviews are on (slice 2). */
@@ -53,15 +56,11 @@ export default class MessageTemplatesController {
 
 	async update(ctx: HttpContext) {
 		const { tenant } = tenantContext(ctx);
-		const { review_request: reviewRequest, ...texts } =
-			await ctx.request.validateUsing(messageTemplatesValidator);
 		// Off, the review request isn't on the page: its stored text stays.
-		await this.templates.save(
-			tenant,
-			reviewsEnabled() && reviewRequest !== undefined
-				? { ...texts, review_request: reviewRequest }
-				: texts,
-		);
+		const texts = reviewsEnabled()
+			? await ctx.request.validateUsing(messageTemplatesValidator)
+			: await ctx.request.validateUsing(messageTemplatesWithoutReviewValidator);
+		await this.templates.save(tenant, texts);
 		ctx.session.flash("success", "Messages saved.");
 		return ctx.response
 			.redirect()

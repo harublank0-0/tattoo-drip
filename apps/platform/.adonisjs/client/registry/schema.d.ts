@@ -587,10 +587,10 @@ export interface Registry {
     methods: ["PUT"]
     pattern: '/t/:tenant/settings/messages'
     types: {
-      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>|InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesWithoutReviewValidator)>>
       paramsTuple: [ParamValue]
       params: { tenant: ParamValue }
-      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>|InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesWithoutReviewValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
@@ -1127,10 +1127,10 @@ export interface Registry {
     methods: ["POST"]
     pattern: '/t/:tenant/inbox/:id/contacted'
     types: {
-      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/contact').inquiryContactValidator)>>
       paramsTuple: [ParamValue, ParamValue]
       params: { tenant: ParamValue; id: ParamValue }
-      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/contact').contactValidator)>>
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/contact').inquiryContactValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['contacted']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/inquiries_controller').default['contacted']>>> | { status: 422; response: { errors: SimpleError[] } }
     }

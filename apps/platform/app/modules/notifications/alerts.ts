@@ -29,16 +29,19 @@ const ARTIST_TAB_COUNTED: readonly AlertKind[] = ["fresh_ink"];
  * The unread alert kinds the bell counts for `role` (TAT-107): only what no
  * tab counts, so no number shows twice. An owner's are all on the Inbox,
  * Today and Reviews; an artist's Fresh ink is on Reviews. A new kind counts
- * on the bell until a tab counts it.
+ * on the bell until a tab counts it. With reviews off (`reviewsOn` false)
+ * there is no Reviews tab, so an old Fresh ink alert counts on the bell.
  */
-export function bellKinds(role: string): AlertKind[] {
+export function bellKinds(role: string, reviewsOn = true): AlertKind[] {
 	const counted =
 		role === "owner"
 			? OWNER_TAB_COUNTED
 			: role === "artist"
 				? ARTIST_TAB_COUNTED
 				: [];
-	return ALERT_KINDS.filter((kind) => !counted.includes(kind));
+	return ALERT_KINDS.filter(
+		(kind) => !counted.includes(kind) || (kind === "fresh_ink" && !reviewsOn),
+	);
 }
 
 /** How much of the idea a new-inquiry email quotes, in characters as people count them. */
@@ -349,7 +352,8 @@ export type AlertTarget =
  * Where opening an alert goes (TAT-52 ruling 10, TAT-88 ruling 9): an
  * owner's new-inquiry alert opens its inquiry; a deposit-proof alert opens
  * its project at the Payments card, for any role (the project page applies
- * the member's access); a Fresh ink alert opens the Reviews page. Anything
+ * the member's access); a Fresh ink alert opens the Reviews page while
+ * reviews are on. Anything
  * else stays on the list. Computed from the
  * row and the member's current role, never from the request.
  */
@@ -360,6 +364,7 @@ export function alertTarget(
 		projectId?: string | null;
 	},
 	role: string,
+	reviewsOn = true,
 ): AlertTarget | null {
 	if (alert.kind === "new_inquiry" && alert.inquiryId && role === "owner") {
 		return { route: "tenant.inbox.show", id: alert.inquiryId };
@@ -371,7 +376,10 @@ export function alertTarget(
 			hash: PAYMENTS_CARD,
 		};
 	}
-	// Fresh ink opens the Reviews page, whose waiting posts are the member's own (any role).
-	if (alert.kind === "fresh_ink") return { route: "tenant.reviews.index" };
+	// Fresh ink opens the Reviews page, whose waiting posts are the member's
+	// own (any role); with reviews off that page is a 404: stay on the list.
+	if (alert.kind === "fresh_ink" && reviewsOn) {
+		return { route: "tenant.reviews.index" };
+	}
 	return null;
 }

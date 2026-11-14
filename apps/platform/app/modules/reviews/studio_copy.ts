@@ -24,6 +24,23 @@ export const STUDIO_RULE_MESSAGES: Record<StudioReviewRule, string> = {
 	already_reported: "You reported this already. TattooDrip will decide.",
 };
 
+/** A studio's report as TattooDrip left it: still to decide, kept up, or taken down. */
+export type ReportOutcome = "open" | "kept" | "removed";
+
+export function reportOutcome(review: {
+	reportedAt: unknown;
+	reportResolvedAt: unknown;
+	takenDownAt: unknown;
+}): ReportOutcome | null {
+	if (!review.reportedAt) return null;
+	if (review.takenDownAt) return "removed";
+	return review.reportResolvedAt ? "kept" : "open";
+}
+
+/** Said by Approve when a video of the post couldn't be processed: it has no files to show. */
+export const FAILED_VIDEO_NOTE =
+	"A video couldn't be processed, so it won't be shown. The photos will.";
+
 /** The toast after each action. */
 export const STUDIO_DONE = {
 	approvedShown: "Approved. It shows where the client allowed.",
@@ -69,14 +86,16 @@ export function lastDayText(expiresAt: DateTime, timezone: string): string {
 
 /**
  * A post's state as the Reviews page says it, for the studio: waiting,
- * approved and shown (or kept, without a surface), declined, unpublished.
- * A takedown is said separately.
+ * approved and shown (or kept, without a surface), declined, unpublished,
+ * or taken down by TattooDrip (whatever the decision; its sentence follows).
  */
 export function postStatusText(post: {
 	status: PostStatus;
 	consentStudioPage: boolean;
 	consentDiscover: boolean;
+	takenDownAt?: unknown;
 }): string {
+	if (post.takenDownAt) return "Taken down by TattooDrip";
 	if (post.status === "waiting") return "Waiting for you";
 	if (post.status === "declined") return "Declined";
 	if (post.status === "unpublished") return "Unpublished";

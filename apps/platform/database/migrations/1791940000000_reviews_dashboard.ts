@@ -41,8 +41,10 @@ const NEW_KINDS = `${OLD_KINDS}, 'review_request'`;
  *   `tenants.deleted_at`: a migration that drops or retypes one of them
  *   replaces the function in the same migration.
  *
- * down() deletes the fresh-ink alerts, the studios' own review request texts
- * and the review request contacts' kind (the old checks can't hold them).
+ * down() refuses while a post is published (its public copies would be left
+ * with nothing naming them), then deletes the fresh-ink alerts, the studios'
+ * own review request texts and the review request contacts' kind (the old
+ * checks can't hold them).
  */
 export default class extends BaseSchema {
 	async up() {
@@ -133,6 +135,13 @@ end`,
 	}
 
 	async down() {
+		// Published posts have public copies that nothing would name any more:
+		// unpublish or take them down first.
+		this.schema.raw(`do $$ begin
+	if exists (select 1 from client_posts where published_at is not null) then
+		raise exception 'published Fresh ink posts exist: unpublish them (their public copies) before rolling back';
+	end if;
+end $$`);
 		for (const statement of [
 			"drop function public.client_post_tenant(uuid)",
 			"drop function public.client_review_tenant(uuid)",

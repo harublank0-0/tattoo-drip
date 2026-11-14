@@ -39,8 +39,10 @@ import StudioReviewService, {
 import {
 	consentText,
 	dayText,
+	FAILED_VIDEO_NOTE,
 	postStatusText,
 	ratingText,
+	reportOutcome,
 	STUDIO_DONE,
 	STUDIO_RULE_MESSAGES,
 } from "#modules/reviews/studio_copy";
@@ -281,9 +283,13 @@ export default class ReviewsController {
 				const processing = items.some(
 					(item) => item.kind === "video" && item.videoState === "processing",
 				);
+				const failed = items.some(
+					(item) => item.kind === "video" && item.videoState === "failed",
+				);
 				const takenDown = post.takenDownAt
 					? takedownText(post.takedownReason)
 					: null;
+				const waiting = !takenDown && post.status === "waiting";
 				return {
 					id: post.id,
 					status: post.status,
@@ -309,9 +315,12 @@ export default class ReviewsController {
 						!processing &&
 						items.length > 0,
 					approveNote:
-						!takenDown && post.status === "waiting" && processing
+						waiting && processing
 							? STUDIO_RULE_MESSAGES.processing
-							: null,
+							: waiting && failed
+								? FAILED_VIDEO_NOTE
+								: null,
+					processing,
 					canDecline: !takenDown && post.status === "waiting",
 					canUnpublish: !takenDown && post.status === "approved",
 				};
@@ -381,8 +390,8 @@ function reviewRow(
 	const takenDown = review.takenDownAt
 		? takedownText(review.takedownReason)
 		: null;
-	const openReport =
-		review.reportedAt !== null && review.reportResolvedAt === null;
+	const outcome = reportOutcome(review);
+	const openReport = outcome === "open";
 	return {
 		id: review.id,
 		rating: review.rating,
@@ -405,7 +414,9 @@ function reviewRow(
 							: null,
 					}
 				: null,
-		canReply: review.replyTakenDownAt === null,
+		// Nothing to answer once TattooDrip took the review down; a reply it
+		// took down can't change either.
+		canReply: takenDown === null && review.replyTakenDownAt === null,
 		report: review.reportedAt
 			? {
 					reasonText:
@@ -413,7 +424,7 @@ function reviewRow(
 						"",
 					note: review.reportNote,
 					dateText: dayText(review.reportedAt, timezone),
-					open: openReport,
+					outcome: outcome ?? "open",
 				}
 			: null,
 		canReport: takenDown === null && !openReport,

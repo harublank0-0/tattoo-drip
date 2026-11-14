@@ -93,8 +93,8 @@ export default function ProjectShow(props: ProjectPageProps) {
 		project.id,
 		urlFor("tenant.projects.contacted.store", params),
 		{ contactedText: props.contactedText, lastChannel: props.lastChannel },
-		// A review request's tap also sets its link's "sent on".
-		["review"],
+		// A review request's tap also sets its link's "sent on"; no other tap asks for `review`.
+		(via) => (via.kind === "review_request" ? ["review"] : []),
 	);
 
 	return (

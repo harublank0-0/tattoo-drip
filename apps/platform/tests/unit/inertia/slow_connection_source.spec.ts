@@ -131,7 +131,7 @@ test.group(
 			// A page may name more props a contact changes (the project page's `review`, slice 2).
 			assert.include(
 				source,
-				'only: ["contactedText", "lastChannel", ...also],',
+				'only: ["contactedText", "lastChannel", ...also(via)],',
 			);
 		});
 

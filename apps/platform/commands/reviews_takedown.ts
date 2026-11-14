@@ -15,7 +15,9 @@ import {
  * it was taken down, in the reason's fixed sentence; the note is for
  * operators only. Nothing is deleted, and neither the studio nor the client
  * can lift it (`reviews:restore` does). Taking a reported review down
- * closes its report.
+ * closes its report. A post's takedown deletes its public copies in the same
+ * step: while storage can't delete them the takedown fails and changes
+ * nothing; run it again once storage recovers.
  *
  *   node ace reviews:takedown review <review id> --reason hate --note "Report #12"
  *   node ace reviews:takedown reply <review id> --reason personal_data
@@ -27,6 +29,11 @@ export default class ReviewsTakedown extends BaseCommand {
 	static description =
 		"Take a client's review, the studio's reply or a Fresh ink post off every public surface";
 	static options: CommandOptions = { startApp: true };
+	static help = [
+		"A post's takedown deletes its public copies in the same step. While storage",
+		"can't delete them the takedown fails and changes nothing: run it again once",
+		"storage recovers.",
+	];
 
 	@args.string({ description: "review, reply (the review's id) or post" })
 	declare kind: string;
@@ -63,6 +70,7 @@ export default class ReviewsTakedown extends BaseCommand {
 		}
 		const { default: ReviewOperatorService, ReviewOperatorError } =
 			await import("#modules/reviews/services/review_operator_service");
+		const { ImageDeleteError } = await import("#modules/media/errors");
 		const operator = await this.app.container.make(ReviewOperatorService);
 		try {
 			await operator.takedown(
@@ -77,6 +85,13 @@ export default class ReviewsTakedown extends BaseCommand {
 					: `The ${this.kind} is off every public surface.`,
 			);
 		} catch (error) {
+			if (error instanceof ImageDeleteError) {
+				this.logger.error(
+					"Storage couldn't delete the post's public copies, so nothing changed. Run it again once storage recovers.",
+				);
+				this.exitCode = 1;
+				return;
+			}
 			if (!(error instanceof ReviewOperatorError)) throw error;
 			this.logger.error(error.message);
 			this.exitCode = 1;

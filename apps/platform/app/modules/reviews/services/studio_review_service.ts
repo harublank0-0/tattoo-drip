@@ -99,9 +99,11 @@ export default class StudioReviewService {
 
 	/**
 	 * A page of the posts `member` may see: waiting ones first in, first
-	 * out; approved and declined (declined or unpublished) ones by their
-	 * decision, newest first. Drafts are the client's own and never listed.
-	 * A page past the last is the last.
+	 * out; approved ones by their decision, newest first; declined ones
+	 * (declined, unpublished, or taken down by TattooDrip whatever their
+	 * status) by their decision or takedown, newest first. A taken-down post
+	 * is never waiting or approved here, as the badge never counts it. Drafts
+	 * are the client's own and never listed. A page past the last is the last.
 	 */
 	async postsPage(
 		tenant: TenantRef,
@@ -121,17 +123,23 @@ export default class StudioReviewService {
 			if (query.filter === "waiting") {
 				rows
 					.where("status", "waiting")
+					.whereNull("taken_down_at")
 					.orderBy("waiting_since", "asc")
 					.orderBy("id", "asc");
+			} else if (query.filter === "approved") {
+				rows
+					.where("status", "approved")
+					.whereNull("taken_down_at")
+					.orderBy("decided_at", "desc")
+					.orderBy("id", "desc");
 			} else {
 				rows
-					.whereIn(
-						"status",
-						query.filter === "approved"
-							? ["approved"]
-							: ["declined", "unpublished"],
+					.where((group) =>
+						group
+							.whereIn("status", ["declined", "unpublished"])
+							.orWhereNotNull("taken_down_at"),
 					)
-					.orderBy("decided_at", "desc")
+					.orderByRaw("coalesce(taken_down_at, decided_at) desc")
 					.orderBy("id", "desc");
 			}
 			return rows.paginate(at, REVIEWS_PAGE_SIZE);

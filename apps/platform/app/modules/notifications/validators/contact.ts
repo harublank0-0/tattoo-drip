@@ -15,10 +15,30 @@ export const contactValidator = vine.create({
 	channel: vine.enum(CONTACT_CHANNELS).optional(),
 	kind: vine.enum(MESSAGE_KINDS).optional(),
 });
-contactValidator.messagesProvider = new SimpleMessagesProvider({
+const CONTACT_MESSAGES = {
 	"channel.enum": "Choose WhatsApp, Viber, a call or a copied message.",
 	"kind.enum": "Choose one of the studio's messages.",
+};
+contactValidator.messagesProvider = new SimpleMessagesProvider(
+	CONTACT_MESSAGES,
+);
+
+/**
+ * The messages an inquiry's contact may name (`inquiries_last_contact_kind_check`): every kind
+ * but the review request (Reviews and Fresh ink, slice 2), which only a project offers.
+ */
+export const INQUIRY_MESSAGE_KINDS = MESSAGE_KINDS.filter(
+	(kind) => kind !== "review_request",
+);
+
+/** What the inquiry's contact route takes: contactValidator without the review request. */
+export const inquiryContactValidator = vine.create({
+	channel: vine.enum(CONTACT_CHANNELS).optional(),
+	kind: vine.enum(INQUIRY_MESSAGE_KINDS).optional(),
 });
+inquiryContactValidator.messagesProvider = new SimpleMessagesProvider(
+	CONTACT_MESSAGES,
+);
 
 /** The validated body as a last contact: what is missing is null. */
 export function toContactVia({

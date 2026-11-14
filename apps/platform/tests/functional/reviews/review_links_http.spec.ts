@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import Artist from "#modules/artists/models/artist";
+import Inquiry from "#modules/inquiries/models/inquiry";
 import MessageTemplate from "#modules/notifications/models/message_template";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ReviewLink from "#modules/reviews/models/review_link";
@@ -289,6 +290,25 @@ test.group("The review request message in Settings, Messages", (group) => {
 			.withCsrfToken()
 			.redirects(0);
 		assertValidationError(missing, "review_request");
+		// Emptied or left out while reviews are on: the same field error as the other kinds.
+		for (const body of [
+			{ ...texts, review_request: "" },
+			Object.fromEntries(
+				Object.entries(texts).filter(([kind]) => kind !== "review_request"),
+			),
+		]) {
+			const refused = await client
+				.put(settings)
+				.form(body)
+				.loginAs(a.owner)
+				.withCsrfToken()
+				.redirects(0);
+			assertValidationError(
+				refused,
+				"review_request",
+				"Write the message, or reset it to the default.",
+			);
+		}
 		const saved = await client
 			.put(settings)
 			.form({
@@ -331,5 +351,36 @@ test.group("The review request message in Settings, Messages", (group) => {
 			"Tell us how it healed: {review_link}",
 			"kept while reviews are off",
 		);
+	});
+});
+
+test.group("The review request is a project's message only", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("an inquiry's contact route refuses the review request kind (422), and records nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { a } = await twoStudios();
+		const response = await client
+			.post(`/t/${a.tenant.slug}/inbox/${a.newInquiry.id}/contacted`)
+			.json({ channel: "whatsapp", kind: "review_request" })
+			.header("accept", "application/json")
+			.loginAs(a.owner)
+			.withCsrfToken()
+			.redirects(0);
+		response.assertStatus(422);
+		const inquiry = await inTenant(a.tenant, () =>
+			Inquiry.findOrFail(a.newInquiry.id),
+		);
+		assert.isNull(inquiry.lastContactKind);
+		const fine = await client
+			.post(`/t/${a.tenant.slug}/inbox/${a.newInquiry.id}/contacted`)
+			.json({ channel: "whatsapp", kind: "inquiry_received" })
+			.header("accept", "application/json")
+			.loginAs(a.owner)
+			.withCsrfToken()
+			.redirects(0);
+		fine.assertStatus(302);
 	});
 });

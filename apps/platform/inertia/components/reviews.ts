@@ -44,7 +44,10 @@ export type PostRow = {
 	project: ReviewProjectRef;
 	media: ReviewMediaRow[];
 	canApprove: boolean;
+	/** Why Approve is missing, or what it won't show (a video still processing, or one that failed). */
 	approveNote: string | null;
+	/** A video of the post is still processing: the page asks again quietly. */
+	processing: boolean;
 	canDecline: boolean;
 	canUnpublish: boolean;
 };
@@ -65,7 +68,8 @@ export type ReviewRow = {
 		reasonText: string;
 		note: string | null;
 		dateText: string;
-		open: boolean;
+		/** TattooDrip still deciding, kept it up, or took it down. */
+		outcome: "open" | "kept" | "removed";
 	} | null;
 	canReport: boolean;
 };
@@ -153,12 +157,12 @@ export function emptyText(
 	}
 	if (postFilter === "waiting") return "No Fresh ink waiting for you.";
 	if (postFilter === "approved") return "No approved Fresh ink yet.";
-	return "No declined or unpublished Fresh ink.";
+	return "No declined, unpublished or taken-down Fresh ink.";
 }
 
 /** The page's introduction: what the studio can and can't do (rulings 6 and 7). */
 export const REVIEWS_INTRO =
-	"Your clients' reviews and their photos of the healed tattoo. Reviews show as clients write them: you can reply once and report abuse to TattooDrip, never hide or edit them. Fresh ink shows only once you approve it.";
+	"Your clients' reviews and their photos of the healed tattoo. Reviews show as clients write them: you can answer each with one public reply and report abuse to TattooDrip, never hide or edit them. Fresh ink shows only once you approve it.";
 
 /** The Decline question (ruling 7). */
 export const DECLINE_QUESTION =
@@ -176,6 +180,33 @@ export const REVOKE_QUESTION =
 export function replyHint(max: number): string {
 	return `One public reply, up to ${max.toLocaleString("en")} characters. It shows under the review where the client allowed it.`;
 }
+
+/** What a reported review's line says: when, why, the studio's note and what TattooDrip did. */
+export function reportLine(report: {
+	reasonText: string;
+	note: string | null;
+	dateText: string;
+	outcome: "open" | "kept" | "removed";
+}): string {
+	const note = report.note ? ` Your note: “${report.note}”` : "";
+	const outcome =
+		report.outcome === "open"
+			? "TattooDrip will decide; the review stays up until then."
+			: report.outcome === "kept"
+				? "TattooDrip kept it up."
+				: "TattooDrip took it down.";
+	return `Reported on ${report.dateText}. Reason: ${report.reasonText}.${note} ${outcome}`;
+}
+
+/** Whether any post shown has a video the worker still has: the page then asks again every few seconds. */
+export function postsProcessing(
+	posts: readonly { processing: boolean }[],
+): boolean {
+	return posts.some(({ processing }) => processing);
+}
+
+/** A tile whose signed URL failed (it expires after 5 minutes). */
+export const MEDIA_UNAVAILABLE = "Image unavailable. Reload the page.";
 
 /** Under the report form. */
 export const REPORT_HINT =

@@ -548,10 +548,10 @@ export default class ClientPostService {
 		post: ClientPost,
 	): Promise<void> {
 		const media = await this.mediaOf(tenant, post, trx);
-		// The public copies first (slice 2), then the private files.
-		if (post.publishedAt) {
-			await this.publication.withdraw(tenant, post, media);
-		}
+		// The public copies first (slice 2), whatever `published_at` says (a
+		// copy left by an earlier failure goes too; a missing one counts as
+		// deleted), then the private files.
+		await this.publication.withdraw(tenant, post, media);
 		await this.deleteFiles(tenant, media);
 		await ClientPostMedia.query({ client: trx })
 			.where("tenant_id", tenant.id)

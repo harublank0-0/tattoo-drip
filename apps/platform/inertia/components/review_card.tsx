@@ -140,6 +140,7 @@ export default function ReviewCard({
 										text={text}
 										label="Copy message"
 										copiedText="Message copied."
+										failedText="Couldn't copy: select the message instead."
 										variant="outline"
 										onCopied={() =>
 											onContact({ channel: "copy", kind: "review_request" })

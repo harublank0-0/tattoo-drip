@@ -7,6 +7,7 @@ import {
 	lastDayText,
 	postStatusText,
 	ratingText,
+	reportOutcome,
 } from "#modules/reviews/studio_copy";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; `ReviewsModule` below restates its shape and the inertia project type-checks the real one.
 import * as reviewsModule from "../../../inertia/components/reviews.js";
@@ -32,12 +33,23 @@ type ReviewsModule = {
 		sentText: string | null;
 	}): string;
 	replyHint(max: number): string;
+	reportLine(report: {
+		reasonText: string;
+		note: string | null;
+		dateText: string;
+		outcome: "open" | "kept" | "removed";
+	}): string;
+	postsProcessing(posts: { processing: boolean }[]): boolean;
+	REVIEWS_INTRO: string;
 };
 const {
 	emptyText,
 	linkDatesText,
 	mediaLabel,
+	postsProcessing,
 	replyHint,
+	reportLine,
+	REVIEWS_INTRO,
 	reviewsHref,
 	viewTabs,
 } = reviewsModule as ReviewsModule;
@@ -185,6 +197,79 @@ test.group("Reviews page: the words", () => {
 				"Asia/Kathmandu",
 			),
 			"12 Nov 2027",
+		);
+	});
+});
+
+test.group("Reviews page: takedowns, reports and processing", () => {
+	test("a taken-down post says so whatever its decision; a report says what TattooDrip did", ({
+		assert,
+	}) => {
+		for (const status of ["waiting", "approved", "declined"] as const) {
+			assert.equal(
+				postStatusText({
+					status,
+					consentStudioPage: true,
+					consentDiscover: false,
+					takenDownAt: new Date(),
+				}),
+				"Taken down by TattooDrip",
+			);
+		}
+		const at = new Date();
+		assert.isNull(
+			reportOutcome({
+				reportedAt: null,
+				reportResolvedAt: null,
+				takenDownAt: at,
+			}),
+		);
+		assert.equal(
+			reportOutcome({
+				reportedAt: at,
+				reportResolvedAt: null,
+				takenDownAt: null,
+			}),
+			"open",
+		);
+		assert.equal(
+			reportOutcome({
+				reportedAt: at,
+				reportResolvedAt: at,
+				takenDownAt: null,
+			}),
+			"kept",
+		);
+		// The takedown closed the report: it says removed, never "kept it up".
+		assert.equal(
+			reportOutcome({ reportedAt: at, reportResolvedAt: at, takenDownAt: at }),
+			"removed",
+		);
+		const report = {
+			reasonText: "Not a client",
+			note: null,
+			dateText: "14 Nov 2026",
+		};
+		assert.equal(
+			reportLine({ ...report, outcome: "open" }),
+			"Reported on 14 Nov 2026. Reason: Not a client. TattooDrip will decide; the review stays up until then.",
+		);
+		assert.equal(
+			reportLine({ ...report, note: "Never here.", outcome: "kept" }),
+			"Reported on 14 Nov 2026. Reason: Not a client. Your note: “Never here.” TattooDrip kept it up.",
+		);
+		assert.match(
+			reportLine({ ...report, outcome: "removed" }),
+			/TattooDrip took it down\.$/,
+		);
+		assert.isTrue(
+			postsProcessing([{ processing: false }, { processing: true }]),
+		);
+		assert.isFalse(postsProcessing([]));
+		assert.notInclude(REVIEWS_INTRO, "reply once");
+		assert.equal(
+			emptyText("posts", "declined", "all"),
+			"No declined, unpublished or taken-down Fresh ink.",
 		);
 	});
 });

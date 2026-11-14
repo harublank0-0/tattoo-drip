@@ -1,4 +1,5 @@
 import { inject } from "@adonisjs/core";
+import logger from "@adonisjs/core/services/logger";
 import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, { keyUnder } from "#modules/media/services/image_service";
@@ -131,13 +132,21 @@ export default class PostPublicationService {
 	/**
 	 * Deletes the public copies of these items, or throws ImageDeleteError
 	 * (VideoDeleteError for a video) naming what is left, and clears
-	 * `publishedAt` (not saved). A file already gone counts as deleted.
+	 * `publishedAt` (not saved). A file already gone counts as deleted, so it
+	 * may run on a post that was never published (the deletes, `erase`). When
+	 * the post was published, a rollback copies the files back from the
+	 * private originals (best effort, logged), so storage and `published_at`
+	 * agree again.
 	 */
 	async withdraw(
 		tenant: TenantRef,
 		post: ClientPost,
 		media: readonly MediaFiles[],
 	): Promise<void> {
+		if (post.publishedAt !== null) {
+			const items = [...media];
+			afterRollback(() => this.republish(tenant, post.id, items));
+		}
 		for (const key of publicKeys(media).photos) {
 			await this.images.deleteOrThrow(PUBLIC_PHOTO_PURPOSE, key);
 		}
@@ -150,6 +159,43 @@ export default class PostPublicationService {
 			);
 		}
 		post.publishedAt = null;
+	}
+
+	/** A rolled-back withdrawal's copies made again; a failure is logged, never thrown. */
+	private async republish(
+		tenant: TenantRef,
+		postId: string,
+		media: readonly MediaFiles[],
+	): Promise<void> {
+		for (const item of media) {
+			try {
+				if (item.kind === "photo" && item.imageKey) {
+					await this.images.copyTo(
+						PHOTO,
+						PUBLIC_PHOTO_PURPOSE,
+						item.imageKey,
+						tenant,
+					);
+				} else if (
+					item.kind === "video" &&
+					item.videoState === "ready" &&
+					item.imageKey
+				) {
+					await this.videos.copyTo(
+						tenant,
+						item.imageKey,
+						item.videoKeys ?? [],
+						VIDEO,
+						PUBLIC_VIDEO_PURPOSE,
+					);
+				}
+			} catch (error) {
+				logger.error(
+					{ err: error, tenantId: tenant.id, postId },
+					"a rolled-back withdrawal could not copy a Fresh ink file back",
+				);
+			}
+		}
 	}
 
 	private mediaOf(tenant: TenantRef, post: Pick<ClientPost, "id">) {
