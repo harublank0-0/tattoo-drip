@@ -9,7 +9,7 @@ import { Wordmark } from "./wordmark.tsx";
 
 /** A primary link: quiet until hovered, an underline bar on its own page. */
 const PRIMARY_LINK =
-	"relative inline-flex min-h-10 items-center text-sm font-medium text-ink-muted transition-colors hover:text-ink data-[status=active]:text-ink after:absolute after:inset-x-0 after:bottom-1 after:h-px after:origin-left after:scale-x-0 after:bg-ink after:transition-transform data-[status=active]:after:scale-x-100";
+	"relative inline-flex min-h-10 items-center whitespace-nowrap text-sm font-medium text-ink-muted transition-colors hover:text-ink data-[status=active]:text-ink after:absolute after:inset-x-0 after:bottom-1 after:h-px after:origin-left after:scale-x-0 after:bg-ink after:transition-transform data-[status=active]:after:scale-x-100";
 
 /**
  * The global header (D05; Pricing D06): the wordmark, the discovery links
@@ -30,10 +30,10 @@ export function SiteHeader({
 	const business = businessNav(studioOsUrl);
 	return (
 		<header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/85">
-			<div className="page-gutter mx-auto flex h-16 max-w-[90rem] items-center gap-8 lg:gap-5 xl:gap-8">
-				<Wordmark />
+			<div className="page-gutter mx-auto flex h-16 max-w-[90rem] items-center gap-8 lg:gap-4 xl:gap-8">
+				<Wordmark className="shrink-0 whitespace-nowrap" />
 				<nav aria-label="Discover" className="hidden lg:block">
-					<ul className="flex items-center gap-6 xl:gap-7">
+					<ul className="flex items-center gap-4 xl:gap-7">
 						{PRIMARY_NAV.map((item) => (
 							<li key={item.to}>
 								<NavLink item={item} className={PRIMARY_LINK} />

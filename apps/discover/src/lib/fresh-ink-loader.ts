@@ -31,8 +31,8 @@ const optional = <T>(read: Promise<T>) =>
  * list and places beside the page (optional; only a `style` waits for the
  * list), then the page in the page's country. A cursor the API refuses
  * goes to the same filters' first page; any other failure is the route's
- * error state. An empty page (nothing posted, nothing matching, or reviews
- * switched off on the platform) says `noindex` (thin content).
+ * error state. An empty page (nothing posted or nothing matching) says
+ * `noindex` (thin content).
  */
 export async function loadFreshInk(
 	context: LoaderContext,

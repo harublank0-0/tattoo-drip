@@ -140,8 +140,8 @@ export const INDEXABLE_PATTERNS: readonly RegExp[] = [
 	/^\/tattoos\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
 	// Reviews and Fresh ink (slice 4): the bare feed, indexable only when it has
 	// posts (its loader says `noindex` when empty). A pattern, not an
-	// INDEXABLE_PATHS entry, so it stays out of the static sitemap while the
-	// feature is behind its flag (frontend guidance, "Fresh ink").
+	// INDEXABLE_PATHS entry: the static sitemap lists it only while the
+	// default country's feed has a post (src/lib/sitemap.ts).
 	/^\/fresh-ink$/,
 ];
 

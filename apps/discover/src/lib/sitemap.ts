@@ -8,7 +8,8 @@ import { INDEXABLE_PATHS, siteUrl } from "./seo.ts";
  * while DISCOVER_INDEXING is on (the routes answer 404 otherwise).
  *
  * `/sitemap.xml` is an index of child sitemaps under `/sitemaps/`:
- * `static.xml` (INDEXABLE_PATHS), `styles.xml`, `locations.xml`, and the
+ * `static.xml` (INDEXABLE_PATHS, and the Fresh ink feed while it has a
+ * post), `styles.xml`, `locations.xml`, and the
  * paged `studios.xml`, `artists.xml` and `tattoos.xml`. A paged child is one
  * page of the API's sitemap list (`/discover/sitemap/*`: identifiers only,
  * keyset-paged by id, `SITEMAP_PAGE` a page, far under the protocol's
@@ -163,7 +164,10 @@ export async function sitemapUrls(
 	const at = (path: string) => siteUrl(settings, path);
 	switch (kind as SitemapKind) {
 		case "static":
-			return INDEXABLE_PATHS.map(at);
+			return [
+				...INDEXABLE_PATHS,
+				...((await freshInkListed(client, settings)) ? [paths.freshInk()] : []),
+			].map(at);
 		case "styles":
 			return (await listedStyles(client, settings)).map((slug) =>
 				at(paths.style(slug)),
@@ -196,6 +200,22 @@ function pageQuery(after: string | null) {
 		limit: SITEMAP_PAGE,
 		...(after ? { cursor: after.toLowerCase() } : {}),
 	};
+}
+
+/**
+ * Whether the bare Fresh ink feed is indexable for a crawler: like a style
+ * page it follows the visitor's country, a crawler without a cookie gets
+ * the default country, and an empty feed is noindex. One read (limit 1).
+ */
+async function freshInkListed(
+	client: DiscoverClient,
+	settings: Settings,
+): Promise<boolean> {
+	const page = await client.freshInk.list({
+		country: settings.defaultCountry,
+		limit: 1,
+	});
+	return page.data.length > 0;
 }
 
 /**

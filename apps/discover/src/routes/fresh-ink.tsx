@@ -16,8 +16,7 @@ import { galleryPlaces } from "#/lib/gallery-loader";
  * Discover, newest first, in the page's country (D06.5), filtered by style
  * and city, paged by the API's cursor. Each opens its viewer; each links
  * its artist's and studio's profiles, and booking only through
- * `bookingLinks`. While reviews are switched off on the platform the API
- * answers empty pages: the page is then its empty state, noindex.
+ * `bookingLinks`. An empty page is its empty state, noindex.
  */
 export const Route = createFileRoute("/fresh-ink")({
 	validateSearch: (search: Record<string, unknown>): FreshInkSearch =>

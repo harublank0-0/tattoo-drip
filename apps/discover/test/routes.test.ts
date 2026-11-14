@@ -107,6 +107,7 @@ describe("Discover routes and navigation", () => {
 				"Explore studios",
 				"Find artists",
 				"Tattoo inspiration",
+				"Fresh ink",
 				"For studios",
 				"Pricing",
 				"Sign in",
