@@ -1088,6 +1088,60 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         default: { $ref: "#/components/responses/Error" }
 
+  /tenants/{tenant}/deposits/{token}/checkout:
+    parameters:
+      - $ref: "#/components/parameters/Tenant"
+      - $ref: "#/components/parameters/DepositToken"
+    post:
+      operationId: startDepositCheckout
+      tags: [V1]
+      summary: Pay the deposit online
+      description: |
+        Starts (or reuses) a PayBridgeNP hosted checkout for the deposit
+        still due, paid to the studio's own eSewa, Khalti or Fonepay
+        merchant accounts (docs/payments-paybridgenp.md). Send no body: the
+        amount is the deposit still due, read by the API; the client never
+        sends one. Open the answer's `checkoutUrl` in the same tab. Coming
+        back from it proves nothing: reload the deposit page, whose
+        `onlinePayment.checkout` says `confirming` until the studio's
+        payment provider confirms the payment to the API, then `paid`.
+        Only while `onlinePayment.available` is true. Under an old slug it
+        is a 404. Rate-limited per address and per link.
+
+        Own codes: `online_payment_unavailable` (409: the studio doesn't
+        take online payments, the page's state isn't `due`, or the amount
+        is outside NPR 10 to NPR 10,00,000), `online_payment_in_progress`
+        (409: the previous online payment is still on the provider's page or
+        was just paid; never offer to pay again, reload later) and
+        `payment_provider_unavailable` (503: the provider didn't answer;
+        nothing was charged, try again).
+      responses:
+        "201":
+          description: The checkout to open
+          headers:
+            Cache-Control: { $ref: "#/components/headers/CacheControl" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                additionalProperties: false
+                properties:
+                  data: { $ref: "#/components/schemas/DepositCheckout" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Online payment isn't available for this deposit now (`online_payment_unavailable`, `online_payment_in_progress`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: The payment provider or the API is busy (`payment_provider_unavailable`, `service_busy`). Try again in a moment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        default: { $ref: "#/components/responses/Error" }
+
   /tenants/{tenant}/review:
     parameters:
       - $ref: "#/components/parameters/Tenant"
@@ -2732,7 +2786,7 @@ components:
 
     DepositPage:
       type: object
-      required: [studio, project, deposit, referenceCode, state, lastProofRejected, proofSubmittedAt, paymentMethods, depositPolicy, nextSession]
+      required: [studio, project, deposit, referenceCode, state, lastProofRejected, proofSubmittedAt, paymentMethods, depositPolicy, nextSession, onlinePayment]
       additionalProperties: false
       properties:
         studio:
@@ -2792,6 +2846,46 @@ components:
         nextSession:
           description: Once the deposit is paid, the project's next session; null in every other state and when none is scheduled.
           oneOf: [{ $ref: "#/components/schemas/DepositSession" }, { type: "null" }]
+        onlinePayment: { $ref: "#/components/schemas/DepositOnlinePayment" }
+
+    DepositOnlinePayment:
+      type: object
+      description: |
+        Paying the deposit online through the studio's own payment provider
+        (startDepositCheckout).
+      required: [available, checkout]
+      additionalProperties: false
+      properties:
+        available:
+          type: boolean
+          description: The page may offer "Pay online" now (state `due`, and the studio takes online payments).
+        checkout:
+          description: The latest online attempt of the last two days, or null.
+          oneOf:
+            - type: object
+              required: [id, status]
+              additionalProperties: false
+              properties:
+                id: { type: string, format: uuid }
+                status:
+                  type: string
+                  description: |
+                    `confirming` (started, no confirmed payment yet: show it
+                    as being checked, never as paid), `paid` (confirmed and
+                    recorded), `failed` or `expired` (offer to try again).
+                  enum: [confirming, paid, failed, expired]
+            - { type: "null" }
+
+    DepositCheckout:
+      type: object
+      required: [checkoutUrl]
+      additionalProperties: false
+      properties:
+        checkoutUrl:
+          type: string
+          format: uri
+          description: The provider's hosted checkout page. Valid for 30 minutes.
+
 
     DepositSession:
       type: object

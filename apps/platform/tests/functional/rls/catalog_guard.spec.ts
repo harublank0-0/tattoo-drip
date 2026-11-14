@@ -19,6 +19,8 @@ const EXEMPT: Record<string, string> = {
 		"single-use account links (TAT-18): SHA-256 digests only, read before any context exists by a link anyone may open, not tenant-owned",
 	places:
 		"platform reference data (Discover D02): the cities a studio can name, the same for everyone; the app role may only read it",
+	billing_plans:
+		"platform reference data: TattooDrip's own plan catalogue, mirrored to PayBridgeNP (docs/payments-paybridgenp.md); no studio's data",
 	adonis_schema: "migration bookkeeping",
 	adonis_schema_versions: "migration bookkeeping",
 };
@@ -39,6 +41,11 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 		"discovery_select:SELECT",
 		"tenant_isolation:ALL",
 	],
+	billing_access_periods: ["tenant_isolation:ALL"],
+	billing_customers: ["tenant_isolation:ALL"],
+	billing_events: ["tenant_isolation:ALL"],
+	billing_invoices: ["tenant_isolation:ALL"],
+	billing_subscriptions: ["tenant_isolation:ALL"],
 	clients: ["tenant_isolation:ALL"],
 	deposit_links: ["tenant_isolation:ALL"],
 	// Reviews and Fresh ink (slice 1).
@@ -49,6 +56,11 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	client_video_reservations: ["tenant_isolation:ALL"],
 	deposit_outcomes: ["tenant_isolation:ALL"],
 	flash_designs: ["tenant_isolation:ALL"],
+	gateway_accounts: ["tenant_isolation:ALL"],
+	gateway_checkouts: ["tenant_isolation:ALL"],
+	gateway_events: ["tenant_isolation:ALL"],
+	gateway_payments: ["tenant_isolation:ALL"],
+	gateway_refunds: ["tenant_isolation:ALL"],
 	inquiries: ["tenant_isolation:ALL"],
 	inventory_items: ["tenant_isolation:ALL"],
 	inventory_lots: ["tenant_isolation:ALL"],
@@ -91,6 +103,31 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
  * pinned search_path and no EXECUTE for PUBLIC (database/README.md).
  */
 const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
+	"public.billing_tenant_for_customer": {
+		args: "requested_customer text",
+		reason:
+			"the id of the live studio whose PayBridgeNP billing customer id is exactly the argument, for signed platform webhooks (docs/payments-paybridgenp.md)",
+	},
+	"public.billing_tenants": {
+		args: "",
+		reason:
+			"the ids of live studios with a billing customer, for the reconciliation job and the admin Billing page, each read in its own context",
+	},
+	"public.gateway_account_tenants": {
+		args: "",
+		reason:
+			"the ids of live studios with a payment connection, for the admin review page, each read in its own context",
+	},
+	"public.gateway_checkouts_to_reconcile": {
+		args: "",
+		reason:
+			"lists (tenant_id, checkout_id) of online checkouts still open 10 minutes to 2 days on, for the reconciliation job",
+	},
+	"public.gateway_tenant_for_webhook": {
+		args: "requested_key text",
+		reason:
+			"the id of the live studio whose payment connection has exactly this webhook path key, before its own secret checks the signature",
+	},
 	"public.client_post_tenant": {
 		args: "requested_id uuid",
 		reason:

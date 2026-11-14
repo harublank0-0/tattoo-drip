@@ -93,6 +93,30 @@ export interface DepositView {
 	readonly takesProof: boolean;
 	/** Once `paid`, the project's next session (TAT-110); null otherwise. */
 	readonly session: SessionView | null;
+	/** Paying online (startDepositCheckout): offered, and the latest attempt's state. */
+	readonly online: OnlineView;
+}
+
+export interface OnlineView {
+	readonly available: boolean;
+	/** The latest attempt of the last two days, or null. */
+	readonly checkout: "confirming" | "paid" | "failed" | "expired" | null;
+}
+
+const CHECKOUT_STATES = ["confirming", "paid", "failed", "expired"] as const;
+
+/** The API's onlinePayment, or nothing offered (missing on an API before it). */
+function onlineView(
+	value: DepositPage["onlinePayment"] | undefined,
+): OnlineView {
+	const status = value?.checkout?.status;
+	return {
+		available: value?.available === true,
+		checkout:
+			status && (CHECKOUT_STATES as readonly string[]).includes(status)
+				? status
+				: null,
+	};
 }
 
 export function depositView(page: DepositPage): DepositView {
@@ -123,6 +147,10 @@ export function depositView(page: DepositPage): DepositView {
 		takesProof:
 			state === "due" && methods.length > 0 && Number.isInteger(due) && due > 0,
 		session: state === "paid" ? sessionView(page.nextSession) : null,
+		online:
+			state === "due"
+				? onlineView(page.onlinePayment)
+				: { available: false, checkout: null },
 	};
 }
 

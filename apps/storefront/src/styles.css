@@ -932,6 +932,7 @@
   .deposit-pick:hover { background: var(--stencil-wash); }
   .deposit-pick:focus-within { outline: 2px solid var(--stencil); outline-offset: 3px; }
   .deposit-pick-locked { cursor: progress; opacity: 0.75; }
+  .deposit-online { border: 1px solid var(--line, currentColor); border-radius: 0.75rem; padding: 1rem; inline-size: 100%; }
   .deposit-proof-status, .deposit-send-status { min-block-size: 1.6em; font-size: 0.9375rem; font-weight: 600; }
   .deposit-field-error { color: var(--destructive); font-size: 0.9375rem; }
   .deposit-alert { display: grid; gap: 0.5rem; justify-items: start; padding-block: 0.75rem; padding-inline: 1rem 0; border-inline-start: 2px solid var(--destructive); }

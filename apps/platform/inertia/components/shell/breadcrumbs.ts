@@ -31,6 +31,8 @@ export const PAGE_LABELS: Record<string, string> = {
 	"settings/discover_preview": "Discover preview",
 	"settings/payments": "Payments",
 	"settings/payment_method_form": "Payment method",
+	"settings/online_payments": "Online payments",
+	"settings/billing": "Billing",
 	"settings/messages": "Messages",
 	"settings/members": "Members",
 	"alerts/index": "Alerts",
@@ -43,6 +45,8 @@ export const PAGE_LABELS: Record<string, string> = {
 const OUTSIDE_LABELS: Record<string, string> = {
 	"artists/form": "Your artist profile",
 	"account/show": "Your account",
+	"admin/billing": "TattooDrip billing",
+	"admin/payments": "Studio payment connections",
 };
 
 /**

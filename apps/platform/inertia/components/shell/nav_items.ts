@@ -12,6 +12,7 @@ export type NavKey =
 	| "clients"
 	| "artists"
 	| "inventory"
+	| "transactions"
 	| "portfolio"
 	| "reviews"
 	| "settings";
@@ -27,6 +28,7 @@ export type ShellNavItem = {
 		| "tenant.clients.index"
 		| "tenant.artists"
 		| "tenant.inventory.index"
+		| "tenant.transactions.index"
 		| "tenant.portfolio"
 		| "tenant.reviews.index"
 		| "tenant.settings";
@@ -59,7 +61,7 @@ const counted = (count: number | null, badgeLabel?: string) =>
 /**
  * What `tenant`'s member sees (TAT-107): Today, Inbox (owners), Projects and
  * Calendar, and for owners Reviews (while reviews are on), Clients, Artists, Portfolio,
- * Inventory and Settings under More. An artist has Portfolio (their own work) as a fourth tab,
+ * Inventory, Transactions and Settings under More. An artist has Portfolio (their own work) as a fourth tab,
  * Reviews as a fifth while reviews are on, and Inventory under More when their owner grants
  * access. Nothing
  * is counted twice: the Inbox counts new requests, Today the projects that
@@ -149,6 +151,12 @@ export function navItems(
 			},
 			portfolio,
 			inventory,
+			{
+				key: "transactions",
+				label: "Transactions",
+				route: "tenant.transactions.index",
+				place: "more",
+			},
 			{
 				key: "settings",
 				label: "Settings",

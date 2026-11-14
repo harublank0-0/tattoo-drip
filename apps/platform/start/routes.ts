@@ -144,6 +144,18 @@ router
 			.where("id", router.matchers.uuid())
 			.as("tenant.inventory.restore");
 
+		// The studio's customer-side money (docs/payments-paybridgenp.md).
+		router
+			.get("transactions", [controllers.Transactions, "index"])
+			.as("tenant.transactions.index");
+		router
+			.get("transactions/export.csv", [controllers.Transactions, "exportCsv"])
+			.as("tenant.transactions.export");
+		router
+			.post("transactions/:id/sync", [controllers.Transactions, "sync"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.transactions.sync");
+
 		// Today (TAT-107): every member's home, what needs them right now.
 		router.get("today", [controllers.Today, "show"]).as("tenant.today");
 
@@ -196,6 +208,40 @@ router
 				router
 					.get("payments", [controllers.PaymentMethods, "index"])
 					.as("tenant.settings.payments");
+				// The studio's own PayBridgeNP project, for clients' online
+				// deposits (docs/payments-paybridgenp.md).
+				router
+					.get("online-payments", [controllers.OnlinePayments, "show"])
+					.as("tenant.settings.online_payments");
+				router
+					.post("online-payments", [controllers.OnlinePayments, "connect"])
+					.as("tenant.settings.online_payments.connect");
+				router
+					.delete("online-payments", [controllers.OnlinePayments, "disconnect"])
+					.as("tenant.settings.online_payments.disconnect");
+				// The studio's TattooDrip subscription (PayBridgeNP Billing).
+				router
+					.get("billing", [controllers.Billing, "show"])
+					.as("tenant.settings.billing");
+				router
+					.post("billing/subscription", [controllers.Billing, "subscribe"])
+					.as("tenant.settings.billing.subscribe");
+				router
+					.post("billing/subscription/cancel", [controllers.Billing, "cancel"])
+					.as("tenant.settings.billing.cancel");
+				router
+					.post("billing/subscription/plan", [
+						controllers.Billing,
+						"changePlan",
+					])
+					.as("tenant.settings.billing.change_plan");
+				router
+					.post("billing/sync", [controllers.Billing, "sync"])
+					.as("tenant.settings.billing.sync");
+				router
+					.post("billing/invoices/:id/pay", [controllers.Billing, "pay"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.settings.billing.pay");
 				router
 					.put("deposits", [controllers.DepositSettings, "update"])
 					.as("tenant.settings.deposits.update");
@@ -795,6 +841,25 @@ router
 	.use([middleware.auth(), middleware.dbContext()]);
 
 /**
+ * TattooDrip's own staff pages (docs/payments-paybridgenp.md): accounts
+ * listed in PLATFORM_ADMIN_EMAILS; anyone else gets a 404.
+ */
+router
+	.group(() => {
+		router
+			.get("billing", [controllers.Admin, "billingIndex"])
+			.as("admin.billing");
+		router
+			.get("payments", [controllers.Admin, "gatewaysIndex"])
+			.as("admin.payments");
+		router
+			.post("payments/review", [controllers.Admin, "review"])
+			.as("admin.payments.review");
+	})
+	.prefix("/admin")
+	.use([middleware.auth(), middleware.dbContext(), middleware.platformAdmin()]);
+
+/**
  * The public API (TAT-32): stateless and cookieless (the session, CSRF,
  * auth and Inertia middleware skip /api), CORS open without credentials,
  * { data } and { error } envelopes (#services/public_api_errors). Every /api
@@ -805,6 +870,27 @@ router
  */
 router
 	.group(() => {
+		/**
+		 * PayBridgeNP's webhooks (docs/payments-paybridgenp.md): no body
+		 * parser and no per-address budget (BodyParserMiddleware,
+		 * PublicGateMiddleware); the handler reads the raw body, at most 64 KB,
+		 * and checks its signature before anything else. A studio's URL holds
+		 * its connection's random key (32 base64url characters).
+		 */
+		router
+			.post("/webhooks/paybridgenp/platform", [
+				controllers.PaybridgeWebhooks,
+				"platform",
+			])
+			.as("api.v1.webhooks.platform");
+		router
+			.post("/webhooks/paybridgenp/studios/:key", [
+				controllers.PaybridgeWebhooks,
+				"studio",
+			])
+			.where("key", /^[A-Za-z0-9_-]{32}$/)
+			.as("api.v1.webhooks.studio");
+
 		// The platform's tattoo styles (TAT-126): the fixed list, the same for
 		// everyone and under no studio, so it is cached like the studio's reads.
 		router
@@ -953,6 +1039,16 @@ router
 					.where("token", DEPOSIT_TOKEN)
 					.use(middleware.depositThrottle())
 					.as("api.v1.deposits.store");
+				// Paying the deposit online (startDepositCheckout): no body is
+				// read; the amount is the API's own.
+				router
+					.post("/deposits/:token/checkout", [
+						controllers.PublicDeposits,
+						"checkout",
+					])
+					.where("token", DEPOSIT_TOKEN)
+					.use(middleware.depositThrottle())
+					.as("api.v1.deposits.checkout");
 				// The client's review page (Reviews and Fresh ink, slice 1). The
 				// link's token rides in the X-Review-Token header, never the URL.
 				// reviewGuard answers every route with the 404 while the feature

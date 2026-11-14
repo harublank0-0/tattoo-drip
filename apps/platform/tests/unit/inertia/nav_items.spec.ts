@@ -56,7 +56,15 @@ test.group("navItems", () => {
 		});
 		assert.deepEqual(
 			owned.filter(({ place }) => place === "more").map(({ key }) => key),
-			["reviews", "clients", "artists", "portfolio", "inventory", "settings"],
+			[
+				"reviews",
+				"clients",
+				"artists",
+				"portfolio",
+				"inventory",
+				"transactions",
+				"settings",
+			],
 		);
 		const artists = navItems(artist, { ...none, reviews: 0 });
 		assert.deepEqual(
@@ -77,7 +85,7 @@ test.group("navItems", () => {
 		assert.deepEqual(rolesFor("tenant.reviews.index"), ["owner", "artist"]);
 	});
 
-	test("owners get Today, Inbox, Projects and Calendar, with Clients, Artists, Portfolio, Inventory and Settings under More; artists get Today, Projects, Calendar and Portfolio", ({
+	test("owners get Today, Inbox, Projects and Calendar, with Clients, Artists, Portfolio, Inventory, Transactions and Settings under More; artists get Today, Projects, Calendar and Portfolio", ({
 		assert,
 	}) => {
 		assert.deepEqual(
@@ -91,6 +99,7 @@ test.group("navItems", () => {
 				["artists", "more"],
 				["portfolio", "more"],
 				["inventory", "more"],
+				["transactions", "more"],
 				["settings", "more"],
 			],
 		);
@@ -225,7 +234,14 @@ test.group("navItems", () => {
 		);
 		assert.deepEqual(
 			owners.more.map(({ key }) => key),
-			["clients", "artists", "portfolio", "inventory", "settings"],
+			[
+				"clients",
+				"artists",
+				"portfolio",
+				"inventory",
+				"transactions",
+				"settings",
+			],
 		);
 		const artists = tabBarItems(navItems(artist, none));
 		assert.deepEqual(

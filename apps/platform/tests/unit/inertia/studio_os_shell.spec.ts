@@ -46,7 +46,14 @@ test.group("Studio OS shell: the sidebar's groups", () => {
 				["Workspace", ["today", "inbox", "projects", "calendar"]],
 				[
 					"Studio",
-					["clients", "artists", "portfolio", "inventory", "settings"],
+					[
+						"clients",
+						"artists",
+						"portfolio",
+						"inventory",
+						"transactions",
+						"settings",
+					],
 				],
 			],
 		);

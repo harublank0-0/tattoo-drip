@@ -1,6 +1,7 @@
 import type {
 	Artist,
 	BodyPlacement,
+	DepositCheckout,
 	DepositPage,
 	DepositPaymentMethod,
 	FlashDesign,
@@ -296,6 +297,22 @@ export function createTattooClient(options: TattooClientOptions) {
 					// No Content-Type: fetch sets multipart's boundary itself.
 					{ method: "POST", body: form },
 					{ ...call, timeoutMs: call.timeoutMs ?? UPLOAD_TIMEOUT_MS },
+				);
+				return body.data;
+			},
+			/**
+			 * Starts (or reuses) an online checkout for the deposit still due and
+			 * returns the provider's `checkoutUrl` to open. Sends no amount: the
+			 * API reads it. Returning from the checkout proves nothing; read the
+			 * page again (`onlinePayment.checkout`). Fails with a TattooApiError
+			 * such as `online_payment_unavailable`, `payment_provider_unavailable`
+			 * or `rate_limited`.
+			 */
+			startCheckout: async (token: string, call?: RequestOptions) => {
+				const body = await request<{ data: DepositCheckout }>(
+					`${tenantRoot}/deposits/${encodeURIComponent(token)}/checkout`,
+					{ method: "POST" },
+					call,
 				);
 				return body.data;
 			},

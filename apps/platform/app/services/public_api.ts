@@ -70,6 +70,10 @@ export type ApiErrorCode =
 	// submitDepositProof (TAT-65)
 	| "deposit_not_due"
 	| "deposit_changed"
+	// startDepositCheckout (docs/payments-paybridgenp.md)
+	| "online_payment_unavailable"
+	| "online_payment_in_progress"
+	| "payment_provider_unavailable"
 	// The review page (Reviews and Fresh ink, slice 1)
 	| "review_locked"
 	| "post_full"
@@ -182,6 +186,24 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		code: "deposit_changed",
 		message:
 			"The deposit amount changed. Check the new amount before you upload.",
+	},
+	online_payment_unavailable: {
+		status: 409,
+		code: "online_payment_unavailable",
+		message:
+			"Online payment isn't available for this deposit. Pay one of the other ways on this page.",
+	},
+	online_payment_in_progress: {
+		status: 409,
+		code: "online_payment_in_progress",
+		message:
+			"An online payment for this deposit is still being completed or confirmed. Don't pay again: reload this page in a few minutes.",
+	},
+	payment_provider_unavailable: {
+		status: 503,
+		code: "payment_provider_unavailable",
+		message:
+			"The payment service didn't answer. Nothing was charged; try again in a minute.",
 	},
 	// Something TattooDrip took down, or a post the studio declined or
 	// unpublished: its content can't change (its consents, name and delete can).

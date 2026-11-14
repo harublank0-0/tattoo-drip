@@ -3,6 +3,8 @@ import { cn } from "cn";
 import {
 	Clock,
 	Compass,
+	CreditCard,
+	Globe,
 	MessageCircleQuestion,
 	MessageSquareText,
 	Palette,
@@ -58,6 +60,18 @@ function settingsNav(tenantSlug: string): NavItem[] {
 			route: "tenant.settings.payments",
 			params,
 			icon: Wallet,
+		},
+		{
+			label: "Online payments",
+			route: "tenant.settings.online_payments",
+			params,
+			icon: Globe,
+		},
+		{
+			label: "Billing",
+			route: "tenant.settings.billing",
+			params,
+			icon: CreditCard,
 		},
 		{
 			label: "Messages",

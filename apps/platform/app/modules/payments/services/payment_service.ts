@@ -103,6 +103,14 @@ export type DeskPayment = {
 	note: string | null;
 };
 
+/** Money received or returned online, in stored units (paisa > 0). */
+export type OnlinePayment = {
+	amount: number;
+	currency: string;
+	method: Extract<PaymentMethodKind, "esewa" | "khalti" | "fonepay">;
+	note: string | null;
+};
+
 /** Money given back, in stored units (paisa > 0; stored negative). */
 export type RefundInput = {
 	method: PaymentMethodKind;
@@ -670,6 +678,79 @@ export default class PaymentService {
 	 * whether that booked the project, its status and what is still due of
 	 * the deposit.
 	 */
+	/**
+	 * A deposit paid online through the studio's own PayBridgeNP project
+	 * (GatewayCheckoutService, docs/payments-paybridgenp.md), once that
+	 * service matched the provider's payment to its checkout. Recorded
+	 * verified at once with no member as verifier (the provider confirmed
+	 * it), under the project's lock, with the effects of any verified
+	 * deposit (the flash claim, settleBooking). Like a late verification, a
+	 * deposit arriving after the project moved on is still the client's
+	 * money and is recorded; the Payments card then shows what it holds.
+	 * Null when the project was deleted: the caller holds it for review.
+	 */
+	async recordOnlineDeposit(
+		tenant: TenantRef,
+		projectId: string,
+		input: OnlinePayment,
+	): Promise<Recorded | null> {
+		return withTransaction(async (trx) => {
+			const live = await this.projects.lockLive(trx, tenant, projectId);
+			if (!live) return null;
+			const payment = await Payment.create(
+				{
+					tenantId: tenant.id,
+					projectId: live.id,
+					kind: "deposit",
+					amount: input.amount,
+					currency: input.currency,
+					method: input.method,
+					status: "verified",
+					verifiedAt: DateTime.utc(),
+					verifiedByUserId: null,
+					note: clean(input.note),
+				},
+				{ client: trx },
+			);
+			await payment.refresh();
+			return this.afterPayment(tenant, live, payment);
+		});
+	}
+
+	/**
+	 * A refund PayBridgeNP reports as succeeded for an online payment: money
+	 * already back with the client, so it is recorded as it happened (a
+	 * negative `refund`, verified, no member), without the desk's limit.
+	 * Null when the project was deleted.
+	 */
+	async recordOnlineRefund(
+		tenant: TenantRef,
+		projectId: string,
+		input: OnlinePayment,
+	): Promise<Payment | null> {
+		return withTransaction(async (trx) => {
+			const live = await this.projects.lockLive(trx, tenant, projectId);
+			if (!live) return null;
+			const payment = await Payment.create(
+				{
+					tenantId: tenant.id,
+					projectId: live.id,
+					kind: "refund",
+					amount: -input.amount,
+					currency: input.currency,
+					method: input.method,
+					status: "verified",
+					verifiedAt: DateTime.utc(),
+					verifiedByUserId: null,
+					note: clean(input.note),
+				},
+				{ client: trx },
+			);
+			await payment.refresh();
+			return payment;
+		});
+	}
+
 	private async afterPayment(
 		tenant: TenantRef,
 		project: TattooProject,
