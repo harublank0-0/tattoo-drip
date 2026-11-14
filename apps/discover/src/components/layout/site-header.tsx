@@ -49,13 +49,13 @@ export function SiteHeader({
 						<li>
 							<NavLink
 								item={business.forStudios}
-								className={cn(PRIMARY_LINK, "mr-5")}
+								className={cn(PRIMARY_LINK, "lg:mr-2 xl:mr-5")}
 							/>
 						</li>
 						<li>
 							<NavLink
 								item={business.pricing}
-								className={cn(PRIMARY_LINK, "mr-5")}
+								className={cn(PRIMARY_LINK, "lg:mr-2 xl:mr-5")}
 							/>
 						</li>
 						<li>

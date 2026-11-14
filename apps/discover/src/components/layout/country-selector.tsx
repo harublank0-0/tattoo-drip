@@ -209,7 +209,7 @@ export function CountrySelector({
 				<GlobeIcon className="hidden size-4 xl:block" aria-hidden="true" />
 				<span className="sr-only">Country: </span>
 				{/* Tight from lg to xl, beside every header link: a long name is cut. */}
-				<span className="max-w-20 truncate xl:max-w-none" title={name}>
+				<span className="max-w-12 truncate xl:max-w-none" title={name}>
 					{name}
 				</span>
 				<ChevronDownIcon
