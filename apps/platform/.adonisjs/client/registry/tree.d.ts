@@ -320,11 +320,32 @@ export interface ApiDefinition {
           artists: {
             index: typeof routes['api.v1.discover.studios.artists.index']
             show: typeof routes['api.v1.discover.studios.artists.show']
+            reviews: {
+              index: typeof routes['api.v1.discover.studios.artists.reviews.index']
+            }
+            freshInk: {
+              index: typeof routes['api.v1.discover.studios.artists.fresh_ink.index']
+            }
+          }
+          reviews: {
+            index: typeof routes['api.v1.discover.studios.reviews.index']
+          }
+          freshInk: {
+            index: typeof routes['api.v1.discover.studios.fresh_ink.index']
           }
         }
         artists: {
           index: typeof routes['api.v1.discover.artists.index']
           show: typeof routes['api.v1.discover.artists.show']
+          reviews: {
+            index: typeof routes['api.v1.discover.artists.reviews.index']
+          }
+          freshInk: {
+            index: typeof routes['api.v1.discover.artists.fresh_ink.index']
+          }
+        }
+        freshInk: {
+          index: typeof routes['api.v1.discover.fresh_ink.index']
         }
         tattoos: {
           index: typeof routes['api.v1.discover.tattoos.index']

@@ -930,6 +930,37 @@ router
 					.where("studio", STORED_SLUG)
 					.where("artist", ARTIST_SLUG)
 					.as("api.v1.discover.studios.artists.show");
+				// Reviews and Fresh ink (slice 4): a profile's reviews and Fresh ink.
+				router
+					.get("/studios/:studio/reviews", [
+						controllers.Discover,
+						"studioReviews",
+					])
+					.where("studio", STORED_SLUG)
+					.as("api.v1.discover.studios.reviews.index");
+				router
+					.get("/studios/:studio/fresh-ink", [
+						controllers.Discover,
+						"studioFreshInk",
+					])
+					.where("studio", STORED_SLUG)
+					.as("api.v1.discover.studios.fresh_ink.index");
+				router
+					.get("/studios/:studio/artists/:artist/reviews", [
+						controllers.Discover,
+						"studioArtistReviews",
+					])
+					.where("studio", STORED_SLUG)
+					.where("artist", ARTIST_SLUG)
+					.as("api.v1.discover.studios.artists.reviews.index");
+				router
+					.get("/studios/:studio/artists/:artist/fresh-ink", [
+						controllers.Discover,
+						"studioArtistFreshInk",
+					])
+					.where("studio", STORED_SLUG)
+					.where("artist", ARTIST_SLUG)
+					.as("api.v1.discover.studios.artists.fresh_ink.index");
 				router
 					.get("/artists", [controllers.Discover, "artists"])
 					.as("api.v1.discover.artists.index");
@@ -938,6 +969,24 @@ router
 					.get("/artists/:artist", [controllers.Discover, "independentArtist"])
 					.where("artist", STORED_SLUG)
 					.as("api.v1.discover.artists.show");
+				router
+					.get("/artists/:artist/reviews", [
+						controllers.Discover,
+						"independentArtistReviews",
+					])
+					.where("artist", STORED_SLUG)
+					.as("api.v1.discover.artists.reviews.index");
+				router
+					.get("/artists/:artist/fresh-ink", [
+						controllers.Discover,
+						"independentArtistFreshInk",
+					])
+					.where("artist", STORED_SLUG)
+					.as("api.v1.discover.artists.fresh_ink.index");
+				// Slice 4: the global Fresh ink feed.
+				router
+					.get("/fresh-ink", [controllers.Discover, "freshInk"])
+					.as("api.v1.discover.fresh_ink.index");
 				router
 					.get("/tattoos", [controllers.Discover, "tattoos"])
 					.as("api.v1.discover.tattoos.index");

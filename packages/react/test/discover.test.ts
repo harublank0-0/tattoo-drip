@@ -203,6 +203,59 @@ describe("discoverQueries", () => {
 		for (const call of calls) assert.ok(call.signal instanceof AbortSignal);
 	});
 
+	test("reviews and Fresh ink: keys under their profile, separate per page, and the SDK's paths", async () => {
+		const page = { data: [], nextCursor: null, rating: null };
+		const { calls, client } = discoverAnswering(page);
+		const keys = [
+			discoverQueries.studioReviews(client, "s").queryKey,
+			discoverQueries.studioFreshInk(client, "s").queryKey,
+			discoverQueries.studioArtistReviews(client, "s", "a").queryKey,
+			discoverQueries.studioArtistFreshInk(client, "s", "a").queryKey,
+			discoverQueries.independentArtistReviews(client, "s").queryKey,
+			discoverQueries.independentArtistFreshInk(client, "s").queryKey,
+			discoverQueries.freshInk(client).queryKey,
+			discoverQueries.freshInk(client, { style: "blackwork" }).queryKey,
+			discoverQueries.studioReviews(client, "s", { cursor: "c" }).queryKey,
+			discoverQueries.studio(client, "s").queryKey,
+			discoverQueries.tattoos(client).queryKey,
+		];
+		for (const key of keys) assert.deepEqual(key.slice(0, 2), ROOT);
+		assert.equal(
+			new Set(keys.map((key) => JSON.stringify(key))).size,
+			keys.length,
+			"no two reads share a key",
+		);
+		assert.deepEqual(discoverKeys.studioReviews("s").slice(0, 4), [
+			...ROOT,
+			"studio",
+			"s",
+		]);
+		const queryClient = noRetries();
+		assert.deepEqual(
+			await queryClient.fetchQuery(
+				discoverQueries.studioArtistReviews(client, "needle", "sita", {
+					limit: 6,
+				}),
+			),
+			page,
+		);
+		await queryClient.fetchQuery(
+			discoverQueries.freshInk(client, { country: "NP", style: "blackwork" }),
+		);
+		await queryClient.fetchQuery(
+			discoverQueries.independentArtistFreshInk(client, "solo"),
+		);
+		assert.deepEqual(
+			calls.map((call) => call.url),
+			[
+				"https://api.example.com/api/v1/discover/studios/needle/artists/sita/reviews?limit=6",
+				"https://api.example.com/api/v1/discover/fresh-ink?country=NP&style=blackwork",
+				"https://api.example.com/api/v1/discover/artists/solo/fresh-ink",
+			],
+		);
+		for (const call of calls) assert.ok(call.signal instanceof AbortSignal);
+	});
+
 	test("a cancelled query aborts its request", async () => {
 		let seen: AbortSignal | undefined;
 		const fetch = ((_input: RequestInfo | URL, init: RequestInit = {}) => {

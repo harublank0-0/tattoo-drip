@@ -177,8 +177,15 @@ export type ScannedRoutes = {
     'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
     'api.v1.discover.studios.artists.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
     'api.v1.discover.studios.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.studios.reviews.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.reviews.index': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.studios.artists.fresh_ink.index': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
     'api.v1.discover.artists.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.artists.show': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.artists.reviews.index': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.artists.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.fresh_ink.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.tattoos.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
     'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }
@@ -272,8 +279,15 @@ export type ScannedRoutes = {
     'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
     'api.v1.discover.studios.artists.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
     'api.v1.discover.studios.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.studios.reviews.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.reviews.index': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.studios.artists.fresh_ink.index': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
     'api.v1.discover.artists.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.artists.show': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.artists.reviews.index': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.artists.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.fresh_ink.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.tattoos.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
     'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }
@@ -355,8 +369,15 @@ export type ScannedRoutes = {
     'api.v1.discover.studios.show': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
     'api.v1.discover.studios.artists.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
     'api.v1.discover.studios.artists.show': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.studios.reviews.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'studio': ParamValue} }
+    'api.v1.discover.studios.artists.reviews.index': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
+    'api.v1.discover.studios.artists.fresh_ink.index': { paramsTuple: [ParamValue,ParamValue]; params: {'studio': ParamValue,'artist': ParamValue} }
     'api.v1.discover.artists.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.artists.show': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.artists.reviews.index': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.artists.fresh_ink.index': { paramsTuple: [ParamValue]; params: {'artist': ParamValue} }
+    'api.v1.discover.fresh_ink.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.tattoos.index': { paramsTuple?: []; params?: {} }
     'api.v1.discover.tattoos.show': { paramsTuple: [ParamValue]; params: {'tattoo': ParamValue} }
     'api.v1.discover.styles.index': { paramsTuple?: []; params?: {} }

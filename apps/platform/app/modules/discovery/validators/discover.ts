@@ -85,6 +85,21 @@ export const listDiscoverTattoosValidator = vine.create({
 	limit: limit(),
 });
 
+/** A profile's reviews or Fresh ink (Reviews and Fresh ink, slice 4): a page at a time. */
+export const listDiscoverProfilePageValidator = vine.create({
+	cursor: cursor(),
+	limit: limit(),
+});
+
+/** The Fresh ink feed (slice 4): filtered as the tattoos' (place, style), newest first. */
+export const listDiscoverFreshInkValidator = vine.create({
+	country: country(),
+	city: vine.string().maxLength(63).regex(PLACE_SLUG).optional(),
+	style: style(),
+	cursor: cursor(),
+	limit: limit(),
+});
+
 /** The sitemap lists' page (D10): identifiers only, so far more rows than a list's 48. */
 export const SITEMAP_PAGE_SIZE = 5000;
 
@@ -138,6 +153,8 @@ const messages = new SimpleMessagesProvider({
 listDiscoverStudiosValidator.messagesProvider = messages;
 listDiscoverArtistsValidator.messagesProvider = messages;
 listDiscoverTattoosValidator.messagesProvider = messages;
+listDiscoverProfilePageValidator.messagesProvider = messages;
+listDiscoverFreshInkValidator.messagesProvider = messages;
 listDiscoverSitemapValidator.messagesProvider = new SimpleMessagesProvider({
 	"cursor.string": CURSOR_MESSAGE,
 	"cursor.regex": CURSOR_MESSAGE,

@@ -300,6 +300,18 @@ test.group("Discover listing consent", () => {
 			assert.include(consent.text, "turn the listing off at any time");
 			assert.isAbove(consent.shows.length, 2);
 		}
+		// Reviews and Fresh ink (slice 4): the wording names both, version draft-2.
+		assert.equal(LISTING_CONSENT_VERSION, "2026-11-14.draft-2");
+		for (const type of ["studio", "independent"] as const) {
+			const consent = listingConsent(type);
+			assert.include(consent.text, "reviews and rating");
+			assert.include(consent.text, "Fresh ink photos and videos");
+			assert.include(consent.text, "with that client's consent");
+			assert.isTrue(
+				consent.shows.some((line) => /reviews and rating/.test(line)),
+			);
+			assert.isTrue(consent.shows.some((line) => /Fresh ink/.test(line)));
+		}
 		assert.include(listingConsent("studio").text, "studio");
 		assert.notInclude(listingConsent("independent").text, "studio");
 	});

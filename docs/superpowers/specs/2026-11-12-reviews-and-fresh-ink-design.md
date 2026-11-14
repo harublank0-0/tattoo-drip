@@ -1,7 +1,7 @@
 # Reviews and Fresh ink (client posts)
 
 Date: 2026-11-12
-Status: **design, agreed with the product owner; not built.** Built after work photo angles and video angles, whose media pipeline it reuses.
+Status: **design, agreed with the product owner; built (slices 1 to 4), behind `REVIEWS_ENABLED` until the client content terms are reviewed.** Built after work photo angles and video angles, whose media pipeline it reuses.
 Builds on: completed projects and session outcomes (TAT-85), client records (`clients`), the deposit page's token links (TAT-65b: a single-use credential in a link, no account), message templates and chat links (TAT-52), the image pipeline (`ImageService`, TAT-112/116), work photo angles and the video pipeline (this round), Page look sections (TAT-126), the storefront themes, and Discover (D02–D10: the `discovery` views, publication controls, takedowns, SEO).
 Reverses: `docs/roadmap.md` lists "loyalty and reviews" and "customer accounts" under *Later, maybe never*. The product owner has decided to build reviews now; customer accounts stay out (ruling 2). The roadmap and requirements are updated in the first slice.
 
@@ -43,7 +43,7 @@ A client who got tattooed at a studio can say how it went (a rating and a review
 1. **Data, links and the client page**: migrations, services, the token link (digest, expiry, revoke), the `/review/<token>` page with upload, consents and edit/delete; roadmap, requirements and terms drafts. Behind a feature flag until the terms are reviewed.
 2. **Dashboard**: Ask for a review, the message template, the Reviews page (approve, decline, reply, report), operator commands and the report list.
 3. **Studio site**: the `reviews` and `fresh_ink` sections in every theme; the public API (`listReviews`, `listFreshInk`, contract first, SDK, hooks).
-4. **Discover**: the views, the Discover API, profile sections, the global feed, JSON-LD from 3 reviews.
+4. **Discover**: the views, the Discover API, profile sections, the global feed, JSON-LD from 3 reviews. Built (`1791970000000`, docs/discover/api.md and frontend.md, "Reviews and Fresh ink").
 
 Each slice: review with Fable at high effort before its PR, isolation and cross-tenant tests for every new route and query, browser checks at 375 and 1440, and docs updated with the code.
 

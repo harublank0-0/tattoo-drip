@@ -129,6 +129,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/discover/studios/{studio}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A listed studio's client reviews on Discover, newest first
+         * @description Reviews and Fresh ink (slice 4): the reviews the studio's clients
+         *     wrote through its review link and allowed on Discover, that the
+         *     client has not deleted and TattooDrip has not taken down, for a
+         *     tattoo by an artist the studio shows on Discover. Newest first,
+         *     never "best first", a page at a time. `rating` is the average and
+         *     count of all of them, only from 3 (ruling 10); below that it is null:
+         *     list the reviews without an average. A studio that unlists takes
+         *     every review off at once. While reviews are switched off on the
+         *     platform the answer is an empty page with a null `rating`. 404 like
+         *     `getDiscoverStudio`. Cacheable like every Discover read.
+         */
+        get: operations["listDiscoverStudioReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/studios/{studio}/fresh-ink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+            };
+            cookie?: never;
+        };
+        /**
+         * A listed studio's Fresh ink on Discover, newest first
+         * @description Reviews and Fresh ink (slice 4): the studio's Fresh ink posts on
+         *     Discover (see `listDiscoverFreshInk`), newest published first, a page
+         *     at a time. 404 like `getDiscoverStudio`; an empty page while reviews
+         *     are switched off.
+         */
+        get: operations["listDiscoverStudioFreshInk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/studios/{studio}/artists/{artist}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+                /**
+                 * @description The artist's slug, matched exactly: never case-folded. An artist's
+                 *     old slug is not kept: after a change it is a 404.
+                 */
+                artist: components["parameters"]["ArtistSlug"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The reviews of an artist at a listed studio, newest first
+         * @description As `listDiscoverStudioReviews`, for the reviews of tattoos by this
+         *     artist; `rating` is the artist's own, only from 3. 404 like
+         *     `getDiscoverStudioArtist`.
+         */
+        get: operations["listDiscoverStudioArtistReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/studios/{studio}/artists/{artist}/fresh-ink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+                /**
+                 * @description The artist's slug, matched exactly: never case-folded. An artist's
+                 *     old slug is not kept: after a change it is a 404.
+                 */
+                artist: components["parameters"]["ArtistSlug"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The Fresh ink of an artist at a listed studio, newest first
+         * @description As `listDiscoverStudioFreshInk`, for this artist's tattoos. 404 like `getDiscoverStudioArtist`.
+         */
+        get: operations["listDiscoverStudioArtistFreshInk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/discover/artists": {
         parameters: {
             query?: never;
@@ -218,6 +334,82 @@ export interface paths {
          *     with a temporary redirect (which photo leads a tattoo can change).
          */
         get: operations["getDiscoverTattoo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/artists/{artist}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The independent artist's business slug (their studio page's) */
+                artist: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * A listed independent artist's reviews, newest first
+         * @description As `listDiscoverStudioArtistReviews`, for the artist profile
+         *     `getDiscoverIndependentArtist` answers. 404 like it.
+         */
+        get: operations["listDiscoverIndependentArtistReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/artists/{artist}/fresh-ink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The independent artist's business slug (their studio page's) */
+                artist: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * A listed independent artist's Fresh ink, newest first
+         * @description As `listDiscoverStudioArtistFreshInk`, for the artist profile `getDiscoverIndependentArtist` answers. 404 like it.
+         */
+        get: operations["listDiscoverIndependentArtistFreshInk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/discover/fresh-ink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover's Fresh ink feed, newest first, a page at a time
+         * @description Reviews and Fresh ink (slice 4): healed tattoos clients of listed
+         *     businesses posted through the studio's review link, that the studio
+         *     approved and the client allowed on Discover, published and not
+         *     taken down, by an artist shown on Discover. Newest published first
+         *     (never ranked). The filters combine as `listDiscoverTattoos`'s: one
+         *     that matches nothing is an empty page. Each post names its studio's
+         *     slug (its Discover profile) and carries the studio's booking link
+         *     and page, as an artwork does. A studio that unlists takes every post
+         *     off at once. While reviews are switched off on the platform the
+         *     answer is an empty page. Cacheable like every Discover read.
+         */
+        get: operations["listDiscoverFreshInk"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2130,9 +2322,10 @@ export interface components {
             } | null;
         };
         /**
-         * @description The studio's average rating and how many reviews it comes from
-         *     (`listReviews`): only from 3 reviews shown on its page. Show it as
-         *     "4.7 from 12 reviews".
+         * @description The average rating and how many reviews it comes from: a studio's
+         *     on its own page (`listReviews`, from the reviews shown there), a
+         *     studio's or an artist's on Discover (from the reviews Discover shows
+         *     of them). Only from 3 reviews. Show it as "4.7 from 12 reviews".
          */
         ReviewRating: {
             /**
@@ -2565,8 +2758,145 @@ export interface components {
          *     to it as it is.
          */
         DiscoverBookingUrl: string;
+        /**
+         * @description A client's review on Discover (Reviews and Fresh ink, slice 4). Every
+         *     property is always there. All text is plain text: render it as text,
+         *     never as markup, and keep its line breaks. Never the client's full
+         *     name, phone, email or any id of theirs.
+         */
+        DiscoverReview: {
+            /**
+             * Format: uuid
+             * @description The review's own id (a key for lists).
+             */
+            id: string;
+            /** @description Whole stars. Say it in words too, such as "4 out of 5". */
+            rating: number;
+            /** @description The client's own words. */
+            body: string;
+            /**
+             * @description The name the client chose to show ("Sita R.").
+             * @example Sita R.
+             */
+            shownName: string;
+            /**
+             * Format: date
+             * @description The day the client wrote it, in the studio's timezone.
+             */
+            date: string;
+            /** @description The artist who made the tattoo (always shown on Discover). */
+            artist: {
+                /** Format: uuid */
+                id: string;
+                slug: string;
+                name: string;
+            };
+            studio: components["schemas"]["DiscoverStudioRef"];
+            /** @description The studio's public reply, or null when it has none or TattooDrip took it down. */
+            reply: {
+                body: string;
+                /**
+                 * Format: date
+                 * @description The day the studio last wrote it, in its timezone.
+                 */
+                date: string;
+            } | null;
+        };
+        /**
+         * @description A Fresh ink post on Discover (Reviews and Fresh ink, slice 4): a
+         *     healed tattoo a client posted, shaped like `FreshInkPost` (its main
+         *     photo, always a photo, with its other photos and ready videos in
+         *     `angles`; only the public copies), with the artist's `id`, the
+         *     studio (its `slug` is its Discover profile's), the studio's place,
+         *     and the booking destination fields an artwork has: `bookingUrl` (the
+         *     studio site's `/book` naming the artist, with Discover's referral)
+         *     and `storefrontUrl` (the studio's own page). All text is plain text.
+         *     Never the client's full name, phone, email or any id of theirs.
+         */
+        DiscoverFreshInkPost: {
+            /**
+             * Format: uuid
+             * @description The post's own id (a key for lists).
+             */
+            id: string;
+            /**
+             * Format: uri
+             * @description Public and absolute.
+             */
+            url: string;
+            width: number;
+            height: number;
+            /** @description A description of the main photo, one line of plain text, or null. */
+            alt: string | null;
+            /** @description Smaller copies, narrowest first (as `FreshInkPost`). */
+            variants: components["schemas"]["ImageVariant"][];
+            /** @description The post's other photos and ready videos, in the client's order. Skip an item whose `kind` you do not know. */
+            angles: (components["schemas"]["PhotoAngle"] | components["schemas"]["VideoAngle"])[];
+            /** @example Sita R. */
+            shownName: string;
+            /** @description The client's caption, or null. */
+            caption: string | null;
+            /** @description The post's styles from the platform's list; [] when none. */
+            styles: components["schemas"]["TattooStyle"][];
+            /** @description Where it is on the body, in the client's words, or null. */
+            placement: string | null;
+            /**
+             * Format: date
+             * @description The day it was published (its public copies made), in the studio's timezone.
+             */
+            date: string;
+            artist: {
+                /** Format: uuid */
+                id: string;
+                slug: string;
+                name: string;
+            };
+            /** @description Whether the artist takes new requests (their `acceptingInquiries`), as an artwork's. When false, link a studio's general request instead (`bookingUrl` without `artist`), and for an independent artist no request at all. */
+            artistAcceptingInquiries: boolean;
+            studio: components["schemas"]["DiscoverStudioRef"];
+            location: components["schemas"]["DiscoverLocation"] | null;
+            /**
+             * Format: uri
+             * @description The studio's own page
+             */
+            storefrontUrl: string;
+            bookingUrl: components["schemas"]["DiscoverBookingUrl"];
+        };
     };
     responses: {
+        /** @description A page of reviews, and the average from 3 */
+        DiscoverReviewsPage: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["ETag"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["DiscoverReview"][];
+                    nextCursor: components["schemas"]["DiscoverNextCursor"];
+                    /**
+                     * @description The average and count of every review this list holds (not
+                     *     just this page), the same on every page; null below 3.
+                     */
+                    rating: components["schemas"]["ReviewRating"] | null;
+                };
+            };
+        };
+        /** @description A page of Fresh ink posts */
+        DiscoverFreshInkPage: {
+            headers: {
+                "Cache-Control": components["headers"]["CacheControl"];
+                ETag: components["headers"]["ETag"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data: components["schemas"]["DiscoverFreshInkPost"][];
+                    nextCursor: components["schemas"]["DiscoverNextCursor"];
+                };
+            };
+        };
         /** @description The review page as it now is */
         ReviewPageResponse: {
             headers: {
@@ -2862,6 +3192,112 @@ export interface operations {
             default: components["responses"]["Error"];
         };
     };
+    listDiscoverStudioReviews: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DiscoverReviewsPage"];
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverStudioFreshInk: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DiscoverFreshInkPage"];
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverStudioArtistReviews: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+                /**
+                 * @description The artist's slug, matched exactly: never case-folded. An artist's
+                 *     old slug is not kept: after a change it is a 404.
+                 */
+                artist: components["parameters"]["ArtistSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DiscoverReviewsPage"];
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverStudioArtistFreshInk: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path: {
+                /** @description A studio's slug, current or old */
+                studio: components["parameters"]["DiscoverStudio"];
+                /**
+                 * @description The artist's slug, matched exactly: never case-folded. An artist's
+                 *     old slug is not kept: after a change it is a 404.
+                 */
+                artist: components["parameters"]["ArtistSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DiscoverFreshInkPage"];
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
     listDiscoverArtists: {
         parameters: {
             query?: {
@@ -3019,6 +3455,80 @@ export interface operations {
             };
             304: components["responses"]["NotModified"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverIndependentArtistReviews: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path: {
+                /** @description The independent artist's business slug (their studio page's) */
+                artist: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DiscoverReviewsPage"];
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverIndependentArtistFreshInk: {
+        parameters: {
+            query?: {
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path: {
+                /** @description The independent artist's business slug (their studio page's) */
+                artist: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DiscoverFreshInkPage"];
+            304: components["responses"]["NotModified"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationError"];
+            429: components["responses"]["RateLimited"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listDiscoverFreshInk: {
+        parameters: {
+            query?: {
+                /** @description An ISO 3166-1 alpha-2 country code (`NP`), either case */
+                country?: components["parameters"]["DiscoverCountry"];
+                /** @description A city's `slug` (`listDiscoverLocations`); needs `country` */
+                city?: components["parameters"]["DiscoverCity"];
+                /** @description A style's slug (`listDiscoverStyles`) */
+                style?: components["parameters"]["DiscoverStyle"];
+                /** @description The previous page's `nextCursor`, as sent, with the same filters and sort */
+                cursor?: components["parameters"]["DiscoverCursor"];
+                limit?: components["parameters"]["DiscoverLimit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["DiscoverFreshInkPage"];
+            304: components["responses"]["NotModified"];
+            422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
             default: components["responses"]["Error"];
         };

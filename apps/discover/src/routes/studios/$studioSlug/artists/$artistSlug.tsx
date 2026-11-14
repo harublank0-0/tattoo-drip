@@ -35,11 +35,16 @@ function StudioArtistProfile() {
 	const artist = useSuspenseQuery(queries.artist).data;
 	// Optional: when it failed, the section stays hidden (and is retried here).
 	const colleagues = useQuery(queries.colleagues).data;
+	const reviews = useQuery(queries.reviews).data;
+	const freshInk = useQuery(queries.freshInk).data;
 	return (
 		<ArtistProfile
 			artist={artist}
 			colleagues={colleagues}
 			markets={discover.settings.markets}
+			subject={{ kind: "studioArtist", studio: studioSlug, artist: artistSlug }}
+			reviews={reviews}
+			freshInk={freshInk}
 		/>
 	);
 }

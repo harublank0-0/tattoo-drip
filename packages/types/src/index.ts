@@ -117,3 +117,19 @@ export type DiscoverSitemapQuery = NonNullable<
 	operations["listDiscoverSitemapTattoos"]["parameters"]["query"]
 >;
 export type DiscoverSitemapPage<T> = { data: T[]; nextCursor: string | null };
+// Reviews and Fresh ink on Discover (slice 4): profiles' reviews and Fresh
+// ink, and the global Fresh ink feed.
+export type DiscoverReview = Schemas["DiscoverReview"];
+export type DiscoverFreshInkPost = Schemas["DiscoverFreshInkPost"];
+export type DiscoverReviewsPage =
+	operations["listDiscoverStudioReviews"]["responses"][200]["content"]["application/json"];
+export type DiscoverFreshInkPage =
+	operations["listDiscoverFreshInk"]["responses"][200]["content"]["application/json"];
+/** A profile's reviews or Fresh ink: a page at a time. */
+export type DiscoverProfilePageQuery = NonNullable<
+	operations["listDiscoverStudioReviews"]["parameters"]["query"]
+>;
+/** The Fresh ink feed's filters (country, city, style) and page. */
+export type DiscoverFreshInkQuery = NonNullable<
+	operations["listDiscoverFreshInk"]["parameters"]["query"]
+>;

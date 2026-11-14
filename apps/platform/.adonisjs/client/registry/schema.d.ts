@@ -2083,6 +2083,54 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtist']>>>
     }
   }
+  'api.v1.discover.studios.reviews.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/studios/:studio/reviews'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { studio: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioReviews']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioReviews']>>>
+    }
+  }
+  'api.v1.discover.studios.fresh_ink.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/studios/:studio/fresh-ink'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { studio: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioFreshInk']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioFreshInk']>>>
+    }
+  }
+  'api.v1.discover.studios.artists.reviews.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/studios/:studio/artists/:artist/reviews'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { studio: ParamValue; artist: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtistReviews']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtistReviews']>>>
+    }
+  }
+  'api.v1.discover.studios.artists.fresh_ink.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/studios/:studio/artists/:artist/fresh-ink'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { studio: ParamValue; artist: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtistFreshInk']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['studioArtistFreshInk']>>>
+    }
+  }
   'api.v1.discover.artists.index': {
     methods: ["GET","HEAD"]
     pattern: '/api/v1/discover/artists'
@@ -2105,6 +2153,42 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['independentArtist']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['independentArtist']>>>
+    }
+  }
+  'api.v1.discover.artists.reviews.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/artists/:artist/reviews'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { artist: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['independentArtistReviews']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['independentArtistReviews']>>>
+    }
+  }
+  'api.v1.discover.artists.fresh_ink.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/artists/:artist/fresh-ink'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { artist: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['independentArtistFreshInk']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['independentArtistFreshInk']>>>
+    }
+  }
+  'api.v1.discover.fresh_ink.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/api/v1/discover/fresh-ink'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: ExtractQueryForGet<InferInput<(typeof import('#modules/discovery/validators/discover').listDiscoverFreshInkValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['freshInk']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/discover_controller').default['freshInk']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'api.v1.discover.tattoos.index': {

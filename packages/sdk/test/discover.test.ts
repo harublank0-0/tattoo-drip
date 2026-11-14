@@ -218,6 +218,40 @@ describe("createDiscoverClient", () => {
 		assert.equal(calls[0].url, `${ROOT}/tattoos/${detail.id}`);
 	});
 
+	test("reviews and Fresh ink: the profiles' pages and the feed, their paths and queries, the whole page back", async () => {
+		const page = { data: [{ id: "r1" }], nextCursor: "c2", rating: null };
+		const { calls, fetch } = fakeFetch(() => json(200, page));
+		const discover = client(fetch);
+		assert.deepEqual(await discover.studios.reviews("needle"), page);
+		await discover.studios.freshInk("needle", { cursor: "c1", limit: 12 });
+		await discover.studios.artistReviews("needle", "sita", { limit: 6 });
+		await discover.studios.artistFreshInk("needle house", "../x");
+		await discover.artists.independentReviews("asha-solo");
+		await discover.artists.independentFreshInk("asha-solo", { cursor: "c" });
+		assert.deepEqual(
+			await discover.freshInk.list({
+				country: "NP",
+				city: "kathmandu",
+				style: "blackwork",
+				cursor: "c3",
+			}),
+			page,
+		);
+		assert.deepEqual(
+			calls.map((call) => call.url),
+			[
+				`${ROOT}/studios/needle/reviews`,
+				`${ROOT}/studios/needle/fresh-ink?cursor=c1&limit=12`,
+				`${ROOT}/studios/needle/artists/sita/reviews?limit=6`,
+				`${ROOT}/studios/needle%20house/artists/..%2Fx/fresh-ink`,
+				`${ROOT}/artists/asha-solo/reviews`,
+				`${ROOT}/artists/asha-solo/fresh-ink?cursor=c`,
+				`${ROOT}/fresh-ink?country=NP&city=kathmandu&style=blackwork&cursor=c3`,
+			],
+		);
+		for (const call of calls) assert.equal(call.init.credentials, "omit");
+	});
+
 	test("reads of one resource encode their path segments and unwrap { data }", async () => {
 		const { calls, fetch } = fakeFetch(() => json(200, { data: { id: "x" } }));
 		const discover = client(fetch);

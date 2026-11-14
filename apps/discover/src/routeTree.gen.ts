@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ForStudiosRouteImport } from './routes/for-studios'
+import { Route as FreshInkRouteImport } from './routes/fresh-ink'
 import { Route as HealthzRouteImport } from './routes/healthz'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
@@ -42,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
 const ForStudiosRoute = ForStudiosRouteImport.update({
   id: '/for-studios',
   path: '/for-studios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FreshInkRoute = FreshInkRouteImport.update({
+  id: '/fresh-ink',
+  path: '/fresh-ink',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HealthzRoute = HealthzRouteImport.update({
@@ -159,6 +165,7 @@ const StudiosStudioSlugArtistsArtistSlugRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/for-studios': typeof ForStudiosRoute
+  '/fresh-ink': typeof FreshInkRoute
   '/healthz': typeof HealthzRoute
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/for-studios': typeof ForStudiosRoute
+  '/fresh-ink': typeof FreshInkRoute
   '/healthz': typeof HealthzRoute
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/for-studios': typeof ForStudiosRoute
+  '/fresh-ink': typeof FreshInkRoute
   '/healthz': typeof HealthzRoute
   '/pricing': typeof PricingRoute
   '/robots.txt': typeof RobotsDottxtRoute
@@ -240,6 +249,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/for-studios'
+    | '/fresh-ink'
     | '/healthz'
     | '/pricing'
     | '/robots.txt'
@@ -266,6 +276,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/for-studios'
+    | '/fresh-ink'
     | '/healthz'
     | '/pricing'
     | '/robots.txt'
@@ -292,6 +303,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/for-studios'
+    | '/fresh-ink'
     | '/healthz'
     | '/pricing'
     | '/robots.txt'
@@ -319,6 +331,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ForStudiosRoute: typeof ForStudiosRoute
+  FreshInkRoute: typeof FreshInkRoute
   HealthzRoute: typeof HealthzRoute
   PricingRoute: typeof PricingRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
@@ -357,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/for-studios'
       fullPath: '/for-studios'
       preLoaderRoute: typeof ForStudiosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fresh-ink': {
+      id: '/fresh-ink'
+      path: '/fresh-ink'
+      fullPath: '/fresh-ink'
+      preLoaderRoute: typeof FreshInkRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/healthz': {
@@ -519,6 +539,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ForStudiosRoute: ForStudiosRoute,
+  FreshInkRoute: FreshInkRoute,
   HealthzRoute: HealthzRoute,
   PricingRoute: PricingRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,

@@ -322,6 +322,7 @@ export async function seedReview(
 		reply: string;
 		shownName: string;
 		consentStudioPage: boolean;
+		consentDiscover: boolean;
 		createdAt: DateTime;
 	}> = {},
 ) {
@@ -334,7 +335,7 @@ export async function seedReview(
 		body: over.body ?? "Healed beautifully, the lines are crisp and even.",
 		shownName: over.shownName ?? "Sita R.",
 		consentStudioPage: over.consentStudioPage ?? true,
-		consentDiscover: false,
+		consentDiscover: over.consentDiscover ?? false,
 		reply: over.reply ?? null,
 		repliedAt: over.reply ? DateTime.now() : null,
 		...(over.createdAt ? { createdAt: over.createdAt } : {}),

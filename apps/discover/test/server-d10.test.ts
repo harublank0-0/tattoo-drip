@@ -379,7 +379,16 @@ describe("D10 head, robots and structured data (indexing on)", { skip }, () => {
 		for (const page of [studioPage, artistPage, soloPage, artPage])
 			assert.doesNotMatch(
 				JSON.stringify(jsonLd(page)),
-				/bookingUrl|\/book\?|ref=|aggregateRating|review|priceRange|openingHours|telephone|email|streetAddress|timezone/i,
+				/bookingUrl|\/book\?|ref=|priceRange|openingHours|telephone|email|streetAddress|timezone/i,
+			);
+		// Reviews and Fresh ink (slice 4): a rating and reviews only on a
+		// studio's profile, from 3 (the stub's studio has 4, its artists 2;
+		// schema.org gives a Person no aggregateRating), never elsewhere.
+		assert.match(JSON.stringify(jsonLd(studioPage)), /"aggregateRating"/);
+		for (const page of [artistPage, soloPage, artPage])
+			assert.doesNotMatch(
+				JSON.stringify(jsonLd(page)),
+				/aggregateRating|review/i,
 			);
 	});
 

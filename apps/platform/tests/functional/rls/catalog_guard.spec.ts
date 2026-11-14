@@ -48,11 +48,23 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	billing_subscriptions: ["tenant_isolation:ALL"],
 	clients: ["tenant_isolation:ALL"],
 	deposit_links: ["tenant_isolation:ALL"],
-	// Reviews and Fresh ink (slice 1).
+	// Reviews and Fresh ink (slice 1; the discovery_* policies since slice 4).
 	review_links: ["tenant_isolation:ALL"],
-	client_reviews: ["tenant_isolation:ALL"],
-	client_posts: ["tenant_isolation:ALL"],
-	client_post_media: ["tenant_isolation:ALL"],
+	client_reviews: [
+		"discovery_only:SELECT",
+		"discovery_select:SELECT",
+		"tenant_isolation:ALL",
+	],
+	client_posts: [
+		"discovery_only:SELECT",
+		"discovery_select:SELECT",
+		"tenant_isolation:ALL",
+	],
+	client_post_media: [
+		"discovery_only:SELECT",
+		"discovery_select:SELECT",
+		"tenant_isolation:ALL",
+	],
 	client_video_reservations: ["tenant_isolation:ALL"],
 	deposit_outcomes: ["tenant_isolation:ALL"],
 	flash_designs: ["tenant_isolation:ALL"],

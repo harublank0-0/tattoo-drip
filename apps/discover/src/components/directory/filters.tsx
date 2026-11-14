@@ -66,13 +66,26 @@ function SelectField({
 	);
 }
 
-/** Who the controls filter: a directory's rows, or the gallery's photos (D09: no sort, no "who"). */
-export type FilterKind = DirectoryKind | "tattoos";
+/**
+ * Who the controls filter: a directory's rows, or the gallery's photos (D09:
+ * no sort, no "who"), or the Fresh ink feed's posts (Reviews and Fresh ink,
+ * slice 4: the gallery's controls, its own words).
+ */
+export type FilterKind = DirectoryKind | "tattoos" | "fresh-ink";
 
 const KIND_NOUN: Record<FilterKind, string> = {
 	studios: "Studios",
 	artists: "Artists",
 	tattoos: "Tattoos",
+	"fresh-ink": "Fresh ink",
+};
+
+/** The toolbar form's name: "Filter studios", "Filter Fresh ink". */
+const KIND_FILTER: Record<FilterKind, string> = {
+	studios: "Filter studios",
+	artists: "Filter artists",
+	tattoos: "Filter tattoos",
+	"fresh-ink": "Filter Fresh ink",
 };
 
 export type FilterLists = {
@@ -163,7 +176,7 @@ function FilterFields({
 					<option value="true">Independent</option>
 				</SelectField>
 			)}
-			{kind !== "tattoos" && (
+			{(kind === "studios" || kind === "artists") && (
 				<SelectField
 					label="Sort"
 					name="sort"
@@ -226,7 +239,7 @@ export function FilterToolbar({
 		<form
 			action={action}
 			method="get"
-			aria-label={`Filter ${kind}`}
+			aria-label={KIND_FILTER[kind]}
 			onSubmit={(event) => {
 				event.preventDefault();
 				onApply(draft);

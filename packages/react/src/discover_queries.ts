@@ -2,6 +2,8 @@ import { queryOptions } from "@tanstack/react-query";
 import type {
 	DiscoverArtistsListQuery,
 	DiscoverClient,
+	DiscoverFreshInkQuery,
+	DiscoverProfilePageQuery,
 	DiscoverStudiosListQuery,
 	DiscoverTattoosListQuery,
 } from "@tattoo-drip/sdk";
@@ -34,6 +36,41 @@ export const discoverKeys = {
 	tattoo: (id: string) => [...discoverKeys.all, "tattoo", id] as const,
 	styles: () => [...discoverKeys.all, "styles"] as const,
 	locations: () => [...discoverKeys.all, "locations"] as const,
+	// Reviews and Fresh ink: under the profile's own key, then the page's query.
+	studioReviews: (slug: string, query?: DiscoverProfilePageQuery) =>
+		[...discoverKeys.studio(slug), "reviews", query ?? {}] as const,
+	studioFreshInk: (slug: string, query?: DiscoverProfilePageQuery) =>
+		[...discoverKeys.studio(slug), "fresh-ink", query ?? {}] as const,
+	studioArtistReviews: (
+		studioSlug: string,
+		artistSlug: string,
+		query?: DiscoverProfilePageQuery,
+	) =>
+		[
+			...discoverKeys.studioArtist(studioSlug, artistSlug),
+			"reviews",
+			query ?? {},
+		] as const,
+	studioArtistFreshInk: (
+		studioSlug: string,
+		artistSlug: string,
+		query?: DiscoverProfilePageQuery,
+	) =>
+		[
+			...discoverKeys.studioArtist(studioSlug, artistSlug),
+			"fresh-ink",
+			query ?? {},
+		] as const,
+	independentArtistReviews: (slug: string, query?: DiscoverProfilePageQuery) =>
+		[...discoverKeys.independentArtist(slug), "reviews", query ?? {}] as const,
+	independentArtistFreshInk: (slug: string, query?: DiscoverProfilePageQuery) =>
+		[
+			...discoverKeys.independentArtist(slug),
+			"fresh-ink",
+			query ?? {},
+		] as const,
+	freshInk: (query?: DiscoverFreshInkQuery) =>
+		[...discoverKeys.all, "fresh-ink", query ?? {}] as const,
 };
 
 /**
@@ -100,5 +137,78 @@ export const discoverQueries = {
 		queryOptions({
 			queryKey: discoverKeys.locations(),
 			queryFn: ({ signal }) => client.locations.list({ signal }),
+		}),
+	studioReviews: (
+		client: DiscoverClient,
+		slug: string,
+		query?: DiscoverProfilePageQuery,
+	) =>
+		queryOptions({
+			queryKey: discoverKeys.studioReviews(slug, query),
+			queryFn: ({ signal }) => client.studios.reviews(slug, query, { signal }),
+		}),
+	studioFreshInk: (
+		client: DiscoverClient,
+		slug: string,
+		query?: DiscoverProfilePageQuery,
+	) =>
+		queryOptions({
+			queryKey: discoverKeys.studioFreshInk(slug, query),
+			queryFn: ({ signal }) => client.studios.freshInk(slug, query, { signal }),
+		}),
+	studioArtistReviews: (
+		client: DiscoverClient,
+		studioSlug: string,
+		artistSlug: string,
+		query?: DiscoverProfilePageQuery,
+	) =>
+		queryOptions({
+			queryKey: discoverKeys.studioArtistReviews(studioSlug, artistSlug, query),
+			queryFn: ({ signal }) =>
+				client.studios.artistReviews(studioSlug, artistSlug, query, {
+					signal,
+				}),
+		}),
+	studioArtistFreshInk: (
+		client: DiscoverClient,
+		studioSlug: string,
+		artistSlug: string,
+		query?: DiscoverProfilePageQuery,
+	) =>
+		queryOptions({
+			queryKey: discoverKeys.studioArtistFreshInk(
+				studioSlug,
+				artistSlug,
+				query,
+			),
+			queryFn: ({ signal }) =>
+				client.studios.artistFreshInk(studioSlug, artistSlug, query, {
+					signal,
+				}),
+		}),
+	independentArtistReviews: (
+		client: DiscoverClient,
+		slug: string,
+		query?: DiscoverProfilePageQuery,
+	) =>
+		queryOptions({
+			queryKey: discoverKeys.independentArtistReviews(slug, query),
+			queryFn: ({ signal }) =>
+				client.artists.independentReviews(slug, query, { signal }),
+		}),
+	independentArtistFreshInk: (
+		client: DiscoverClient,
+		slug: string,
+		query?: DiscoverProfilePageQuery,
+	) =>
+		queryOptions({
+			queryKey: discoverKeys.independentArtistFreshInk(slug, query),
+			queryFn: ({ signal }) =>
+				client.artists.independentFreshInk(slug, query, { signal }),
+		}),
+	freshInk: (client: DiscoverClient, query?: DiscoverFreshInkQuery) =>
+		queryOptions({
+			queryKey: discoverKeys.freshInk(query),
+			queryFn: ({ signal }) => client.freshInk.list(query, { signal }),
 		}),
 };

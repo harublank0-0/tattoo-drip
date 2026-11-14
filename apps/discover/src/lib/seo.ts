@@ -138,6 +138,11 @@ export const INDEXABLE_PATTERNS: readonly RegExp[] = [
 	new RegExp(`^/studios/${SLUG}(?:/artists/${SLUG})?$`),
 	new RegExp(`^/artists/${SLUG}$`),
 	/^\/tattoos\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+	// Reviews and Fresh ink (slice 4): the bare feed, indexable only when it has
+	// posts (its loader says `noindex` when empty). A pattern, not an
+	// INDEXABLE_PATHS entry, so it stays out of the static sitemap while the
+	// feature is behind its flag (frontend guidance, "Fresh ink").
+	/^\/fresh-ink$/,
 ];
 
 /** Whether a page may be indexed: indexing on, the path listed or matched, and the page not opted out. */

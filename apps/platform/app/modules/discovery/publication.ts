@@ -12,9 +12,11 @@
  * meaning is a new version, never an edit of this one. Turning a listing on
  * records the version accepted; an older acceptance stays valid for the
  * listing it was given for, and turning the listing on again always asks for
- * this one.
+ * this one. `2026-11-14.draft-2` (Reviews and Fresh ink, slice 4) added the
+ * clients' reviews and rating and their Fresh ink to what Discover shows;
+ * `2026-11-07.draft-1` was D04's first wording.
  */
-export const LISTING_CONSENT_VERSION = "2026-11-07.draft-1";
+export const LISTING_CONSENT_VERSION = "2026-11-14.draft-2";
 
 /**
  * Recommended profile completeness (the blueprint's open decision 1). Not
@@ -46,20 +48,24 @@ export function listingConsent(type: BusinessType): ListingConsent {
 		version: LISTING_CONSENT_VERSION,
 		draft: true,
 		text: studio
-			? "By listing this studio on TattooDrip Discover, I confirm I may do so for the studio, and I allow TattooDrip to show the studio's public profile, its published portfolio photos, the artists shown on Discover and links to the studio's booking page in its public directory. I confirm the studio may publish these photos, including with the consent of clients who can be recognised in them. I understand I can turn the listing off at any time."
-			: "By listing my artist profile on TattooDrip Discover, I allow TattooDrip to show my public profile, my published portfolio photos and links to my booking page in its public directory. I confirm I may publish these photos, including with the consent of clients who can be recognised in them. I understand I can turn the listing off at any time.",
+			? "By listing this studio on TattooDrip Discover, I confirm I may do so for the studio, and I allow TattooDrip to show the studio's public profile, its published portfolio photos, the artists shown on Discover, its clients' reviews and rating, the Fresh ink photos and videos its clients post (each only with that client's consent) and links to the studio's booking page in its public directory. I confirm the studio may publish these photos, including with the consent of clients who can be recognised in them. I understand I can turn the listing off at any time."
+			: "By listing my artist profile on TattooDrip Discover, I allow TattooDrip to show my public profile, my published portfolio photos, my clients' reviews and rating, the Fresh ink photos and videos my clients post (each only with that client's consent) and links to my booking page in its public directory. I confirm I may publish these photos, including with the consent of clients who can be recognised in them. I understand I can turn the listing off at any time.",
 		shows: studio
 			? [
 					"The studio's name, description, city, logo and cover photo",
 					"Its tattoo styles and social links",
 					"Published portfolio photos of the artists shown on Discover",
 					"Those artists' names, photos, bios, styles and social links",
+					"Your clients' reviews and rating (an average only from 3 reviews)",
+					"Fresh ink photos and videos your clients post (with their consent)",
 					"Links to the studio's page and its booking form",
 				]
 			: [
 					"Your name, description, city, logo and cover photo",
 					"Your tattoo styles and social links",
 					"Your published portfolio photos",
+					"Your clients' reviews and rating (an average only from 3 reviews)",
+					"Fresh ink photos and videos your clients post (with their consent)",
 					"Links to your page and your booking form",
 				],
 	};

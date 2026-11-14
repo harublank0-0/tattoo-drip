@@ -17,7 +17,16 @@ import env from "#start/env";
 const DISCOVERY = "tattoo_drip_discovery";
 const APP = env.get("DB_USER");
 // Angles (1791900000002): artwork_angles maps a tattoo's other photos to it.
-const VIEWS = ["artists", "artwork_angles", "artworks", "studios"];
+// Reviews and Fresh ink (slice 4, 1791970000000): reviews, fresh_ink and its media.
+const VIEWS = [
+	"artists",
+	"artwork_angles",
+	"artworks",
+	"fresh_ink",
+	"fresh_ink_media",
+	"reviews",
+	"studios",
+];
 
 /** The columns the discovery role may read (the migration's COLUMN_GRANTS). */
 const READABLE: Record<string, string[]> = {
@@ -58,6 +67,52 @@ const READABLE: Record<string, string[]> = {
 		"tenant_id",
 		"tiktok_url",
 		"visible",
+	],
+	// Slice 4: what the reviews' and Fresh ink views and policies read; never
+	// a client or project id, the studio-page consent, a report, a takedown
+	// reason or note, a submitter digest, a staging key or a failure.
+	client_post_media: [
+		"alt",
+		"height",
+		"id",
+		"image_key",
+		"kind",
+		"position",
+		"post_id",
+		"tenant_id",
+		"video_duration_ms",
+		"video_keys",
+		"video_state",
+		"width",
+	],
+	client_posts: [
+		"artist_id",
+		"caption",
+		"consent_discover",
+		"deleted_at",
+		"id",
+		"placement",
+		"published_at",
+		"shown_name",
+		"status",
+		"styles",
+		"taken_down_at",
+		"tenant_id",
+	],
+	client_reviews: [
+		"artist_id",
+		"body",
+		"consent_discover",
+		"created_at",
+		"deleted_at",
+		"id",
+		"rating",
+		"replied_at",
+		"reply",
+		"reply_taken_down_at",
+		"shown_name",
+		"taken_down_at",
+		"tenant_id",
 	],
 	tenant_memberships: ["deleted_at", "tenant_id", "user_id"],
 	tenants: [
@@ -373,7 +428,7 @@ test.group("Discover database: catalog (D02)", () => {
 		});
 	});
 
-	test("the discovery role owns exactly the four views, which run as their owner (not security_invoker)", async ({
+	test("the discovery role owns exactly the seven views, which run as their owner (not security_invoker)", async ({
 		assert,
 	}) => {
 		await rolledBack(async (trx) => {
@@ -446,14 +501,16 @@ test.group("Discover database: catalog (D02)", () => {
 				`select c.relname as table, pg_get_userbyid(c.relowner) <> ? as other_owner,
 				        c.relrowsecurity as rls
 				 from pg_class c where c.oid in ('public.tenants'::regclass, 'public.artists'::regclass,
-				   'public.artist_work_photos'::regclass, 'public.tenant_memberships'::regclass)
+				   'public.artist_work_photos'::regclass, 'public.tenant_memberships'::regclass,
+				   'public.client_reviews'::regclass, 'public.client_posts'::regclass,
+				   'public.client_post_media'::regclass)
 				 order by 1`,
 				[DISCOVERY],
 			);
 			for (const row of tables) {
 				assert.deepInclude(row, { other_owner: true, rls: true });
 			}
-			assert.lengthOf(tables, 4);
+			assert.lengthOf(tables, 7);
 		});
 	});
 
@@ -485,6 +542,12 @@ test.group("Discover database: catalog (D02)", () => {
 					`artist_work_photos.discovery_select:PERMISSIVE:${DISCOVERY}:SELECT`,
 					`artists.discovery_only:RESTRICTIVE:${DISCOVERY}:SELECT`,
 					`artists.discovery_select:PERMISSIVE:${DISCOVERY}:SELECT`,
+					`client_post_media.discovery_only:RESTRICTIVE:${DISCOVERY}:SELECT`,
+					`client_post_media.discovery_select:PERMISSIVE:${DISCOVERY}:SELECT`,
+					`client_posts.discovery_only:RESTRICTIVE:${DISCOVERY}:SELECT`,
+					`client_posts.discovery_select:PERMISSIVE:${DISCOVERY}:SELECT`,
+					`client_reviews.discovery_only:RESTRICTIVE:${DISCOVERY}:SELECT`,
+					`client_reviews.discovery_select:PERMISSIVE:${DISCOVERY}:SELECT`,
 					`tenant_memberships.discovery_none:RESTRICTIVE:${DISCOVERY}:SELECT`,
 					`tenants.discovery_only:RESTRICTIVE:${DISCOVERY}:SELECT`,
 					`tenants.discovery_select:PERMISSIVE:${DISCOVERY}:SELECT`,
@@ -688,6 +751,39 @@ test.group("Discover database: who can read what (D02)", () => {
 					"healed",
 					"created_at",
 				],
+				fresh_ink: [
+					"id",
+					"studio_id",
+					"artist_id",
+					"shown_name",
+					"caption",
+					"styles",
+					"placement",
+					"published_at",
+				],
+				fresh_ink_media: [
+					"id",
+					"post_id",
+					"position",
+					"kind",
+					"image_key",
+					"width",
+					"height",
+					"alt",
+					"video_keys",
+					"video_duration_ms",
+				],
+				reviews: [
+					"id",
+					"studio_id",
+					"artist_id",
+					"rating",
+					"body",
+					"shown_name",
+					"reply",
+					"replied_at",
+					"created_at",
+				],
 				studios: [
 					"id",
 					"slug",
@@ -718,6 +814,12 @@ test.group("Discover database: who can read what (D02)", () => {
 				"select deposit_policy from discovery.studios",
 				"select user_id from discovery.artists",
 				"select hidden from discovery.artworks",
+				"select client_id from discovery.reviews",
+				"select consent_studio_page from discovery.reviews",
+				"select report_reason from discovery.reviews",
+				"select takedown_note from discovery.fresh_ink",
+				"select project_id from discovery.fresh_ink",
+				"select video_staging_key from discovery.fresh_ink_media",
 			]) {
 				await refused(
 					assert,
@@ -787,6 +889,18 @@ test.group("Discover database: who can read what (D02)", () => {
 				"select id from payment_methods",
 				"select id from reference_images",
 				"select id from places",
+				"select client_id from client_reviews",
+				"select project_id from client_reviews",
+				"select consent_studio_page from client_reviews",
+				"select report_reason, report_note from client_reviews",
+				"select takedown_reason, takedown_note from client_reviews",
+				"select reply_takedown_note from client_reviews",
+				"select submitter_digest from client_reviews",
+				"select client_id from client_posts",
+				"select takedown_note from client_posts",
+				"select video_staging_key from client_post_media",
+				"select video_failure from client_post_media",
+				"select id from review_links",
 			]) {
 				await refused(
 					assert,
@@ -1190,6 +1304,479 @@ test.group("Discover database: publication changes (D02)", () => {
 				);
 				assert.equal(counts.total, counts.distinct, view);
 			}
+		});
+	});
+});
+
+/**
+ * Slice 4's rows on top of `seed`: reviews, posts and their media at every
+ * business, each case named. Written as the owner (no RLS); every review and
+ * post gets a project and client of its own (one per project).
+ */
+async function seedClientContent(trx: Trx, { t, a }: Seeded) {
+	let phone = 0;
+	const projectOf = async (tenantId: string) => {
+		phone += 1;
+		const [client] = await rows<{ id: string }>(
+			trx,
+			"insert into clients (tenant_id, name, phone, created_at) values (?, 'Sita Rai', ?, now()) returning id",
+			[tenantId, `+97798000${String(phone).padStart(5, "0")}`],
+		);
+		const [project] = await rows<{ id: string }>(
+			trx,
+			"insert into tattoo_projects (tenant_id, client_id, brief, created_at) values (?, ?, 'A koi', now()) returning id",
+			[tenantId, client.id],
+		);
+		return { clientId: client.id, projectId: project.id };
+	};
+	const insert = async (
+		table: string,
+		values: Record<string, unknown>,
+	): Promise<string> => {
+		const columns = Object.keys(values);
+		const [row] = await rows<{ id: string }>(
+			trx,
+			`insert into ${table} (${columns.join(", ")}) values (${columns.map(() => "?").join(", ")}) returning id`,
+			Object.values(values),
+		);
+		return row.id;
+	};
+	const review = async (
+		tenantId: string,
+		artistId: string,
+		values: Record<string, unknown> = {},
+	) => {
+		const { clientId, projectId } = await projectOf(tenantId);
+		return insert("client_reviews", {
+			tenant_id: tenantId,
+			project_id: projectId,
+			client_id: clientId,
+			artist_id: artistId,
+			rating: 5,
+			body: "Healed beautifully, the lines are crisp.",
+			shown_name: "Sita R.",
+			consent_discover: true,
+			created_at: new Date(),
+			...values,
+		});
+	};
+	const post = async (
+		tenantId: string,
+		artistId: string,
+		values: Record<string, unknown> = {},
+	) => {
+		const { clientId, projectId } = await projectOf(tenantId);
+		const now = new Date();
+		return insert("client_posts", {
+			tenant_id: tenantId,
+			project_id: projectId,
+			client_id: clientId,
+			artist_id: artistId,
+			status: "approved",
+			submitted_at: now,
+			waiting_round: 1,
+			waiting_since: now,
+			decided_at: now,
+			shown_name: "Sita R.",
+			consent_discover: true,
+			published_at: now,
+			created_at: now,
+			...values,
+		});
+	};
+	const photo = (
+		tenantId: string,
+		postId: string,
+		position: number,
+		key?: string,
+	) =>
+		insert("client_post_media", {
+			tenant_id: tenantId,
+			post_id: postId,
+			position,
+			kind: "photo",
+			image_key:
+				key ?? `tenants/${tenantId}/client_post_photo/p${position}.jpg`,
+			width: 1200,
+			height: 1600,
+			created_at: new Date(),
+		});
+	const video = (
+		tenantId: string,
+		postId: string,
+		position: number,
+		state: "ready" | "processing" | "failed",
+	) =>
+		insert("client_post_media", {
+			tenant_id: tenantId,
+			post_id: postId,
+			position,
+			kind: "video",
+			video_state: state,
+			video_staging_key: `client_video_upload/tenants/${tenantId}/${postId}-${position}`,
+			video_failure: state === "failed" ? "The video is too long." : null,
+			...(state === "ready"
+				? {
+						image_key: `tenants/${tenantId}/client_post_video/v${position}.jpg`,
+						width: 1080,
+						height: 1920,
+						video_duration_ms: 12000,
+						video_keys: `{tenants/${tenantId}/client_post_video/v${position}.720x1280.mp4,tenants/${tenantId}/client_post_video/v${position}.1080x1920.mp4}`,
+					}
+				: {}),
+			created_at: new Date(),
+		});
+	const unpublished = { published_at: null };
+	const r = {
+		shown: await review(t.studio, a.shown, {
+			reply: "Thank you!",
+			replied_at: new Date(),
+		}),
+		studioPageOnly: await review(t.studio, a.shown, {
+			consent_discover: false,
+			consent_studio_page: true,
+		}),
+		takenDown: await review(t.studio, a.shown, {
+			taken_down_at: new Date(),
+			takedown_reason: "other",
+		}),
+		deleted: await review(t.studio, a.shown, { deleted_at: new Date() }),
+		replyDown: await review(t.studio, a.shown, {
+			reply: "Rude words",
+			replied_at: new Date(),
+			reply_taken_down_at: new Date(),
+			reply_takedown_reason: "hate",
+		}),
+		byHiddenArtist: await review(t.studio, a.hidden),
+		byOptedOutArtist: await review(t.studio, a.optedOut),
+		never: await review(t.never, a.never),
+		tenantTakenDown: await review(t.takenDown, a.tenantTakenDown),
+		solo: await review(t.independent, a.solo),
+	};
+	const p = {
+		shown: await post(t.studio, a.shown),
+		waiting: await post(t.studio, a.shown, {
+			status: "waiting",
+			decided_at: null,
+			...unpublished,
+		}),
+		declined: await post(t.studio, a.shown, {
+			status: "declined",
+			...unpublished,
+		}),
+		unpublishedByStudio: await post(t.studio, a.shown, {
+			status: "unpublished",
+			...unpublished,
+		}),
+		noCopies: await post(t.studio, a.shown, unpublished),
+		studioPageOnly: await post(t.studio, a.shown, {
+			consent_discover: false,
+			consent_studio_page: true,
+		}),
+		takenDown: await post(t.studio, a.shown, {
+			taken_down_at: new Date(),
+			takedown_reason: "other",
+			...unpublished,
+		}),
+		deleted: await post(t.studio, a.shown, {
+			deleted_at: new Date(),
+			...unpublished,
+		}),
+		byHiddenArtist: await post(t.studio, a.hidden),
+		never: await post(t.never, a.never),
+		solo: await post(t.independent, a.solo),
+	};
+	const m = {
+		lead: await photo(t.studio, p.shown, 0),
+		ready: await video(t.studio, p.shown, 1, "ready"),
+		processing: await video(t.studio, p.shown, 2, "processing"),
+		failed: await video(t.studio, p.shown, 3, "failed"),
+		// A key of another tenant's folder, and one climbing out: never mapped.
+		foreignKey: await photo(
+			t.studio,
+			p.shown,
+			4,
+			`tenants/${t.independent}/client_post_photo/x.jpg`,
+		),
+		climbing: await photo(
+			t.studio,
+			p.shown,
+			5,
+			`tenants/${t.studio}/client_post_photo/..`,
+		),
+		// A ready video whose renditions hold a NULL: a regex lets NULL through,
+		// so the view refuses it by array_position.
+		nullKey: await insert("client_post_media", {
+			tenant_id: t.studio,
+			post_id: p.shown,
+			position: 6,
+			kind: "video",
+			video_state: "ready",
+			video_staging_key: `client_video_upload/tenants/${t.studio}/null-key`,
+			image_key: `tenants/${t.studio}/client_post_video/n6.jpg`,
+			width: 1080,
+			height: 1920,
+			video_duration_ms: 12000,
+			video_keys: `{tenants/${t.studio}/client_post_video/n6.720x1280.mp4,NULL}`,
+			created_at: new Date(),
+		}),
+		ofWaiting: await photo(t.studio, p.waiting, 0),
+		ofStudioPageOnly: await photo(t.studio, p.studioPageOnly, 0),
+		ofHiddenArtist: await photo(t.studio, p.byHiddenArtist, 0),
+		ofNever: await photo(t.never, p.never, 0),
+		solo: await photo(t.independent, p.solo, 0),
+	};
+	return { r, p, m };
+}
+
+/** What the app role reads through slice 4's views, seeded rows only. */
+async function clientContent(
+	trx: Trx,
+	seeded: Awaited<ReturnType<typeof seedClientContent>>,
+	context: { tenantId?: string; userId?: string } = {},
+) {
+	const keep = (all: Record<string, string>, list: { id: string }[]) =>
+		ids(list).filter((id) => Object.values(all).includes(id));
+	return {
+		reviews: keep(
+			seeded.r,
+			await as(trx, APP, "select id from discovery.reviews", context),
+		),
+		posts: keep(
+			seeded.p,
+			await as(trx, APP, "select id from discovery.fresh_ink", context),
+		),
+		media: keep(
+			seeded.m,
+			await as(trx, APP, "select id from discovery.fresh_ink_media", context),
+		),
+	};
+}
+
+test.group("Discover database: reviews and Fresh ink (slice 4)", () => {
+	test("only Discover-consented, live reviews and approved, published posts of shown artists at listed businesses", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const content = await seedClientContent(trx, seeded);
+			const { r, p, m } = content;
+			const expected = {
+				reviews: [r.shown, r.replyDown, r.solo].sort(),
+				posts: [p.shown, p.solo].sort(),
+				media: [m.lead, m.ready, m.solo].sort(),
+			};
+			assert.deepEqual(await clientContent(trx, content), expected);
+			// Whatever context a session forges, the same rows.
+			for (const context of [
+				{ tenantId: seeded.t.never },
+				{ tenantId: seeded.t.studio },
+				{ userId: seeded.user },
+			]) {
+				assert.deepEqual(
+					await clientContent(trx, content, context),
+					expected,
+					JSON.stringify(context),
+				);
+			}
+		});
+	});
+
+	test("the discovery role reads only eligible rows of the client tables, whatever the context", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const { r, p, m } = await seedClientContent(trx, seeded);
+			const keep = (all: Record<string, string>, list: { id: string }[]) =>
+				ids(list).filter((id) => Object.values(all).includes(id));
+			for (const context of [{}, { tenantId: seeded.t.studio }]) {
+				// The tables' policies: Discover consent, no takedown or delete, a
+				// shown artist at a listed business (reviews keep a reply that is
+				// down: the view nulls it); media of a shown post, photos and
+				// ready videos (the view checks the keys).
+				assert.deepEqual(
+					keep(
+						r,
+						await as(trx, DISCOVERY, "select id from client_reviews", context),
+					),
+					[r.shown, r.replyDown, r.solo].sort(),
+				);
+				assert.deepEqual(
+					keep(
+						p,
+						await as(trx, DISCOVERY, "select id from client_posts", context),
+					),
+					[p.shown, p.solo].sort(),
+				);
+				assert.deepEqual(
+					keep(
+						m,
+						await as(
+							trx,
+							DISCOVERY,
+							"select id from client_post_media",
+							context,
+						),
+					),
+					[m.lead, m.ready, m.foreignKey, m.climbing, m.nullKey, m.solo].sort(),
+				);
+			}
+		});
+	});
+
+	test("a reply taken down is null, the review stays; media keys are the public copies' only", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const { r, m } = await seedClientContent(trx, seeded);
+			const replies = await as<{
+				id: string;
+				reply: string | null;
+				replied_at: Date | null;
+			}>(
+				trx,
+				APP,
+				`select id, reply, replied_at from discovery.reviews where id in ('${r.shown}', '${r.replyDown}')`,
+			);
+			const byId = new Map(replies.map((row) => [row.id, row]));
+			assert.equal(byId.get(r.shown)?.reply, "Thank you!");
+			assert.isNotNull(byId.get(r.shown)?.replied_at);
+			assert.isNull(byId.get(r.replyDown)?.reply);
+			assert.isNull(byId.get(r.replyDown)?.replied_at);
+
+			const media = await as<{
+				id: string;
+				position: number;
+				kind: string;
+				image_key: string;
+				video_keys: string[] | null;
+			}>(
+				trx,
+				APP,
+				`select id, position, kind, image_key, video_keys from discovery.fresh_ink_media where id in ('${m.lead}', '${m.ready}') order by position`,
+			);
+			const studio = seeded.t.studio;
+			assert.deepEqual(media, [
+				{
+					id: m.lead,
+					position: 0,
+					kind: "photo",
+					image_key: `tenants/${studio}/fresh_ink_photo/p0.jpg`,
+					video_keys: null,
+				},
+				{
+					id: m.ready,
+					position: 1,
+					kind: "video",
+					image_key: `tenants/${studio}/fresh_ink_video/v1.jpg`,
+					video_keys: [
+						`tenants/${studio}/fresh_ink_video/v1.720x1280.mp4`,
+						`tenants/${studio}/fresh_ink_video/v1.1080x1920.mp4`,
+					],
+				},
+			]);
+			const all = JSON.stringify(
+				await as(trx, APP, "select * from discovery.fresh_ink_media"),
+			);
+			assert.notInclude(all, "client_post_");
+		});
+	});
+
+	test("only the reviews view reads a reply, and only inside the CASE that nulls one taken down", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			// The never-leak rules are in the policies, with this exception: a
+			// reply TattooDrip took down is readable by the role (the review is
+			// published) and nulled by the view's CASE alone. No view may read
+			// client_reviews.reply any other way.
+			const allowed = [
+				"CASE WHEN (r.reply_taken_down_at IS NULL) THEN r.reply ELSE NULL::text END AS reply",
+				"CASE WHEN ((r.reply_taken_down_at IS NULL) AND (r.reply IS NOT NULL)) THEN r.replied_at ELSE NULL::timestamp with time zone END AS replied_at",
+			];
+			const views = await rows<{ name: string; definition: string }>(
+				trx,
+				"select viewname as name, definition from pg_views where schemaname = 'discovery' order by 1",
+			);
+			assert.lengthOf(views, VIEWS.length);
+			for (const { name, definition } of views) {
+				let rest = definition.replace(/\s+/g, " ");
+				if (name === "reviews") {
+					for (const each of allowed) {
+						assert.equal(rest.split(each).length, 2, `${name}: ${each}`);
+						rest = rest.replace(each, "");
+					}
+				}
+				assert.notMatch(rest, /\breply\b|replied_at/, name);
+			}
+		});
+	});
+
+	test("a studio that unlists or is suspended takes every review and post off at once; listing again brings them back", async ({
+		assert,
+	}) => {
+		for (const [off, on] of [
+			[
+				"update tenants set discovery_listed = false where id = ?",
+				"update tenants set discovery_listed = true where id = ?",
+			],
+			[
+				"update tenants set discovery_suspended_at = now() where id = ?",
+				"update tenants set discovery_suspended_at = null where id = ?",
+			],
+		]) {
+			await rolledBack(async (trx) => {
+				const seeded = await seed(trx);
+				const content = await seedClientContent(trx, seeded);
+				const { r, p, m } = content;
+				const before = await clientContent(trx, content);
+				await trx.rawQuery(off, [seeded.t.studio]);
+				assert.deepEqual(
+					await clientContent(trx, content),
+					{ reviews: [r.solo], posts: [p.solo], media: [m.solo] },
+					off,
+				);
+				await trx.rawQuery(on, [seeded.t.studio]);
+				assert.deepEqual(await clientContent(trx, content), before, on);
+			});
+		}
+	});
+
+	test("an artist who opts out or is hidden takes their reviews and posts; withdrawn consent takes one", async ({
+		assert,
+	}) => {
+		await rolledBack(async (trx) => {
+			const seeded = await seed(trx);
+			const content = await seedClientContent(trx, seeded);
+			const { r, p, m } = content;
+			await trx.rawQuery(
+				"update artists set discovery_listed = false where id = ?",
+				[seeded.a.shown],
+			);
+			assert.deepEqual(await clientContent(trx, content), {
+				reviews: [r.solo],
+				posts: [p.solo],
+				media: [m.solo],
+			});
+			await trx.rawQuery(
+				"update artists set discovery_listed = true where id = ?",
+				[seeded.a.shown],
+			);
+			await trx.rawQuery(
+				"update client_reviews set consent_discover = false where id = ?",
+				[r.shown],
+			);
+			await trx.rawQuery(
+				"update client_posts set consent_discover = false, consent_studio_page = true where id = ?",
+				[p.shown],
+			);
+			assert.deepEqual(await clientContent(trx, content), {
+				reviews: [r.replyDown, r.solo].sort(),
+				posts: [p.solo],
+				media: [m.solo],
+			});
 		});
 	});
 });

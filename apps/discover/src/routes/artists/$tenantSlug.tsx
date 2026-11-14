@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ArtistProfile } from "#/components/profile/artist-profile";
 import { independentQueries, loadIndependentProfile } from "#/lib/profiles";
@@ -27,8 +27,17 @@ export const Route = createFileRoute("/artists/$tenantSlug")({
 function IndependentProfile() {
 	const { discover } = Route.useRouteContext();
 	const { tenantSlug } = Route.useParams();
-	const artist = useSuspenseQuery(
-		independentQueries(discover.client, tenantSlug).artist,
-	).data;
-	return <ArtistProfile artist={artist} markets={discover.settings.markets} />;
+	const queries = independentQueries(discover.client, tenantSlug);
+	const artist = useSuspenseQuery(queries.artist).data;
+	const reviews = useQuery(queries.reviews).data;
+	const freshInk = useQuery(queries.freshInk).data;
+	return (
+		<ArtistProfile
+			artist={artist}
+			markets={discover.settings.markets}
+			subject={{ kind: "independent", slug: tenantSlug }}
+			reviews={reviews}
+			freshInk={freshInk}
+		/>
+	);
 }
