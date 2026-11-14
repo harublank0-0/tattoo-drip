@@ -158,6 +158,8 @@ test.group(
 							status: "declined",
 							decided_at: new Date(),
 							submitted_at: new Date(),
+							waiting_round: 1,
+							waiting_since: new Date(),
 						}),
 				);
 			await decline();
@@ -720,6 +722,8 @@ test.group("Review fixes: the order-only write (finding 13)", (group) => {
 				status: "approved",
 				decided_at: new Date(),
 				submitted_at: new Date(),
+				waiting_round: 1,
+				waiting_since: new Date(),
 			}),
 		);
 		const back = await reviewRequest(

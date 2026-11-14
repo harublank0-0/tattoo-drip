@@ -21,6 +21,7 @@ import { placementsOf } from "~/components/project_page";
 import type { ProjectPageProps } from "~/components/projects";
 import { PricePanel, QuoteCard, RevisePanel } from "~/components/quote_card";
 import ReferenceGrid from "~/components/references";
+import ReviewCard from "~/components/review_card";
 import SessionsCard, { SchedulePanel } from "~/components/sessions_card";
 import StatusBadge from "~/components/status_badge";
 import { Button, buttonVariants } from "~/components/ui/button";
@@ -68,6 +69,7 @@ export default function ProjectShow(props: ProjectPageProps) {
 		request,
 		clientId,
 		deposit,
+		review,
 	} = props;
 	const tenant = useTenant();
 	// The design is claimed by another client: the quote form, the deposit link and Verify warn first.
@@ -91,6 +93,8 @@ export default function ProjectShow(props: ProjectPageProps) {
 		project.id,
 		urlFor("tenant.projects.contacted.store", params),
 		{ contactedText: props.contactedText, lastChannel: props.lastChannel },
+		// A review request's tap also sets its link's "sent on".
+		["review"],
 	);
 
 	return (
@@ -170,6 +174,16 @@ export default function ProjectShow(props: ProjectPageProps) {
 							footer={contactedText}
 							onMarkContacted={closed ? undefined : () => markContacted()}
 						/>
+
+						{review && (
+							<ReviewCard
+								projectId={project.id}
+								review={review}
+								lastChannel={lastChannel}
+								onContact={markContacted}
+								fallback={heading}
+							/>
+						)}
 
 						{flash && <FlashDesignCard flash={flash} />}
 

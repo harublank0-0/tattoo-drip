@@ -474,7 +474,7 @@ test.group("bellKinds (TAT-107)", () => {
 		assert.deepEqual(bellKinds("owner"), []);
 	});
 
-	test("an artist has neither count, so the bell counts every kind", ({
+	test("an artist's bell counts every kind but Fresh ink, which their Reviews tab counts", ({
 		assert,
 	}) => {
 		assert.deepEqual(bellKinds("artist"), ["new_inquiry", "deposit_proof"]);

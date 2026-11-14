@@ -562,8 +562,62 @@ router
 					.post(":id/deposit-outcome", [controllers.Payments, "outcome"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.projects.deposit_outcome.store");
+				// "Ask for a review" (Reviews and Fresh ink, slice 2): owners and
+				// the project's artist (ReviewLinkService through findFor), once
+				// the tattoo work is done; 404 while REVIEWS_ENABLED is off.
+				router
+					.post(":id/review-link", [controllers.ReviewLinks, "store"])
+					.where("id", router.matchers.uuid())
+					.use(middleware.reviewsOn())
+					.as("tenant.projects.review_link.store");
+				router
+					.delete(":id/review-link", [controllers.ReviewLinks, "destroy"])
+					.where("id", router.matchers.uuid())
+					.use(middleware.reviewsOn())
+					.as("tenant.projects.review_link.destroy");
 			})
 			.prefix("/projects");
+
+		/**
+		 * The Reviews page (Reviews and Fresh ink, slice 2): owners every
+		 * review and post, an artist those of projects assigned to their own
+		 * profile (StudioReviewService). 404 while REVIEWS_ENABLED is off. The
+		 * studio decides on a post and replies to or reports a review; no
+		 * route edits or hides a review or edits a post (rulings 6 and 7).
+		 * Every reviews route goes in this group (a test checks).
+		 */
+		router
+			.group(() => {
+				router
+					.get("/", [controllers.Reviews, "index"])
+					.as("tenant.reviews.index");
+				router
+					.post("posts/:id/approve", [controllers.Reviews, "approve"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.reviews.posts.approve");
+				router
+					.post("posts/:id/decline", [controllers.Reviews, "decline"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.reviews.posts.decline");
+				router
+					.post("posts/:id/unpublish", [controllers.Reviews, "unpublish"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.reviews.posts.unpublish");
+				router
+					.put(":id/reply", [controllers.Reviews, "reply"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.reviews.reply.update");
+				router
+					.delete(":id/reply", [controllers.Reviews, "deleteReply"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.reviews.reply.destroy");
+				router
+					.post(":id/report", [controllers.Reviews, "report"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.reviews.report.store");
+			})
+			.prefix("/reviews")
+			.use(middleware.reviewsOn());
 
 		/**
 		 * Decisions on one payment (TAT-66): owners only (TENANT_ROUTE_ROLES),

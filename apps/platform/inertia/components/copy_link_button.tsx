@@ -12,18 +12,25 @@ export default function CopyLinkButton({
 	label = "Copy link",
 	variant = "default",
 	className,
+	copiedText = "Link copied.",
+	onCopied,
 }: {
 	text: string;
 	label?: string;
 	variant?: "default" | "outline";
 	className?: string;
+	/** The toast once copied. */
+	copiedText?: string;
+	/** Called once the text is on the clipboard (a review request records its contact). */
+	onCopied?: () => void;
 }) {
 	const copy = () => {
 		const failed = () => toast.error("Couldn't copy: select the link instead.");
 		if (!navigator.clipboard) return failed();
-		navigator.clipboard
-			.writeText(text)
-			.then(() => toast.success("Link copied."), failed);
+		navigator.clipboard.writeText(text).then(() => {
+			toast.success(copiedText);
+			onCopied?.();
+		}, failed);
 	};
 
 	return (

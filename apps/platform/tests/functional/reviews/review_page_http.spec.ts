@@ -1049,9 +1049,16 @@ test.group("Review page: the Fresh ink post", (group) => {
 		assert.isNull(deleted.body().data.post);
 		assert.deepEqual(await storedFiles(a.tenant, "client_post_photo"), []);
 		const rows = await reviewRows(a.tenant);
-		assert.lengthOf(rows.media, 0);
-		assert.lengthOf(rows.posts, 1);
-		assert.isNotNull(rows.posts[0].deletedAt);
+		// The studio's other posts (twoStudios' slice 2 seeds) are not this project's.
+		const posts = rows.posts.filter(
+			(post) => post.projectId === a.reviewProject.id,
+		);
+		assert.lengthOf(
+			rows.media.filter((item) => item.postId === a.clientPost.id),
+			0,
+		);
+		assert.lengthOf(posts, 1);
+		assert.isNotNull(posts[0].deletedAt);
 		// A new photo starts a new draft.
 		const again = await sendPhoto(client, a);
 		assert.equal(again.status(), 201, JSON.stringify(again.body()));

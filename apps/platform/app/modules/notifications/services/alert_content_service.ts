@@ -14,6 +14,8 @@ import { formatMoney } from "#modules/projects/quotes";
 import ProjectService, {
 	type Member,
 } from "#modules/projects/services/project_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import StudioReviewService from "#modules/reviews/services/studio_review_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 
 type TenantRef = Pick<Tenant, "id">;
@@ -21,7 +23,13 @@ type TenantRef = Pick<Tenant, "id">;
 /** The columns of a StaffAlert this service reads. */
 type AlertSubjects = Pick<
 	StaffAlert,
-	"id" | "kind" | "inquiryId" | "projectId" | "paymentId"
+	| "id"
+	| "kind"
+	| "inquiryId"
+	| "projectId"
+	| "paymentId"
+	| "postId"
+	| "postRound"
 >;
 
 /**
@@ -43,7 +51,10 @@ type AlertSubjects = Pick<
  *   the fixed line, because the inbox is owners only;
  * - a deposit-proof alert shows the project's client only while the member
  *   may open the project (`ProjectService.findManyFor`: owners any, an
- *   artist their own), and the amount to owners only.
+ *   artist their own), and the amount to owners only;
+ * - a Fresh ink alert shows the name the client chose to show while the
+ *   member may see the post (StudioReviewService.postsFor, the same rule),
+ *   and says "changed" for a later round.
  * An alert whose subject is gone or out of reach has no entry: the list
  * keeps the fixed line (`alertCopy`).
  */
@@ -55,6 +66,7 @@ export default class AlertContentService {
 		private projects: ProjectService,
 		private clients: ClientService,
 		private deposits: DepositService,
+		private reviews: StudioReviewService,
 	) {}
 
 	/** The content of each alert that has some, by alert id. */
@@ -66,7 +78,37 @@ export default class AlertContentService {
 		const content = new Map<string, AlertContent>();
 		await this.forInquiries(tenant, member, alerts, content);
 		await this.forProofs(tenant, member, alerts, content);
+		await this.forPosts(tenant, member, alerts, content);
 		return content;
+	}
+
+	private async forPosts(
+		tenant: TenantRef,
+		member: Member,
+		alerts: AlertSubjects[],
+		into: Map<string, AlertContent>,
+	): Promise<void> {
+		const mine = alerts.filter(
+			({ kind, postId }) => kind === "fresh_ink" && postId !== null,
+		);
+		const posts = new Map(
+			(
+				await this.reviews.postsFor(
+					tenant,
+					member,
+					mine.map(({ postId }) => postId as string),
+				)
+			).map((post) => [post.id, post]),
+		);
+		for (const alert of mine) {
+			const post = posts.get(alert.postId as string);
+			if (!post) continue;
+			into.set(alert.id, {
+				kind: "fresh_ink",
+				shownName: post.shownName,
+				edited: (alert.postRound ?? 1) > 1,
+			});
+		}
 	}
 
 	private async forInquiries(

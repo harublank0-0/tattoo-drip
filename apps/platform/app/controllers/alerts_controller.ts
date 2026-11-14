@@ -70,6 +70,11 @@ export default class AlertsController {
 				.redirect()
 				.toRoute("tenant.alerts.index", { tenant: tenant.slug });
 		}
+		if (!("id" in target)) {
+			return ctx.response
+				.redirect()
+				.toRoute(target.route, { tenant: tenant.slug });
+		}
 		const params = { tenant: tenant.slug, id: target.id };
 		if ("hash" in target) {
 			const path = `${router.makeUrl(target.route, params)}#${target.hash}`;

@@ -148,6 +148,56 @@ export default class ReviewLinkService {
 	}
 
 	/**
+	 * What the project page's "Ask for a review" shows (slice 2): the live
+	 * link with its token and URL while it works, else null, and the latest
+	 * link made for the project (revoked or expired included) for "the last
+	 * link was revoked". The caller loaded the project for the member
+	 * (ProjectService.findFor).
+	 */
+	async stateFor(
+		tenant: Pick<Tenant, "id" | "slug">,
+		project: Pick<TattooProject, "id">,
+	): Promise<{
+		live: { link: ReviewLink; token: string; url: string } | null;
+		latest: ReviewLink | null;
+	}> {
+		const latest = await ReviewLink.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.orderBy("created_at", "desc")
+			.orderBy("id", "desc")
+			.first();
+		const token = latest ? liveToken(latest) : null;
+		return {
+			live:
+				latest && token
+					? { link: latest, token, url: reviewPageUrl(tenant.slug, token) }
+					: null,
+			latest,
+		};
+	}
+
+	/**
+	 * Records that the studio sent the project's live link (a chat link or a
+	 * copied message of "Ask for a review", slice 2): `sent_at` now. Nothing
+	 * when the project has no live link. `member` must be able to open the
+	 * project.
+	 */
+	async markSent(
+		tenant: TenantRef,
+		member: Member,
+		projectId: string,
+	): Promise<void> {
+		const project = await this.projects.findFor(tenant, member, projectId);
+		await ReviewLink.query()
+			.where("tenant_id", tenant.id)
+			.where("project_id", project.id)
+			.whereNull("revoked_at")
+			.where("expires_at", ">", new Date())
+			.update({ sent_at: new Date() });
+	}
+
+	/**
 	 * Revokes every live link of the client's projects (the privacy
 	 * deletion, finding 8). In the caller's transaction.
 	 */

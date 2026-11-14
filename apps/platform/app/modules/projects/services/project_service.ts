@@ -85,7 +85,7 @@ const WAITING_COLUMNS = [
 /** Projects per page on the projects list. */
 export const PROJECTS_PER_PAGE = 25;
 
-type ProjectQuery = ReturnType<typeof TattooProject.query>;
+export type ProjectQuery = ReturnType<typeof TattooProject.query>;
 
 /**
  * The way to find and list a tenant's projects and move them through their
@@ -135,6 +135,25 @@ export default class ProjectService {
 		const query = TattooProject.query().whereIn("id", ids);
 		await this.scopeTo(query, tenant, member);
 		return query;
+	}
+
+	/**
+	 * The ids of the live projects `member` may see (the `findFor` rule), as
+	 * a subquery for another module's list (`whereIn("project_id", …)`: the
+	 * Reviews page, Reviews and Fresh ink slice 2); `artistId` narrows it to
+	 * one artist's projects. A subquery skips the model's fetch hooks, so
+	 * `deleted_at` is said here. Wrapped in an object: a query builder is a
+	 * thenable, and an async function would run it.
+	 */
+	async visibleIds(
+		tenant: TenantRef,
+		member: Member,
+		artistId: string | null = null,
+	): Promise<{ subquery: ProjectQuery }> {
+		const query = TattooProject.query().select("id").whereNull("deleted_at");
+		await this.scopeTo(query, tenant, member);
+		if (artistId !== null) query.where("artist_id", artistId);
+		return { subquery: query };
 	}
 
 	/**
@@ -831,7 +850,7 @@ export default class ProjectService {
 	 * non-owner needs the project assigned to their own live artist profile
 	 * now, else E_ROW_NOT_FOUND (a 404).
 	 */
-	private async lockFor(
+	async lockFor(
 		trx: TransactionClientContract,
 		tenant: TenantRef,
 		member: Member,
