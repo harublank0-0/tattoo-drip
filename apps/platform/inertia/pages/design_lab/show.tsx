@@ -299,6 +299,13 @@ export default function DesignLabShow({
 												{project.linked.label}
 											</option>
 										)}
+									{/* Linked to a project this member can no longer open (moved
+									    to another artist, or removed): keep the link on save. */}
+									{project.tattooProjectId && !project.linked && (
+										<option value={project.tattooProjectId}>
+											Linked project (not available to you)
+										</option>
+									)}
 									{linkable.map((option) => (
 										<option key={option.id} value={option.id}>
 											{option.label}

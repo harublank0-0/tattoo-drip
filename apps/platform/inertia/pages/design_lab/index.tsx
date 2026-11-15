@@ -158,10 +158,11 @@ export default function DesignLabIndex({
 								>
 									<div className="flex aspect-square items-center justify-center bg-muted">
 										{project.cover ? (
+											// Not lazy: at most 24 covers a page, each a 5-minute
+											// signed URL that must not expire before it is seen.
 											<img
 												src={project.cover}
 												alt=""
-												loading="lazy"
 												className="size-full object-contain"
 											/>
 										) : (

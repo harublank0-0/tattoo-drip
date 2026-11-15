@@ -3,6 +3,7 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import type { ApiResponse } from "@japa/api-client";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import sharp from "sharp";
 import Client from "#modules/clients/models/client";
 import DesignAsset from "#modules/design_lab/models/design_asset";
 import DesignGeneration from "#modules/design_lab/models/design_generation";
@@ -158,9 +159,15 @@ test.group("AI Design Lab", (group) => {
 		}
 
 		// The provider's files, kept byte for byte (their provenance data too).
+		// Uncompressed PNGs, which re-encoding would change: a pipeline that
+		// re-encoded the original fails the byte comparison below.
 		const delivered = [
-			await testImages.png(832, 1216),
-			await testImages.png(832, 1216),
+			await sharp(await testImages.png(832, 1216))
+				.png({ compressionLevel: 0 })
+				.toBuffer(),
+			await sharp(await testImages.png(832, 1216))
+				.png({ compressionLevel: 0 })
+				.toBuffer(),
 		];
 		designProvider.nextDownloads.push(...delivered);
 		for (const row of rows) {

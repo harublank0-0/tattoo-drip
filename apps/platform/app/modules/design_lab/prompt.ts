@@ -84,6 +84,7 @@ export const ORIENTATIONS = {
 	portrait: {
 		label: "Portrait",
 		phrase: "vertical composition",
+		layout: "vertical composition",
 		width: 832,
 		height: 1216,
 		aspectRatio: "2:3",
@@ -91,6 +92,7 @@ export const ORIENTATIONS = {
 	landscape: {
 		label: "Landscape",
 		phrase: "horizontal composition",
+		layout: "horizontal composition",
 		width: 1216,
 		height: 832,
 		aspectRatio: "3:2",
@@ -98,6 +100,7 @@ export const ORIENTATIONS = {
 	square: {
 		label: "Square",
 		phrase: "balanced square composition",
+		layout: "balanced square composition",
 		width: 1024,
 		height: 1024,
 		aspectRatio: "1:1",
@@ -105,6 +108,7 @@ export const ORIENTATIONS = {
 	round: {
 		label: "Round",
 		phrase: "circular composition that fits inside a round frame",
+		layout: "circular, medallion-like composition",
 		width: 1024,
 		height: 1024,
 		aspectRatio: "1:1",
@@ -270,10 +274,15 @@ const HIDDEN =
  * The words to show when `text` must not be sent, else null. Run on every
  * free-text input after trimming.
  */
+const DATES = /\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b|\b(?:1[89]|20)\d{2}\b/g;
+
 export function personalDataProblem(text: string): string | null {
 	if (HIDDEN.test(text)) return "Remove hidden or control characters.";
+	// Dates and years (a memorial's "12.05.1950 - 03.11.2020") are design
+	// text: taken out before the digit count, so they never add up to a phone.
+	const withoutDates = text.replace(DATES, " ");
 	for (const { pattern, message } of PERSONAL_DATA) {
-		if (pattern.test(text)) return message;
+		if (pattern.test(withoutDates)) return message;
 	}
 	return null;
 }
@@ -289,7 +298,9 @@ export function personalDataProblem(text: string): string | null {
 const EXPLICIT =
 	/\b(?:porn\w*|nsfw|intercourse|sex\s+acts?|explicit\s+sex\w*|genitals?|genitalia)\b/i;
 const MINORS =
-	/\b(?:child|children|kids?|minors?|teens?|teenagers?|under-?age|preteens?|toddlers?|schoolgirls?|schoolboys?|lol(?:i|ita)|(?:[1-9]|1[0-7])[\s-]?(?:years?|yrs?)[\s-]?old)\b/i;
+	/\b(?:child(?:ren)?|kids|minors|an?\s+minor|teens?|teenagers?|under-?age|preteens?|toddlers?|bab(?:y|ies)|infants?|newborns?|juveniles?|adolescents?|schoolgirls?|schoolboys?|lol(?:i|ita)|(?:little|young|small)\s+(?:girl|boy)s?|(?:[1-9]|1[0-7])[\s-]?(?:years?|yrs?)[\s-]?old)\b/i;
+/** Phrases that name a child without meaning one: "inner child", "kid goat". */
+const NOT_MINORS = /\binner\s+child\b|\bkid\s+goats?\b/gi;
 const SEXUAL =
 	/\b(?:nude|naked|nudity|sexy|sexual\w*|erotic\w*|seductive|lingerie|topless|fetish\w*|sensual)\b/i;
 const HARM =
@@ -304,7 +315,8 @@ export function policyProblem(
 ): boolean {
 	const text = texts.filter(Boolean).join(" \n ");
 	if (EXPLICIT.test(text)) return true;
-	return MINORS.test(text) && (SEXUAL.test(text) || HARM.test(text));
+	const minors = MINORS.test(text.replace(NOT_MINORS, " "));
+	return minors && (SEXUAL.test(text) || HARM.test(text));
 }
 
 /** One line of text: newlines and runs of whitespace become one space. */
@@ -352,7 +364,7 @@ function promptV3(inputs: GenerationInputs): string {
 		`Concept: ${fragment(inputs.concept)}`,
 		letteringOf(inputs),
 		PALETTES[inputs.palette].phrase,
-		ORIENTATIONS[inputs.orientation].phrase,
+		ORIENTATIONS[inputs.orientation].layout,
 		DETAIL_LEVELS[inputs.detail].phrase,
 		inputs.bodyArea !== "any"
 			? `Laid out as ${BODY_AREAS[inputs.bodyArea].layout}`

@@ -4,6 +4,7 @@ import {
 	buildPrompt,
 	type GenerationInputs,
 	inputsLabel,
+	ORIENTATION_KEYS,
 	PROMPT_VERSION,
 	personalDataProblem,
 	policyProblem,
@@ -42,13 +43,15 @@ test.group("Design Lab prompt", () => {
 		);
 		// No placement, body word, enclosing shape or negative list reaches the
 		// model: FLUX draws what a prompt names, even after "no".
-		for (const bodyArea of BODY_AREA_KEYS) {
-			const text = buildPrompt(inputs({ bodyArea }));
-			assert.notMatch(
-				text,
-				/\b(?:body|skin|person|arm|forearm|shoulder|chest|back|ribs?|thigh|calf|hand|neck|ankle|wrist|limb|mockup|photo\w*|stencil|no|edges?|frame\w*|borders?|taper\w*|shaped)\b/i,
-				bodyArea,
-			);
+		for (const orientation of ORIENTATION_KEYS) {
+			for (const bodyArea of BODY_AREA_KEYS) {
+				const text = buildPrompt(inputs({ bodyArea, orientation }));
+				assert.notMatch(
+					text,
+					/\b(?:body|skin|person|arm|forearm|shoulder|chest|back|ribs?|thigh|calf|hand|neck|ankle|wrist|limb|mockup|photo\w*|stencil|no|edges?|frame\w*|borders?|taper\w*|shaped)\b/i,
+					`${orientation} ${bodyArea}`,
+				);
+			}
 		}
 	});
 
@@ -101,6 +104,14 @@ test.group("Design Lab prompt", () => {
 		// Dates, spans of years and joined Devanagari are ordinary design text.
 		assert.isNull(personalDataProblem("Est. 12.05.2019"));
 		assert.isNull(personalDataProblem("1990-2024"));
+		// Memorial dates side by side are dates, not a phone number.
+		assert.isNull(personalDataProblem("12.05.1950 - 03.11.2020"));
+		assert.isNull(personalDataProblem("03.11.2020 14.02.2022"));
+		assert.isNull(personalDataProblem("1950 1975 2000"));
+		assert.include(
+			personalDataProblem("call 980 123 4567 tonight") ?? "",
+			"phone",
+		);
 		assert.isNull(personalDataProblem("\u0915\u094D\u200D\u0937 lettering"));
 		assert.include(personalDataProblem("zero\u200Bwidth") ?? "", "hidden");
 	});
@@ -117,6 +128,19 @@ test.group("Design Lab prompt", () => {
 		assert.isFalse(policyProblem("pin-up nude in traditional style"));
 		assert.isFalse(policyProblem("bloody dagger through a skull"));
 		assert.isFalse(policyProblem("hardcore punk lettering"));
+		// The common words for children are caught...
+		assert.isTrue(policyProblem("nude little girl"));
+		assert.isTrue(policyProblem("naked young boy"));
+		assert.isTrue(policyProblem("a baby", "bloody"));
+		assert.isTrue(policyProblem("a minor posing nude"));
+		// ...and words that only look like them are not.
+		assert.isFalse(
+			policyProblem("Bloody dagger through a rose, minor shading"),
+		);
+		assert.isFalse(policyProblem("Wounded lion with minor scars"));
+		assert.isFalse(policyProblem("inner child, wounded heart"));
+		assert.isFalse(policyProblem("kid goat skull, bloody horns"));
+		assert.isFalse(policyProblem("pin-up girl, sexy sailor style"));
 		assert.isFalse(policyProblem(null, undefined, ""));
 	});
 
