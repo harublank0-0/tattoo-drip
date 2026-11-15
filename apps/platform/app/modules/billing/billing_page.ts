@@ -7,6 +7,12 @@ import type BillingSubscription from "#modules/billing/models/billing_subscripti
 import { ENDED_STATUSES } from "#modules/billing/models/billing_subscription";
 import { intervalText } from "#modules/billing/plans";
 import type { BillingOverview } from "#modules/billing/services/billing_service";
+import {
+	type Entitlement,
+	type EntitlementState,
+	entitlementText,
+} from "#modules/packages/entitlement";
+import { PACKAGES } from "#modules/packages/packages";
 import { formatDay, formatMoney } from "#modules/projects/quotes";
 
 /** Words for each subscription status (PayBridgeNP's display statuses). */
@@ -35,6 +41,13 @@ export const INVOICE_STATUS_TEXT: Record<string, string> = {
 export type BillingPageProps = {
 	configured: boolean;
 	sandbox: boolean;
+	/** The studio's package and its state (studio packages, EntitlementService). */
+	package: {
+		state: EntitlementState;
+		name: string;
+		line: string;
+		text: string;
+	};
 	access: { state: Access["state"]; text: string };
 	plans: {
 		code: string;
@@ -77,12 +90,19 @@ export function billingPage(
 	overview: BillingOverview,
 	planById: Map<string, BillingPlan>,
 	timezone: string,
+	entitlement: Entitlement,
 ): BillingPageProps {
 	const day = (at: DateTime | null) =>
 		at ? formatDay(at.setZone(timezone).toFormat("yyyy-MM-dd")) : null;
 	return {
 		configured: overview.configured,
 		sandbox: overview.mode === "sandbox",
+		package: {
+			state: entitlement.state,
+			name: PACKAGES[entitlement.package].name,
+			line: PACKAGES[entitlement.package].line,
+			text: entitlementText(entitlement, (at) => day(at) as string),
+		},
 		access: {
 			state: overview.access.state,
 			text: accessText(overview.access, day),

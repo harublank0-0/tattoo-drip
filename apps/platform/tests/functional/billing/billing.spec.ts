@@ -10,6 +10,9 @@ import BillingEvent from "#modules/billing/models/billing_event";
 import BillingInvoice from "#modules/billing/models/billing_invoice";
 import BillingSubscription from "#modules/billing/models/billing_subscription";
 import BillingService from "#modules/billing/services/billing_service";
+import { entitlementText } from "#modules/packages/entitlement";
+import EntitlementService from "#modules/packages/services/entitlement_service";
+import { formatDay } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withDbContext, withTransaction } from "#services/db_context";
 import { queuedMails } from "#tests/helpers/accounts";
@@ -866,5 +869,55 @@ test.group("Billing: modes, plans and reversals", (group) => {
 			)?.grant,
 			"ended",
 		);
+	});
+});
+
+test.group("Billing: the package state (studio packages)", (group) => {
+	group.each.setup(() => paybridge.reset());
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("the Billing page names the package and its state", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, owner } = await studioWithOwner("pkg-page", "Pkg Page");
+		const page = await client
+			.get(`/t/${tenant.slug}/settings/billing`)
+			.loginAs(owner)
+			.withInertia();
+		page.assertStatus(200);
+		assert.equal(page.inertiaProps.package.state, "trial");
+		assert.equal(page.inertiaProps.package.name, "Studio");
+		assert.equal(
+			page.inertiaProps.package.line,
+			"Multiple artists working together.",
+		);
+		assert.match(page.inertiaProps.package.text, /^Studio trial until /);
+	});
+
+	test("the admin page shows each studio's package state", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await paidSubscription(client, "pkg-admin");
+		const page = await client
+			.get("/admin/billing")
+			.loginAs(await platformAdmin())
+			.withInertia();
+		page.assertStatus(200);
+		const row = page.inertiaProps.studios.find(
+			(studio: { tenantId: string }) => studio.tenantId === tenant.id,
+		);
+		// The page reads the clock and the fake's period is fixed (Nov 2026):
+		// compare with the service's own line at the same moment.
+		const service = await (
+			await import("@adonisjs/core/services/app")
+		).default.container.make(EntitlementService);
+		const expected = entitlementText(
+			await inTenant(tenant, () => service.for(tenant)),
+			(at) => formatDay(at.toUTC().toISODate() as string),
+		);
+		assert.equal(row?.packageText, expected);
+		assert.match(row?.packageText ?? "", /^(Studio, |Paused)/);
 	});
 });

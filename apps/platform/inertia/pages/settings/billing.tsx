@@ -28,6 +28,13 @@ type Plan = {
 type Props = {
 	configured: boolean;
 	sandbox: boolean;
+	/** The studio's package and its state (studio packages); nothing is enforced yet. */
+	package: {
+		state: "trial" | "paid" | "grace" | "paused" | "pilot";
+		name: string;
+		line: string;
+		text: string;
+	};
 	access: { state: "paid" | "trial" | "none"; text: string };
 	plans: Plan[];
 	subscription: {
@@ -67,6 +74,7 @@ const selectClass =
 export default function Billing({
 	configured,
 	sandbox,
+	package: studioPackage,
 	access,
 	plans,
 	subscription,
@@ -139,6 +147,20 @@ export default function Billing({
 					</p>
 				)}
 				<div className="flex flex-col gap-3">
+					<div className="text-sm">
+						<p className="flex flex-wrap items-center gap-2">
+							<span className="font-medium">Package</span>
+							<Badge
+								variant={
+									studioPackage.state === "paused" ? "outline" : "secondary"
+								}
+							>
+								{studioPackage.name}
+							</Badge>
+							{studioPackage.text}
+						</p>
+						<p className="text-muted-foreground">{studioPackage.line}</p>
+					</div>
 					<p className="flex flex-wrap items-center gap-2 text-sm">
 						<Badge variant={access.state === "none" ? "outline" : "secondary"}>
 							{access.state === "paid"

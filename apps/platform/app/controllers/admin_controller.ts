@@ -13,6 +13,9 @@ import BillingPlan from "#modules/billing/models/billing_plan";
 import BillingService, {
 	STAFF_REVOCATION_REASONS,
 } from "#modules/billing/services/billing_service";
+import { entitlementText } from "#modules/packages/entitlement";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import EntitlementService from "#modules/packages/services/entitlement_service";
 import type GatewayAccount from "#modules/payments/models/gateway_account";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import GatewayAccountService from "#modules/payments/services/gateway_account_service";
@@ -66,6 +69,7 @@ export default class AdminController {
 	constructor(
 		private billing: BillingService,
 		private accounts: GatewayAccountService,
+		private entitlements: EntitlementService,
 	) {}
 
 	async billingIndex(ctx: HttpContext) {
@@ -78,6 +82,8 @@ export default class AdminController {
 			planName: string | null;
 			statusText: string;
 			accessText: string;
+			/** The package and its state (studio packages), dates in UTC. */
+			packageText: string;
 		}[] = [];
 		const invoices: {
 			id: string;
@@ -107,6 +113,7 @@ export default class AdminController {
 				if (!tenant) return;
 				const subscription = await this.billing.latestSubscription(tenant);
 				const access = await this.billing.access(tenant);
+				const entitlement = await this.entitlements.for(tenant);
 				studios.push({
 					tenantId,
 					name: tenant.name,
@@ -121,6 +128,7 @@ export default class AdminController {
 						access.state === "none"
 							? "No paid period"
 							: `${access.state === "paid" ? "Paid" : "Trial"} until ${day(access.until)}`,
+					packageText: entitlementText(entitlement, (at) => day(at) as string),
 				});
 				if (!mode) return;
 				const rows = await BillingInvoice.query()
