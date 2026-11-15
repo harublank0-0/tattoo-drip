@@ -1,4 +1,5 @@
 import { Form } from "@adonisjs/inertia/react";
+import { CHOOSE_REASON, initialReason } from "~/components/admin_takedown";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 
@@ -63,15 +64,14 @@ export function ReviewTakedownForm({
 					<select
 						id={`${idPrefix}-reason`}
 						name="reason"
-						defaultValue={
-							defaultReason &&
-							reasons.some((reason) => reason.value === defaultReason)
-								? defaultReason
-								: reasons[0]?.value
-						}
+						required
+						defaultValue={initialReason(reasons, defaultReason)}
 						className={selectClass}
 						aria-invalid={!!errors.reason}
 					>
+						<option value={CHOOSE_REASON} disabled>
+							Choose a reason
+						</option>
 						{reasons.map((reason) => (
 							<option key={reason.value} value={reason.value}>
 								{reason.label}
