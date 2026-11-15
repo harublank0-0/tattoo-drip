@@ -12,6 +12,7 @@ export type NavKey =
 	| "clients"
 	| "artists"
 	| "inventory"
+	| "design_lab"
 	| "transactions"
 	| "portfolio"
 	| "reviews"
@@ -28,6 +29,7 @@ export type ShellNavItem = {
 		| "tenant.clients.index"
 		| "tenant.artists"
 		| "tenant.inventory.index"
+		| "tenant.design_lab.index"
 		| "tenant.transactions.index"
 		| "tenant.portfolio"
 		| "tenant.reviews.index"
@@ -65,10 +67,16 @@ const counted = (count: number | null, badgeLabel?: string) =>
  * their owner grants access. Nothing is counted twice: the Inbox counts new
  * requests, Today the projects that need the member, Reviews the Fresh ink
  * waiting for the member, and the bell (not an item) the alerts none of them
- * counts. The server 404s the rest anyway.
+ * counts. AI Design Lab is under More for every member while the server has
+ * it on (`tenant.designLab`). The server 404s the rest anyway.
  */
 export function navItems(
-	tenant: { slug: string; role: string; inventoryAccess?: boolean },
+	tenant: {
+		slug: string;
+		role: string;
+		inventoryAccess?: boolean;
+		designLab?: boolean;
+	},
 	counts: NavCounts,
 ): ShellNavItem[] {
 	const owner = tenant.role === "owner";
@@ -125,8 +133,18 @@ export function navItems(
 		route: "tenant.inventory.index",
 		place: "more",
 	};
+	// AI Design Lab: under More for every member, while the server has it on.
+	const designLab: ShellNavItem | null = tenant.designLab
+		? {
+				key: "design_lab",
+				label: "AI Design Lab",
+				route: "tenant.design_lab.index",
+				place: "more",
+			}
+		: null;
 	if (!owner) {
 		items.push(portfolio, reviews);
+		if (designLab) items.push(designLab);
 		if (tenant.inventoryAccess) items.push(inventory);
 	}
 	if (owner) {
@@ -145,6 +163,7 @@ export function navItems(
 				place: "more",
 			},
 			portfolio,
+			...(designLab ? [designLab] : []),
 			inventory,
 			{
 				key: "transactions",

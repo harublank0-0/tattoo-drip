@@ -149,6 +149,16 @@ export type ScannedRoutes = {
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio.bulk': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.generate': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.status': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.retry': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.assets.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.assets.select': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.assets.download': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.alerts.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.read': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.open': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -263,6 +273,10 @@ export type ScannedRoutes = {
     'tenant.reviews.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.status': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.assets.download': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.alerts.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'email_verification.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
     'email_verification.show': { paramsTuple?: []; params?: {} }
@@ -353,6 +367,10 @@ export type ScannedRoutes = {
     'tenant.reviews.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.status': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.assets.download': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.alerts.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'email_verification.link': { paramsTuple: [ParamValue]; params: {'token': ParamValue} }
     'email_verification.show': { paramsTuple?: []; params?: {} }
@@ -450,6 +468,10 @@ export type ScannedRoutes = {
     'tenant.sessions.outcome': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.sessions.move': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.portfolio.bulk': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.generate': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.retry': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.assets.select': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.alerts.read': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.alerts.open': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'email_verification.confirm': { paramsTuple?: []; params?: {} }
@@ -499,6 +521,8 @@ export type ScannedRoutes = {
     'tenant.projects.notes.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.projects.artist.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.reviews.reply.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.design_lab.assets.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'account.password.update': { paramsTuple?: []; params?: {} }
     'api.v1.review.update': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'api.v1.review.post.order': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }

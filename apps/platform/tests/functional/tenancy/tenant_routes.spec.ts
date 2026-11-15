@@ -64,6 +64,8 @@ test.group("Tenant routes", (group) => {
 			slug: "black-needle",
 			type: "studio",
 			role: "owner",
+			// AI Design Lab is on in tests (the preview provider).
+			designLab: true,
 			logoUrl: null,
 		});
 		assert.deepEqual(response.inertiaProps.tenants, [

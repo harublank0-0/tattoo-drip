@@ -20,6 +20,7 @@ import InvitationService from "#modules/tenancy/services/invitation_service";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient, withDbContext } from "#services/db_context";
 import { depositServices } from "#tests/helpers/deposits";
+import { seedDesignLab } from "#tests/helpers/design_lab";
 import { connectStudio, seedBilling } from "#tests/helpers/online_payments";
 import { paybridge } from "#tests/helpers/paybridge";
 import {
@@ -497,6 +498,9 @@ export async function seededStudio(slug: string, name: string) {
 			gateway.key,
 		),
 	);
+	// AI Design Lab: the artist's design project, a retryable failed
+	// generation and a stored concept (tests/helpers/design_lab.ts).
+	const designLab = await seedDesignLab(tenant, artist);
 	// Another city than the seeded one, for the Discover city route's case.
 	const { rows: otherCity } = await dbClient().rawQuery(
 		"select id from places where country_code = 'NP' and slug = 'pokhara'",
@@ -505,6 +509,7 @@ export async function seededStudio(slug: string, name: string) {
 		tenant,
 		owner,
 		artist,
+		...designLab,
 		inventoryItem,
 		stockedInventoryItem,
 		lotInventoryItem,

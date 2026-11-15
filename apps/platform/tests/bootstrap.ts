@@ -14,6 +14,7 @@ import { assert } from "@japa/assert";
 import { browserClient } from "@japa/browser-client";
 import { pluginAdonisJS } from "@japa/plugin-adonisjs";
 import type { Config } from "@japa/runner/types";
+import { installFakeDesignProvider } from "#tests/helpers/design_lab";
 import { installFakePaybridge } from "#tests/helpers/paybridge";
 
 /**
@@ -110,6 +111,8 @@ export const runnerHooks: Required<Pick<Config, "setup" | "teardown">> = {
 		installDbTripwire,
 		// No test reaches PayBridgeNP: an in-memory fake answers instead.
 		installFakePaybridge,
+		// No test reaches BFL or spends a credit: an in-memory image provider answers.
+		installFakeDesignProvider,
 	],
 	teardown: [clearTestStorage, () => removeTripwire?.()],
 };

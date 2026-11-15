@@ -10,6 +10,7 @@ import {
 	Package,
 	Receipt,
 	Settings,
+	Sparkles,
 	Star,
 	Users,
 } from "lucide-react";
@@ -26,6 +27,7 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
 	portfolio: Images,
 	reviews: Star,
 	inventory: Package,
+	design_lab: Sparkles,
 	transactions: Receipt,
 	settings: Settings,
 };

@@ -12,6 +12,7 @@ Select guidance for the current task. Follow ordinary links when needed; this in
 | API contract, SDK boundaries, React adapter | [SDK](sdk.md) |
 | Discover: plan and roadmap, domains, the cross-tenant database boundary, the public Discover API and booking referral, Studio OS listing controls and takedowns, the Discover app | [Blueprint](discover/implementation-blueprint.md), [domain migration](discover/domain-migration.md), [database security](discover/database-security.md), [Discover API](discover/api.md), [publication controls](discover/publication-controls.md), [frontend](discover/frontend.md) |
 | Online payments: PayBridgeNP subscription billing, studio checkout, the merchant-account constraint | [PayBridgeNP payments](payments-paybridgenp.md) |
+| AI Design Lab: artists' concept generation with the hosted FLUX API, the worker, allowance, privacy notice and settings | [AI Design Lab](design-lab.md) |
 | Phase scope and release gates | [Roadmap](roadmap.md) |
 | Draft legal terms (not reviewed, not published): client reviews and Fresh ink | [Client content terms](legal/client-content-terms.md) |
 | Market evidence, only when requested | [Research](research.md) |

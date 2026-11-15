@@ -5,11 +5,13 @@ import logger from "@adonisjs/core/services/logger";
 import drive from "@adonisjs/drive/services/main";
 import { ImageDeleteError } from "#modules/media/errors";
 import {
+	imageSize,
 	logoTile,
 	makeVariants,
 	type ProcessedImage,
 	type ProcessedVariant,
 	processImage,
+	sniff,
 	squareIcon,
 	type TileColours,
 } from "#modules/media/services/image_processor";
@@ -62,6 +64,10 @@ export const IMAGE_PURPOSES = {
 	// change of an approved post and a delete.
 	fresh_ink_photo: { visibility: "public", variants: VARIANT_WIDTHS },
 	fresh_ink_video: { visibility: "public", variants: VARIANT_WIDTHS },
+	// AI Design Lab (docs/design-lab.md): a generated concept, private to the
+	// studio, with a photo's copies; downloaded by its members through
+	// ImageService.read after the scoped load of its design asset.
+	design_concept: { visibility: "private", variants: VARIANT_WIDTHS },
 } as const;
 
 export type ImagePurpose = keyof typeof IMAGE_PURPOSES;
@@ -236,6 +242,50 @@ export default class ImageService {
 		return this.storeProcessed(await processImage(bytes), { tenant, purpose });
 	}
 
+	/**
+	 * Stores generated artwork exactly as its provider delivered it (AI
+	 * Design Lab): the file keeps the provider's content provenance (C2PA
+	 * credentials or watermarks), which BFL's usage policy forbids removing,
+	 * so it is never re-encoded. It still passes processImage's checks (real
+	 * PNG or JPEG by its bytes, at most 40 MP), and the purpose's smaller
+	 * copies are made from that cleaned image, as for any upload. A WebP is
+	 * stored like an upload (re-encoded), since keys name only .png and .jpg.
+	 */
+	async storeOriginal(
+		bytes: Buffer,
+		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
+	): Promise<StoredImage> {
+		const format = sniff(bytes);
+		const processed = await processImage(bytes);
+		if (format !== "png" && format !== "jpeg") {
+			return this.storeProcessed(processed, { tenant, purpose });
+		}
+		const size = await imageSize(bytes);
+		const extension: ImageExtension = format === "png" ? "png" : "jpg";
+		const base = `tenants/${tenant.id}/${purpose}/${randomUUID()}`;
+		const widths = await this.storeVariants(
+			purpose,
+			base,
+			extension,
+			// The copies are made from the cleaned image, in the original's format.
+			{ ...processed, format },
+		);
+		const key = originalKey(base, extension, widths);
+		try {
+			await diskFor(purpose).put(key, bytes, {
+				contentType: `image/${format}`,
+				cacheControl: STORED_CACHE_CONTROL[IMAGE_PURPOSES[purpose].visibility],
+			});
+		} catch (error) {
+			await this.removeAll(purpose, [
+				key,
+				...widths.map((width) => variantKey(base, width, extension)),
+			]);
+			throw error;
+		}
+		return { key, ...size };
+	}
+
 	/** Writes an image processImage has accepted, with the purpose's copies. */
 	private async storeProcessed(
 		image: ProcessedImage,
@@ -330,6 +380,25 @@ export default class ImageService {
 	): Promise<string> {
 		assertKeyOf(purpose, key, tenant);
 		return link(purpose, key);
+	}
+
+	/**
+	 * The stored image's own bytes and type, for a download served by the
+	 * app (AI Design Lab). The same access rule as `url()`: load the owning
+	 * record scoped to the tenant first; the key must be this tenant's for
+	 * this purpose.
+	 */
+	async read(
+		purpose: ImagePurpose,
+		key: string,
+		tenant: Pick<Tenant, "id">,
+	): Promise<{ bytes: Uint8Array; contentType: string }> {
+		assertKeyOf(purpose, key, tenant);
+		const bytes = await diskFor(purpose).getBytes(key);
+		return {
+			bytes,
+			contentType: key.endsWith(".png") ? "image/png" : "image/jpeg",
+		};
 	}
 
 	/**

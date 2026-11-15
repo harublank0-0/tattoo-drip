@@ -61,6 +61,8 @@ test.group("Shell: the studio identity (Studio OS)", (group) => {
 				"slug",
 				"type",
 				"role",
+				// AI Design Lab's nav flag: on in tests (the preview provider).
+				"designLab",
 				"logoUrl",
 			]);
 		}

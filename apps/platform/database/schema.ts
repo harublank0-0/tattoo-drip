@@ -802,6 +802,207 @@ export class DepositOutcomeSchema extends BaseModel {
 	declare updatedAt: DateTime | null;
 }
 
+export class DesignAssetSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"designProjectId",
+		"generationId",
+		"height",
+		"id",
+		"imageKey",
+		"notes",
+		"selectedAt",
+		"tenantId",
+		"title",
+		"updatedAt",
+		"width",
+	] as const;
+	$columns = DesignAssetSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare designProjectId: string;
+	@column()
+	declare generationId: string;
+	@column()
+	declare height: number;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare imageKey: string;
+	@column()
+	declare notes: string | null;
+	@column.dateTime()
+	declare selectedAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare title: string | null;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare width: number;
+}
+
+export class DesignGenerationSchema extends BaseModel {
+	static $columns = [
+		"acceptedAt",
+		"attempt",
+		"createdAt",
+		"createdBy",
+		"designProjectId",
+		"failureCode",
+		"finishedAt",
+		"id",
+		"inputs",
+		"model",
+		"pollingUrlSealed",
+		"promptVersion",
+		"provider",
+		"providerMeta",
+		"providerRequestId",
+		"requestId",
+		"status",
+		"step",
+		"submittedAt",
+		"tenantId",
+		"updatedAt",
+		"variantIndex",
+	] as const;
+	$columns = DesignGenerationSchema.$columns;
+	@column.dateTime()
+	declare acceptedAt: DateTime;
+	@column()
+	declare attempt: number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare createdBy: string | null;
+	@column()
+	declare designProjectId: string;
+	@column()
+	declare failureCode: string | null;
+	@column.dateTime()
+	declare finishedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare inputs: any;
+	@column()
+	declare model: string;
+	@column()
+	declare pollingUrlSealed: string | null;
+	@column()
+	declare promptVersion: string;
+	@column()
+	declare provider: string;
+	@column()
+	declare providerMeta: any | null;
+	@column()
+	declare providerRequestId: string | null;
+	@column()
+	declare requestId: string;
+	@column()
+	declare status: string;
+	@column()
+	declare step: number;
+	@column.dateTime()
+	declare submittedAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+	@column()
+	declare variantIndex: number;
+}
+
+export class DesignProjectSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"createdBy",
+		"deletedAt",
+		"id",
+		"notes",
+		"reviewState",
+		"tattooProjectId",
+		"tenantId",
+		"title",
+		"updatedAt",
+	] as const;
+	$columns = DesignProjectSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column()
+	declare createdBy: string | null;
+	@column.dateTime()
+	declare deletedAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare notes: string | null;
+	@column()
+	declare reviewState: string;
+	@column()
+	declare tattooProjectId: string | null;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare title: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime | null;
+}
+
+export class DesignUsageRecordSchema extends BaseModel {
+	static $columns = [
+		"actualCredits",
+		"attempt",
+		"estimatedCredits",
+		"generationId",
+		"id",
+		"model",
+		"provider",
+		"releaseReason",
+		"releasedAt",
+		"reservedAt",
+		"settledAt",
+		"status",
+		"tenantId",
+		"units",
+		"userId",
+	] as const;
+	$columns = DesignUsageRecordSchema.$columns;
+	@column()
+	declare actualCredits: string | null;
+	@column()
+	declare attempt: number;
+	@column()
+	declare estimatedCredits: string | null;
+	@column()
+	declare generationId: string;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare model: string;
+	@column()
+	declare provider: string;
+	@column()
+	declare releaseReason: string | null;
+	@column.dateTime()
+	declare releasedAt: DateTime | null;
+	@column.dateTime()
+	declare reservedAt: DateTime;
+	@column.dateTime()
+	declare settledAt: DateTime | null;
+	@column()
+	declare status: string;
+	@column()
+	declare tenantId: string;
+	@column()
+	declare units: number;
+	@column()
+	declare userId: string | null;
+}
+
 export class FlashDesignSchema extends BaseModel {
 	static $columns = [
 		"artistId",

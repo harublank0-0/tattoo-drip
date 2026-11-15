@@ -16,6 +16,7 @@ export const controllers = {
   Dashboard: () => import('#controllers/dashboard_controller'),
   DepositLinks: () => import('#controllers/deposit_links_controller'),
   DepositSettings: () => import('#controllers/deposit_settings_controller'),
+  DesignLab: () => import('#controllers/design_lab_controller'),
   Discover: () => import('#controllers/discover_controller'),
   DiscoverSettings: () => import('#controllers/discover_settings_controller'),
   EmailVerification: () => import('#controllers/email_verification_controller'),
