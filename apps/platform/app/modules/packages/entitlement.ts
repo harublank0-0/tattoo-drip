@@ -115,11 +115,13 @@ export function resolveEntitlement(input: EntitlementInput): Entitlement {
 	);
 	const pilot = running.length > 0 ? highest(running) : null;
 
-	if (
-		pilot &&
-		(!paid || higherPackage(pilot.package, paid.package) === pilot.package)
-	) {
-		return entitlement("pilot", pilot, pilot.endsAt);
+	// A running grant is always Pilot; paid coverage only lifts its package.
+	if (pilot) {
+		const top =
+			paid && higherPackage(pilot.package, paid.package) !== pilot.package
+				? paid
+				: pilot;
+		return entitlement("pilot", top, pilot.endsAt);
 	}
 	if (paid) return entitlement("paid", paid, paid.end);
 

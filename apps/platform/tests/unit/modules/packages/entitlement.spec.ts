@@ -214,7 +214,7 @@ test.group("Entitlement: resolving a studio's package state", () => {
 		assert.equal(iso(back.until), "2026-11-15T00:00:00.000Z");
 	});
 
-	test("a pilot grant applies while it runs; the higher of pilot and paid wins", ({
+	test("a pilot grant applies while it runs, as Pilot at the higher of its package and paid's", ({
 		assert,
 	}) => {
 		const grant = pilot(
@@ -246,9 +246,11 @@ test.group("Entitlement: resolving a studio's package state", () => {
 				period("studio", "2026-11-01T00:00:00Z", "2026-12-01T00:00:00Z"),
 			],
 		});
-		assert.equal(studioOverPilot.state, "paid");
+		// Rule 1: a running grant is always Pilot, at the higher package.
+		assert.equal(studioOverPilot.state, "pilot");
 		assert.equal(studioOverPilot.package, "studio");
 		assert.equal(studioOverPilot.bundleId, "studio-bundle");
+		assert.equal(iso(studioOverPilot.until), "2027-03-31T00:00:00.000Z");
 	});
 
 	test("an ended pilot on an old workspace is paused, not a new trial", ({
