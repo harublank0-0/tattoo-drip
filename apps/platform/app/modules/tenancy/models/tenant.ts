@@ -53,8 +53,8 @@ const cascade = (): LucidModel[] => [
  */
 export default class Tenant extends compose(TenantSchema, withSoftDeletes) {
 	declare type: TenantType;
-	/** The package the trial runs on, chosen at signup (studio packages). */
-	declare selectedPackage: PackageKey;
+	/** The package the trial runs on, chosen at signup; null when none was (the type suggests one). */
+	declare selectedPackage: PackageKey | null;
 
 	@hasMany(() => TenantMembership)
 	declare memberships: HasMany<typeof TenantMembership>;

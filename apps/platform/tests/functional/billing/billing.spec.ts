@@ -895,6 +895,23 @@ test.group("Billing: the package state (studio packages)", (group) => {
 		assert.match(page.inertiaProps.package.text, /^Studio trial until /);
 	});
 
+	test("the admin page lists studios that never subscribed, with their package state", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("pkg-trial", "Pkg Trial");
+		const page = await client
+			.get("/admin/billing")
+			.loginAs(await platformAdmin())
+			.withInertia();
+		page.assertStatus(200);
+		const row = page.inertiaProps.studios.find(
+			(studio: { tenantId: string }) => studio.tenantId === tenant.id,
+		);
+		assert.equal(row?.name, "Pkg Trial");
+		assert.match(row?.packageText ?? "", /^Studio trial until /);
+	});
+
 	test("the admin page shows each studio's package state", async ({
 		client,
 		assert,

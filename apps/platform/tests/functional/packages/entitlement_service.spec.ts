@@ -87,6 +87,33 @@ test.group("Packages: EntitlementService", (group) => {
 		);
 	});
 
+	test("a workspace with no package on record trials the one its type suggests", async ({
+		assert,
+	}) => {
+		const owner = await User.create({
+			email: "solo@ent-unchosen.example",
+			password: "secret-password",
+		});
+		const tenant = await new TenancyService().createTenant(owner, {
+			type: "independent",
+			name: "Ent Unchosen",
+			slug: "ent-unchosen",
+			timezone: "Asia/Kathmandu",
+			package: "studio",
+		});
+		// Rows written without one (fixtures, a raw insert) have none.
+		await inTenant(tenant, () =>
+			dbClient().rawQuery(
+				"update tenants set selected_package = null where id = ?",
+				[tenant.id],
+			),
+		);
+
+		const entitlement = await entitlementOf(tenant);
+		assert.equal(entitlement.state, "trial");
+		assert.equal(entitlement.package, "solo");
+	});
+
 	test("a paid invoice makes the studio paid on Studio", async ({ assert }) => {
 		const tenant = await paidStudio("ent-paid");
 		const studio = await AllowanceBundle.findByOrFail("key", "studio-v1");

@@ -146,6 +146,74 @@ test.group("Entitlement: resolving a studio's package state", () => {
 		assert.equal(paused.state, "paused");
 	});
 
+	test("a refund or chargeback recorded after the period ended gives no grace from then on", ({
+		assert,
+	}) => {
+		const periods = [
+			period(
+				"studio",
+				"2026-11-01T00:00:00Z",
+				"2026-12-01T00:00:00Z",
+				"2026-12-03T00:00:00Z",
+			),
+		];
+		// Before staff recorded it, the lapse looked ordinary.
+		assert.equal(resolve("2026-12-02T00:00:00Z", { periods }).state, "grace");
+		assert.equal(resolve("2026-12-05T00:00:00Z", { periods }).state, "paused");
+	});
+
+	test("every boundary is half-open: a period covers from its start, not at its end; a pilot ends at its end", ({
+		assert,
+	}) => {
+		const periods = [
+			period("studio", "2026-11-20T00:00:00Z", "2026-12-20T00:00:00Z"),
+		];
+		assert.equal(
+			resolve("2026-11-20T00:00:00Z", {
+				workspaceCreatedAt: longAgo,
+				periods,
+			}).state,
+			"paid",
+		);
+		assert.equal(
+			resolve("2026-12-20T00:00:00Z", {
+				workspaceCreatedAt: longAgo,
+				periods,
+			}).state,
+			"grace",
+		);
+		const grant = pilot(
+			"studio",
+			"2025-06-01T00:00:00Z",
+			"2026-11-10T00:00:00Z",
+		);
+		assert.equal(
+			resolve("2026-11-09T23:59:59Z", {
+				workspaceCreatedAt: longAgo,
+				pilots: [grant],
+			}).state,
+			"pilot",
+		);
+		assert.equal(
+			resolve("2026-11-10T00:00:00Z", {
+				workspaceCreatedAt: longAgo,
+				pilots: [grant],
+			}).state,
+			"paused",
+		);
+	});
+
+	test("a pilot that ends inside the first 14 days returns the workspace to its trial", ({
+		assert,
+	}) => {
+		const back = resolve("2026-11-08T00:00:00Z", {
+			pilots: [pilot("studio", "2026-11-01T00:00:00Z", "2026-11-05T00:00:00Z")],
+		});
+		assert.equal(back.state, "trial");
+		assert.equal(back.package, "solo");
+		assert.equal(iso(back.until), "2026-11-15T00:00:00.000Z");
+	});
+
 	test("a pilot grant applies while it runs; the higher of pilot and paid wins", ({
 		assert,
 	}) => {
@@ -240,7 +308,7 @@ test.group("Entitlement: resolving a studio's package state", () => {
 		);
 		assert.equal(
 			entitlementText(entitlement("paused", "studio", null), day),
-			"Paused: pay to start new client work",
+			"No paid package yet",
 		);
 	});
 });

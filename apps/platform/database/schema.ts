@@ -2442,7 +2442,7 @@ export class TenantSchema extends BaseModel {
 	@column.dateTime()
 	declare policiesUpdatedAt: DateTime | null;
 	@column()
-	declare selectedPackage: string;
+	declare selectedPackage: string | null;
 	@column()
 	declare slug: string;
 	@column()

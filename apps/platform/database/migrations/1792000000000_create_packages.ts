@@ -14,8 +14,9 @@ import { BaseSchema } from "@adonisjs/lucid/schema";
  * - `billing_plans.package` / `allowance_bundle_id`: what a plan sells. Every
  *   existing plan is the Studio plan (`studio-monthly`, `studio-yearly`).
  * - `tenants.selected_package`: the package a workspace's trial runs on,
- *   chosen at signup; existing workspaces take the one their type suggests
- *   (an independent artist Solo, a studio Studio).
+ *   chosen at signup. Null when none was chosen (workspaces from before,
+ *   fixtures, a raw insert): the type's suggestion applies then (an
+ *   independent artist Solo, a studio Studio), in EntitlementService.
  */
 const GUARD = `
 create or replace function allowance_bundles_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
@@ -68,8 +69,6 @@ export default class extends BaseSchema {
 			"update billing_plans set package = 'studio', allowance_bundle_id = (select id from allowance_bundles where key = 'studio-v1')",
 			"alter table billing_plans alter column package set not null, alter column allowance_bundle_id set not null",
 			`alter table billing_plans add constraint billing_plans_package check (package ${PACKAGE_CHECK})`,
-			"update tenants set selected_package = case when type = 'independent' then 'solo' else 'studio' end",
-			"alter table tenants alter column selected_package set not null",
 			`alter table tenants add constraint tenants_selected_package check (selected_package ${PACKAGE_CHECK})`,
 		]) {
 			this.schema.raw(statement);

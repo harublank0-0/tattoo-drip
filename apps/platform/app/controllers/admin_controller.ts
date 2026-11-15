@@ -49,7 +49,9 @@ const day = (at: DateTime | null) =>
 	at ? formatDay(at.toUTC().toISODate() as string) : null;
 
 /** Each live studio's id from a SECURITY DEFINER listing (ids only). */
-async function tenantIds(fn: "billing_tenants" | "gateway_account_tenants") {
+async function tenantIds(
+	fn: "billing_tenants" | "gateway_account_tenants" | "package_tenants",
+) {
 	const { rows } = await dbClient().rawQuery(
 		`select tenant_id from public.${fn}()`,
 	);
@@ -107,7 +109,9 @@ export default class AdminController {
 		// Only the active mode's records: sandbox invoices are no income once
 		// billing runs live, and none count with no mode active.
 		const mode = this.billing.activeMode();
-		for (const tenantId of await tenantIds("billing_tenants")) {
+		// Every live studio, not only those with a billing customer: pilots,
+		// trials and paused studios need a package state too (studio packages).
+		for (const tenantId of await tenantIds("package_tenants")) {
 			await withDbContext({ tenantId }, async () => {
 				const tenant = await Tenant.find(tenantId);
 				if (!tenant) return;

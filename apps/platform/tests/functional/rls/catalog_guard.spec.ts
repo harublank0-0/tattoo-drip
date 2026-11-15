@@ -132,6 +132,11 @@ const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
 		reason:
 			"the ids of live studios with a billing customer, for the reconciliation job and the admin Billing page, each read in its own context",
 	},
+	"public.package_tenants": {
+		args: "",
+		reason:
+			"the ids of every live studio, for the admin Billing page's package states (studio packages), each read in its own context",
+	},
 	"public.gateway_account_tenants": {
 		args: "",
 		reason:

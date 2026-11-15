@@ -7,7 +7,7 @@ import {
 	type Entitlement,
 	resolveEntitlement,
 } from "#modules/packages/entitlement";
-import { PACKAGES } from "#modules/packages/packages";
+import { PACKAGES, packageForTenantType } from "#modules/packages/packages";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import PilotGrantService from "#modules/packages/services/pilot_grant_service";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -47,7 +47,11 @@ export default class EntitlementService {
 		}
 		const coverage = await this.billing.paidCoverage(tenant);
 		const grants = await this.pilots.forTenant(tenant);
-		const trialBundleKey = PACKAGES[studio.selectedPackage].defaultBundleKey;
+		// No choice on record (a workspace from before, a fixture): the type's
+		// suggestion, as at signup.
+		const trialPackage =
+			studio.selectedPackage ?? packageForTenantType(studio.type);
+		const trialBundleKey = PACKAGES[trialPackage].defaultBundleKey;
 		const bundles = await bundleIdsByKey([trialBundleKey, LEGACY_BUNDLE_KEY]);
 		const legacyBundle = bundles.get(LEGACY_BUNDLE_KEY) as string;
 
@@ -55,7 +59,7 @@ export default class EntitlementService {
 			at,
 			workspaceCreatedAt: studio.createdAt,
 			trial: {
-				package: studio.selectedPackage,
+				package: trialPackage,
 				bundleId: bundles.get(trialBundleKey) as string,
 			},
 			pilots: grants.map((grant) => ({

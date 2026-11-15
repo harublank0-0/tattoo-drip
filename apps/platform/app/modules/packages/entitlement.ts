@@ -133,7 +133,9 @@ export function resolveEntitlement(input: EntitlementInput): Entitlement {
 		const lapsed = ended.filter(
 			(period) =>
 				period.end.toMillis() === lastEnd.toMillis() &&
-				(!period.revokedAt || period.revokedAt >= period.endsAt),
+				// Revoked by `at` (a refund or chargeback, even one recorded after
+				// the period ended) is no ordinary lapse.
+				(!period.revokedAt || period.revokedAt > at),
 		);
 		const graceEnd = lastEnd.plus({ days: GRACE_DAYS });
 		if (lapsed.length > 0 && at < graceEnd) {
@@ -181,6 +183,8 @@ export function entitlementText(
 		case "pilot":
 			return `${name}, pilot${until}`;
 		case "paused":
-			return "Paused: pay to start new client work";
+			// Observe mode (phase 1): nothing is paused yet, so say only what is
+			// true. The paused wording comes with enforcement (phase 3).
+			return "No paid package yet";
 	}
 }
