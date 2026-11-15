@@ -263,6 +263,62 @@ test.group("Entitlement: resolving a studio's package state", () => {
 		assert.equal(paused.bundleId, "studio-pilot-bundle");
 	});
 
+	test("a period that counts for nothing or has not started yet keeps the trial", ({
+		assert,
+	}) => {
+		const voided = resolve("2026-11-10T00:00:00Z", {
+			periods: [
+				period(
+					"studio",
+					"2026-11-03T00:00:00Z",
+					"2026-12-03T00:00:00Z",
+					"2026-11-03T00:00:00Z",
+				),
+			],
+		});
+		assert.equal(voided.state, "trial");
+		assert.equal(voided.package, "solo");
+		assert.equal(iso(voided.until), "2026-11-15T00:00:00.000Z");
+
+		const upcoming = resolve("2026-11-10T00:00:00Z", {
+			periods: [
+				period("studio", "2026-11-12T00:00:00Z", "2026-12-12T00:00:00Z"),
+			],
+		});
+		assert.equal(upcoming.state, "trial");
+		assert.equal(upcoming.package, "solo");
+
+		const refunded = resolve("2026-11-10T00:00:00Z", {
+			periods: [
+				period(
+					"studio",
+					"2026-11-02T00:00:00Z",
+					"2026-12-02T00:00:00Z",
+					"2026-11-03T00:00:00Z",
+				),
+			],
+		});
+		assert.equal(refunded.state, "paused");
+	});
+
+	test("a studio that paid during its trial is paused with its paid package, not the trial's", ({
+		assert,
+	}) => {
+		const paused = resolve("2026-11-05T00:00:00Z", {
+			periods: [
+				period(
+					"studio",
+					"2026-11-02T00:00:00Z",
+					"2026-12-02T00:00:00Z",
+					"2026-11-03T00:00:00Z",
+				),
+			],
+		});
+		assert.equal(paused.state, "paused");
+		assert.equal(paused.package, "studio");
+		assert.equal(paused.bundleId, "studio-bundle");
+	});
+
 	test("the status line names the package, the state and the date", ({
 		assert,
 	}) => {

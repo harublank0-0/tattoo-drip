@@ -143,18 +143,26 @@ export function resolveEntitlement(input: EntitlementInput): Entitlement {
 		}
 	}
 
+	// "Never paid" means no coverage that began by `at`: a period that counts
+	// for nothing or hasn't started yet doesn't end the trial.
+	const begun = periods.filter((period) => period.startsAt <= at);
 	const trialEnd = input.workspaceCreatedAt.plus({ days: TRIAL_DAYS });
-	if (input.periods.length === 0 && at < trialEnd) {
+	if (begun.length === 0 && at < trialEnd) {
 		return entitlement("trial", input.trial, trialEnd);
 	}
 
-	// Paused, with the package and bundle of whatever ended last.
+	// Paused, with the package and bundle of whatever ended last. The trial
+	// ended at the first payment, if that came first.
+	const firstPaid = begun[0]?.startsAt;
 	const past: Source[] = [
-		...periods.filter((period) => period.startsAt <= at),
+		...begun,
 		...input.pilots
 			.filter((grant) => grant.endsAt <= at)
 			.map((grant) => ({ ...grant, end: grant.endsAt })),
-		{ ...input.trial, end: trialEnd },
+		{
+			...input.trial,
+			end: firstPaid && firstPaid < trialEnd ? firstPaid : trialEnd,
+		},
 	];
 	const latestEnd = past.reduce(
 		(latest, source) => (source.end > latest ? source.end : latest),
