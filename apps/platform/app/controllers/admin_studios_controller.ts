@@ -18,8 +18,28 @@ import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient, withDbContext } from "#services/db_context";
 
 /** Live items the studio page lists; `?more=1` raises it. */
-const LIVE_ITEMS = 20;
-const MORE_LIVE_ITEMS = 200;
+export const LIVE_ITEMS = 20;
+export const MORE_LIVE_ITEMS = 200;
+
+/**
+ * The live items to list, from one more than the view's limit. The default
+ * view offers "Show more" when items remain; the `?more=1` view never does
+ * and says so when it cut the list.
+ */
+export function liveWindow<T>(
+	items: T[],
+	more: boolean,
+	limits = { normal: LIVE_ITEMS, more: MORE_LIVE_ITEMS },
+) {
+	const limit = more ? limits.more : limits.normal;
+	const over = items.length > limit;
+	return {
+		limit,
+		live: items.slice(0, limit),
+		hasMore: over && !more,
+		truncated: over && more,
+	};
+}
 
 /** Dates on admin pages are UTC. */
 const at = (value: DateTime) =>
@@ -126,13 +146,12 @@ export default class AdminStudiosController {
 
 		const status = await this.publication.operatorStatus(slug);
 		const photos = await this.publication.operatorPhotos(slug);
-		const limit =
-			ctx.request.input("more") === "1" ? MORE_LIVE_ITEMS : LIVE_ITEMS;
+		const more = ctx.request.input("more") === "1";
 		// One past the limit tells whether more exist.
 		const items = await this.reviews.studioItems(tenant.id, {
-			limit: limit + 1,
+			limit: (more ? MORE_LIVE_ITEMS : LIVE_ITEMS) + 1,
 		});
-		const hasMore = items.live.length > limit;
+		const window = liveWindow(items.live, more);
 		const reports = (await this.reviews.openReports()).filter(
 			(report) => report.tenantId === tenant.id,
 		);
@@ -158,8 +177,9 @@ export default class AdminStudiosController {
 				})),
 			),
 			takenDown: items.takenDown.map(itemProps),
-			live: items.live.slice(0, limit).map(itemProps),
-			hasMore,
+			live: window.live.map(itemProps),
+			hasMore: window.hasMore,
+			truncated: window.truncated,
 			reports: reports.map((report) => ({
 				reviewId: report.reviewId,
 				reportedText: at(report.reportedAt),

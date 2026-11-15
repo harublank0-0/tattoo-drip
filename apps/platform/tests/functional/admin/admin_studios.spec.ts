@@ -2,6 +2,7 @@ import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import { LIVE_ITEMS } from "#controllers/admin_studios_controller";
 import PublicationService from "#modules/discovery/services/publication_service";
 import ClientReview from "#modules/reviews/models/client_review";
 import Tenant from "#modules/tenancy/models/tenant";
@@ -161,5 +162,24 @@ test.group("Admin studios", (group) => {
 		assert.isFalse(all.hasMore);
 
 		assert.isFalse((await live(b.tenant.slug)).hasMore);
+	});
+
+	test("a studio with exactly the default limit of live items gets no Show more", async ({
+		client,
+		assert,
+	}) => {
+		const { a } = await twoStudios();
+		const admin = await adminUser();
+		const url = `/admin/studios/${a.tenant.slug}`;
+		const props = async () =>
+			(await client.get(url).loginAs(admin).withInertia()).inertiaProps as {
+				live: unknown[];
+				hasMore: boolean;
+			};
+		const before = (await props()).live.length;
+		await addReviews(a, LIVE_ITEMS - before);
+		const page = await props();
+		assert.lengthOf(page.live, LIVE_ITEMS);
+		assert.isFalse(page.hasMore);
 	});
 });

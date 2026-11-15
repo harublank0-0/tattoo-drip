@@ -36,6 +36,8 @@ type Props = {
 	live: Item[];
 	/** More live items exist than are listed. */
 	hasMore: boolean;
+	/** The ?more=1 view cut the list. */
+	truncated: boolean;
 	reports: {
 		reviewId: string;
 		reportedText: string;
@@ -59,6 +61,7 @@ export default function AdminStudio({
 	takenDown,
 	live,
 	hasMore,
+	truncated,
 	reports,
 }: Props) {
 	return (
@@ -118,6 +121,11 @@ export default function AdminStudio({
 					>
 						Show more
 					</Link>
+				)}
+				{truncated && (
+					<p className="text-sm text-muted-foreground">
+						Showing the 200 most recent.
+					</p>
 				)}
 			</Section>
 
