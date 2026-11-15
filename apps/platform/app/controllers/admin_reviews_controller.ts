@@ -79,7 +79,14 @@ export default class AdminReviewsController {
 	private async takedown(ctx: HttpContext, kind: TakedownKind) {
 		const { reason, note } = await ctx.request.validateUsing(takedownValidator);
 		return this.run(ctx, async () => {
-			await this.operator.takedown(kind, ctx.params.id as string, reason, note);
+			// The body parser turns an empty note into null, which `.optional()`
+			// drops; null clears an earlier note, as `reviews:takedown` does.
+			await this.operator.takedown(
+				kind,
+				ctx.params.id as string,
+				reason,
+				note ?? null,
+			);
 			return kind === "post"
 				? "The post is off every public surface and its public copies are deleted."
 				: `The ${kind} is off every public surface.`;

@@ -208,6 +208,44 @@ test.group("Admin reviews", (group) => {
 		assert.isNull(post.takenDownAt);
 	});
 
+	for (const kind of ["review", "reply", "post"] as const) {
+		test(`a repeat ${kind} takedown with an empty note clears the earlier note`, async ({
+			client,
+			assert,
+		}) => {
+			const { a } = await twoStudios();
+			const admin = await adminUser();
+			const path = {
+				review: `/admin/reviews/${a.clientReview.id}/takedown`,
+				reply: `/admin/reviews/${a.clientReview.id}/reply/takedown`,
+				// An approved post nobody published: no stored copies to delete.
+				post: `/admin/posts/${a.approvedPost.id}/takedown`,
+			}[kind];
+			const note = async () =>
+				kind === "post"
+					? (await postOf(a, a.approvedPost.id)).takedownNote
+					: kind === "reply"
+						? (await reviewOf(a)).replyTakedownNote
+						: (await reviewOf(a)).takedownNote;
+
+			(
+				await send(client, admin, "post", path, {
+					reason: "hate",
+					note: "First note",
+				})
+			).assertStatus(302);
+			assert.equal(await note(), "First note");
+
+			// What the browser sends when the note field is left empty.
+			const again = await send(client, admin, "post", path, {
+				reason: "other",
+				note: "",
+			});
+			again.assertStatus(302);
+			assert.isNull(await note());
+		});
+	}
+
 	test("a post takedown while storage can't delete its copies says so and changes nothing", async ({
 		client,
 		assert,
