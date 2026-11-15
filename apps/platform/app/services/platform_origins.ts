@@ -6,9 +6,11 @@ import { pointsAtThisMachine } from "#services/storefront_url";
  * docs/discover/domain-migration.md):
  *
  * - API_URL: where the public API is served. Unset, it is APP_URL's host (the
- *   live layout: dashboard and API on one host). Set to another host, that host
- *   serves /api only.
- * - DISCOVER_URL: the Discover site. Unset until Discover exists. Its host is
+ *   single-host layout from before the D11 cutover: dashboard and API on one
+ *   host). Set to another host, that host serves /api only (production since
+ *   the cutover: api.tattoodrip.app).
+ * - DISCOVER_URL: the Discover site (tattoodrip.app in production since the
+ *   cutover); unset where no Discover runs (development, tests). Its host is
  *   never the dashboard's or the API's; the platform answers only /api there
  *   (the legacy /api proxy after the cutover), and it is a browser origin the
  *   API's CORS allows.
@@ -104,8 +106,8 @@ export function checkPlatformOrigins({
 /**
  * The hosts on which the platform serves its public API and nothing else: the
  * API's own host when it differs from the dashboard's, and Discover's host.
- * Lower case, without a port or trailing dot. Empty in the live layout, where
- * neither is set (and so every host answers as before).
+ * Lower case, without a port or trailing dot. Empty in the single-host layout,
+ * where neither is set (and so every host answers everything).
  */
 export function apiOnlyHosts({
 	appUrl,

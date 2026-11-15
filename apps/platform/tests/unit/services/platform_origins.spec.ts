@@ -1,28 +1,28 @@
 import { test } from "@japa/runner";
 import { apiOnlyHosts, checkPlatformOrigins } from "#services/platform_origins";
 
-const LIVE = {
+const SINGLE_HOST = {
 	appUrl: "https://tattoodrip.app",
 	storefrontTemplate: "https://{tenant}.tattoodrip.page",
 	production: true,
 };
 const SPLIT = {
-	...LIVE,
+	...SINGLE_HOST,
 	appUrl: "https://app.tattoodrip.app",
 	apiUrl: "https://api.tattoodrip.app",
 	discoverUrl: "https://tattoodrip.app",
 };
 
 test.group("API_URL and DISCOVER_URL at boot (Discover D01)", () => {
-	test("the live layout (neither set) and the D11 layout pass", ({
+	test("the single-host layout (neither set) and the D11 layout pass", ({
 		assert,
 	}) => {
-		assert.doesNotThrow(() => checkPlatformOrigins(LIVE));
+		assert.doesNotThrow(() => checkPlatformOrigins(SINGLE_HOST));
 		assert.doesNotThrow(() => checkPlatformOrigins(SPLIT));
 		// The API may stay on the dashboard's host.
 		assert.doesNotThrow(() =>
 			checkPlatformOrigins({
-				...LIVE,
+				...SINGLE_HOST,
 				apiUrl: "https://tattoodrip.app",
 			}),
 		);
@@ -143,10 +143,10 @@ test.group("API_URL and DISCOVER_URL at boot (Discover D01)", () => {
 });
 
 test.group("apiOnlyHosts (Discover D01)", () => {
-	test("none in the live layout", ({ assert }) => {
-		assert.deepEqual([...apiOnlyHosts(LIVE)], []);
+	test("none in the single-host layout", ({ assert }) => {
+		assert.deepEqual([...apiOnlyHosts(SINGLE_HOST)], []);
 		assert.deepEqual(
-			[...apiOnlyHosts({ ...LIVE, apiUrl: "https://tattoodrip.app" })],
+			[...apiOnlyHosts({ ...SINGLE_HOST, apiUrl: "https://tattoodrip.app" })],
 			[],
 		);
 	});

@@ -21,7 +21,8 @@ const PRODUCTION = {
 	R2_PRIVATE_BUCKET: "td9-test-private",
 	R2_PUBLIC_URL: "https://media.tattoodrip.app",
 	// .env.test's development values reach the child through the environment:
-	// the live layout sets neither (a test that needs them sets both).
+	// this boot uses the single-host layout, neither set (a test that needs
+	// them sets both).
 	API_URL: "",
 	DISCOVER_URL: "",
 	// .env.test's sandbox payments are refused in production
