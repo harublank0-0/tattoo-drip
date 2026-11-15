@@ -11,10 +11,9 @@ visitor --https--> Cloudflare (DNS, TLS, Always Use HTTPS)
                       |  Cloudflare Tunnel (the server connects out; no web ports open)
                       v
               the server (Docker Compose, project tattoo-drip-prod)
-              cloudflared --> nginx --+--> web        (the dashboard and API, :3333)
+              cloudflared --> nginx --+--> web        (Studio OS on app., the API on api., :3333)
                                       +--> storefront (the studio pages, :3000)
-                                      +--> discover   (Discover, :3000; only with discover.env, and
-                                                       public only after the D11 cutover)
+                                      +--> discover   (Discover on tattoodrip.app, :3000; needs discover.env)
               worker (alerts, quote expiry, queue), video-worker (video angles)
               postgres 18 (not reachable from outside)
               backup (a job started by systemd every night)
@@ -24,15 +23,16 @@ backup      --> R2 bucket  tattoo-drip-backups
 
 | Name | Goes to |
 |---|---|
-| `tattoodrip.app` | The dashboard and the API. After the D11 cutover: Discover, with old dashboard links sent on to `app.` |
-| `app.tattoodrip.app`, `api.tattoodrip.app` | After the D11 cutover: the dashboard, and the API ([domain migration](../docs/discover/domain-migration.md), "D11 release plan") |
+| `tattoodrip.app` | Discover, with old dashboard links sent on to `app.` and old `/api` calls still proxied to the API (since the D11 cutover, [domain migration](../docs/discover/domain-migration.md)) |
+| `app.tattoodrip.app` | Studio OS (the dashboard) |
+| `api.tattoodrip.app` | The API (`/api` only) |
 | `media.tattoodrip.app` | The public R2 bucket (public photos) |
 | `tattoodrip.page`, `*.tattoodrip.page` | The studio pages |
 
 | Where | What |
 |---|---|
 | `/srv/tattoo-drip/app` | The git clone of the repo (read-only deploy key). Never edit files in it. |
-| `/srv/tattoo-drip/env` | The six settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env`, and from D11 a seventh, `discover.env` (its presence makes `deploy.sh` deploy Discover). Folder mode 700, files mode 600. Keep `discover.env` in the password manager with the others. |
+| `/srv/tattoo-drip/env` | The six settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env`, and a seventh, `discover.env`, required since the D11 cutover: its presence makes `deploy.sh` deploy Discover, and `deploy.sh` refuses the live nginx layout without it. Folder mode 700, files mode 600. Keep `discover.env` in the password manager with the others. |
 | `/srv/tattoo-drip/deployed` | One line: the commit of the last successful deploy, written by `deploy.sh`. Going back (5) and a restore (7.5) read it. |
 | `/srv/tattoo-drip/restore` | Downloaded backups, only while you restore. They hold clients' data: delete them afterwards. |
 | Docker volume `tattoo-drip-prod_postgres_data` | The database. |
@@ -297,7 +297,7 @@ git -C /srv/tattoo-drip/app pull --ff-only
 ls /srv/tattoo-drip/app/deploy/env
 ```
 
-**You should see:** the six `*.env.example` templates. If `ls` says there is no such folder, the work is not merged to `main` yet: stop and merge it first.
+**You should see:** the seven `*.env.example` templates. If `ls` says there is no such folder, the work is not merged to `main` yet: stop and merge it first.
 
 Then make the files. The loop never overwrites a file that exists, so running it again is safe:
 
@@ -316,6 +316,8 @@ ls -l /srv/tattoo-drip/env
 `install -m 600` makes each file readable by you alone from the start.
 
 **You should see:** `... created` six times (on a second run, `... exists, skipped`), then six files, each `-rw-------` and owned by `haru`.
+
+**A seventh file, `discover.env`, is required since the D11 cutover:** `deploy.sh` refuses the live nginx layout without it. Make it the same way from `discover.env.example`, and give it and `platform.env` Discover's key as in the [domain migration](../docs/discover/domain-migration.md), G.A steps 4 and 5, but with `API_URL=https://api.tattoodrip.app`.
 
 ### 2.2 Make the secrets you generate yourself
 
@@ -350,7 +352,7 @@ About the keys this made:
 
 ### 2.3 What the templates already have right
 
-You change nothing else for production. For reference: `NODE_ENV=production`, `TZ=UTC`, `HOST=0.0.0.0`, `PORT=3333`, `APP_URL=https://tattoodrip.app`, `STOREFRONT_URL=https://{tenant}.tattoodrip.page` (keep `{tenant}` as it is), `TRUST_PROXY=172.30.42.10` (nginx's address inside the Docker network), `SESSION_DRIVER=cookie`, the database host `postgres` and the names `tattoo_drip` and `tattoo_drip_app`, the bucket names and `R2_PUBLIC_URL=https://media.tattoodrip.app`, `ALERT_EMAILS=false`, and placeholder `MAIL_*` / `SMTP_*` values until email exists (TAT-20). The storefront's `API_URL` is `https://tattoodrip.app` and its `MEDIA_URL` is `https://media.tattoodrip.app`, the same origin as `R2_PUBLIC_URL`: the studio pages show photos from that origin only, so with any other value (or none) they show no logo, cover, work photo or flash design.
+You change nothing else for production. For reference: `NODE_ENV=production`, `TZ=UTC`, `HOST=0.0.0.0`, `PORT=3333`, `APP_URL=https://app.tattoodrip.app`, `API_URL=https://api.tattoodrip.app`, `DISCOVER_URL=https://tattoodrip.app`, `STOREFRONT_URL=https://{tenant}.tattoodrip.page` (keep `{tenant}` as it is), `TRUST_PROXY=172.30.42.10` (nginx's address inside the Docker network), `SESSION_DRIVER=cookie`, the database host `postgres` and the names `tattoo_drip` and `tattoo_drip_app`, the bucket names and `R2_PUBLIC_URL=https://media.tattoodrip.app`, `ALERT_EMAILS=false`, and placeholder `MAIL_*` / `SMTP_*` values until email exists (TAT-20). The storefront's `API_URL` is `https://api.tattoodrip.app` (Discover's too) and its `MEDIA_URL` is `https://media.tattoodrip.app`, the same origin as `R2_PUBLIC_URL`: the studio pages show photos from that origin only, so with any other value (or none) they show no logo, cover, work photo or flash design.
 
 ### 2.4 Editing a value with nano
 
@@ -360,14 +362,14 @@ nano /srv/tattoo-drip/env/platform.env
 
 Press Ctrl+W, type `CHANGE_ME`, Enter, to jump to the next placeholder. Delete `CHANGE_ME` and paste the value in its place (right-click in most terminals). Paste only the value: no quotes, no spaces, nothing after it. Ctrl+O then Enter saves; Ctrl+X leaves.
 
-Keep a copy of all six files in your password manager once they are complete (section 4.12 asks for it). They are not in git and not in the backups, and a rebuilt server needs them, `APP_KEY` above all. On your computer:
+Keep a copy of all seven files (`discover.env` too) in your password manager once they are complete (section 4.12 asks for it). They are not in git and not in the backups, and a rebuilt server needs them, `APP_KEY` above all. On your computer:
 
 ```bash
 mkdir -m 700 ~/tattoo-drip-env
 scp -i ~/.ssh/tattoo_drip_vps 'haru@<server-ip>:/srv/tattoo-drip/env/*.env' ~/tattoo-drip-env/
 ```
 
-Attach the six files in the manager (or paste each file's text into a secure note), then delete the copies on your computer: `rm -r ~/tattoo-drip-env`.
+Attach the seven files in the manager (or paste each file's text into a secure note), then delete the copies on your computer: `rm -r ~/tattoo-drip-env`.
 
 ---
 
@@ -397,11 +399,13 @@ On `tattoo-drip-public`, under its settings, connect the custom domain `media.ta
 On `tattoo-drip-private`, under its settings, add two things before the first deploy (Reviews and Fresh ink is live on every deploy, so both are required; [deploy.md](../apps/platform/docs/deploy.md#r2-and-video-uploads), "R2 and video uploads"):
 
 - **Object lifecycle rules:** prefix `work_video_upload/`, delete objects 1 day after upload. Studios' video angles and clients' Fresh ink videos are both staged there, and a client can start an upload and never finish it.
-- **CORS policy:** the browser uploads videos straight to this bucket, from the dashboard (`APP_URL`'s origin: `https://tattoodrip.app` until the D11 cutover moves it to `https://app.tattoodrip.app`) and from the studio pages (`*.tattoodrip.page`). Put `APP_URL`'s origin first:
+- **CORS policy:** the browser uploads videos straight to this bucket, from the dashboard (`APP_URL`'s origin, `https://app.tattoodrip.app` since the D11 cutover) and from the studio pages (`*.tattoodrip.page`). Put `APP_URL`'s origin first:
 
   ```json
-  [{ "AllowedOrigins": ["<APP_URL's origin>", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
+  [{ "AllowedOrigins": ["https://app.tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
   ```
+
+  `https://tattoodrip.app` (the dashboard's origin before the cutover) was listed only during the cutover's rollback window; the window is closed, so if your rule still has it, remove it ([domain migration](../docs/discover/domain-migration.md), G.E step 6).
 
 **Check the CORS policy before deploying.** The wildcard for the studio pages is unverified on R2 until this check passes. From your computer, ask the bucket the question a browser asks before a client's video upload, with a real studio's slug and your account ID (3.1):
 
@@ -414,7 +418,7 @@ curl -s -o /dev/null -D - -X OPTIONS \
   | grep -i -E '^(HTTP|access-control-allow-origin)'
 ```
 
-**You should see:** `200` and an `access-control-allow-origin` line naming `https://<slug>.tattoodrip.page` (or `*`). Run it again with `Origin: <APP_URL's origin>`: the same, naming that origin. The request uploads nothing, so it needs no key.
+**You should see:** `200` and an `access-control-allow-origin` line naming `https://<slug>.tattoodrip.page` (or `*`). Run it again for the dashboard with `Origin: https://app.tattoodrip.app`: the same, naming that origin. The request uploads nothing, so it needs no key.
 
 **If the studio page's origin gets no `access-control-allow-origin` line** (a `403`, or no such line), R2 did not honour the wildcard. Then clients can't upload videos from their review page: the browser stops the upload before any byte is sent. Everything else works: clients' photos go through the API, and studios' video angles come from `APP_URL`'s exact origin. Either list each live studio's origin (`https://<slug>.tattoodrip.page`) in `AllowedOrigins` in place of the wildcard, and add every new studio (or changed slug) by hand from then on, or deploy anyway and record client video uploads as a known blocker for the product owner. Don't add a broader origin such as `*`.
 
@@ -465,11 +469,13 @@ In the dashboard open **Zero Trust** (Cloudflare One). The first time it asks yo
 
 The next page shows install commands for several systems. You install nothing there. Copy the **token**: the long string after `--token` (or after `service install`) in the command shown, usually starting with `eyJ`. Put it in `tunnel.env` as `TUNNEL_TOKEN`.
 
-Then add three public hostnames to the tunnel (the list is called Public Hostnames, or Published application routes in newer dashboards). All three use service type **HTTP** and the URL `172.30.42.10:80` (nginx's fixed address inside the Docker network):
+Then add five public hostnames to the tunnel (the list is called Public Hostnames, or Published application routes in newer dashboards). All five use service type **HTTP** and the URL `172.30.42.10:80` (nginx's fixed address inside the Docker network):
 
 | Subdomain | Domain |
 |---|---|
 | (empty) | `tattoodrip.app` |
+| `app` | `tattoodrip.app` |
+| `api` | `tattoodrip.app` |
 | (empty) | `tattoodrip.page` |
 | `*` | `tattoodrip.page` |
 
@@ -483,11 +489,11 @@ The tunnel shows as inactive until the server runs `cloudflared` (4.3).
 
 For each of the two domains, open the domain, then **SSL/TLS**, **Edge Certificates**, and switch **Always Use HTTPS** on. Cloudflare's free certificate covers each domain and its first-level wildcard (`*.tattoodrip.page`), and `.app` and `.page` are HTTPS-only in browsers anyway.
 
-Never switch on **Bot Fight Mode**, **I'm Under Attack** or any rule that challenges requests (a WAF custom rule with a challenge action, a challenge for a country or an address range) on `tattoodrip.app` or, after the D11 cutover, `api.tattoodrip.app` and `app.tattoodrip.app` (Discover's server reads the API the same way). The studio pages' server asks the API at `https://tattoodrip.app`, from the server's own address, for every page it renders, and it cannot solve a challenge: every studio page would answer "This page can't load right now" (8.1). The one rule of 3.8 is the exception: it blocks, and only on the sign-in pages.
+Never switch on **Bot Fight Mode**, **I'm Under Attack** or any rule that challenges requests (a WAF custom rule with a challenge action, a challenge for a country or an address range) on `tattoodrip.app`, `app.tattoodrip.app` or `api.tattoodrip.app`. The studio pages' server asks the API at `https://api.tattoodrip.app` (Discover's server too), from the server's own address, for every page it renders, and it cannot solve a challenge: every studio page would answer "This page can't load right now" (8.1). The one rule of 3.8 is the exception: it blocks, and only on the sign-in pages.
 
 ### 3.8 Optional: one rate-limiting rule
 
-The free plan allows one. The app already limits requests per address by itself (see deploy.md, "What the app does itself"), so this is an outer layer, not a need. If you add one, aim it at the sign-in pages only: host `tattoodrip.app` (and `app.tattoodrip.app` from the D11 cutover), path starting with `/login`, `/signup` or `/forgot-password`, counted per address, with the longest period and block time the free plan offers. Do not aim it at `/api/`: the studio pages call the API from the server's own address, and Cloudflare would count all their visitors as one. Its action is **Block**, never a challenge (3.7).
+The free plan allows one. The app already limits requests per address by itself (see deploy.md, "What the app does itself"), so this is an outer layer, not a need. If you add one, aim it at the sign-in pages only: host `app.tattoodrip.app` (since the D11 cutover the apex only redirects these paths there), path starting with `/login`, `/signup` or `/forgot-password`, counted per address, with the longest period and block time the free plan offers. Do not aim it at `/api/`: the studio pages call the API from the server's own address, and Cloudflare would count all their visitors as one. Its action is **Block**, never a challenge (3.7).
 
 ### 3.9 Everything from Cloudflare is in
 
@@ -524,7 +530,7 @@ Run the `grep` of 3.9 again. **You should see:** nothing.
 /srv/tattoo-drip/app/deploy/deploy.sh
 ```
 
-This is the same command for every later update. It refuses to start while the checkout has local changes or a settings file is missing, unreadable or unfinished, and says which file and variable, before it changes anything. Then it fetches `origin/main`, builds the images, starts Postgres (which creates the database and the restricted app role on its first start), runs the migrations, starts the services, waits for web and storefront to be healthy and reloads nginx. Last, it writes the commit it deployed to `/srv/tattoo-drip/deployed` (one line, the full commit id) and deletes the images the build replaced. That file always names the last release that got through every step: a deploy that fails leaves it as it was, although the checkout already sits on the failed commit. Going back (section 5) and a restore (7.5) use it. Until the first deploy succeeds there is no such file.
+This is the same command for every later update. It refuses to start while the checkout has local changes or a settings file is missing, unreadable or unfinished, and says which file and variable, before it changes anything. Then it fetches `origin/main`, builds the images, starts Postgres (which creates the database and the restricted app role on its first start), runs the migrations, starts the services, waits for web, storefront and Discover to be healthy and reloads nginx. Last, it writes the commit it deployed to `/srv/tattoo-drip/deployed` (one line, the full commit id) and deletes the images the build replaced. That file always names the last release that got through every step: a deploy that fails leaves it as it was, although the checkout already sits on the failed commit. Going back (section 5) and a restore (7.5) use it. Until the first deploy succeeds there is no such file.
 
 The first build downloads every dependency and can take 5 to 15 minutes; later ones are faster. Lines that begin with `deploy:` say which step it is on.
 
@@ -533,10 +539,10 @@ The first build downloads every dependency and can take 5 to 15 minutes; later o
 ### 4.4 Look at what is running
 
 ```bash
-docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml --profile discover ps
 ```
 
-**You should see** seven lines. `postgres`, `web` and `storefront` say `Up ... (healthy)`; `worker`, `video-worker` (video angles' transcodes), `nginx` and `cloudflared` say `Up`. Anything saying `Restarting` is crashing: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 50 <name>` says why.
+`--profile discover` makes `ps` include Discover, which `deploy.sh` starts because `discover.env` exists. **You should see** eight lines. `postgres`, `web`, `storefront` and `discover` say `Up ... (healthy)`; `worker`, `video-worker` (video angles' transcodes), `nginx` and `cloudflared` say `Up`. Anything saying `Restarting` is crashing: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 50 <name>` says why.
 
 ### 4.5 The tunnel and the site
 
@@ -551,17 +557,19 @@ docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 20 cloudfl
 Then, from your computer:
 
 ```bash
-curl -sI http://tattoodrip.app/login | grep -i -E '^(HTTP|location)'
-curl -sI https://tattoodrip.app/login | head -1
+curl -sI http://app.tattoodrip.app/login | grep -i -E '^(HTTP|location)'
+curl -sI https://app.tattoodrip.app/login | head -1
+curl -s https://tattoodrip.app/healthz; echo
+curl -sI https://tattoodrip.app/login | grep -i -E '^(HTTP|location)'
 curl -s -o /dev/null -w '%{http_code}\n' https://tattoodrip.page/
 curl -s -o /dev/null -w '%{http_code}\n' https://nosuch.tattoodrip.page/
 ```
 
-**You should see:** the first, a redirect (`301`) with `location: https://tattoodrip.app/login`; the second, `HTTP/2 200`; the third, `200` (the landing page for a host with no studio); the fourth, `404` (a studio that does not exist).
+**You should see:** the first, a redirect (`301`) with `location: https://app.tattoodrip.app/login`; the second, `HTTP/2 200`; the third, `ok` (Discover on the apex); the fourth, `308` with `location: https://app.tattoodrip.app/login` (the old dashboard address); the fifth, `200` (the landing page for a host with no studio); the sixth, `404` (a studio that does not exist).
 
 ### 4.6 The pilot's account
 
-1. Open `https://tattoodrip.app/signup` and sign up with the pilot owner's email address. Email is off, so no confirmation mail arrives. (The worker logs "Sending email failed." for it; that is expected until TAT-20.)
+1. Open `https://app.tattoodrip.app/signup` and sign up with the pilot owner's email address. Email is off, so no confirmation mail arrives. (The worker logs "Sending email failed." for it; that is expected until TAT-20.)
 2. Check who is asking, in person or by phone. This command skips the proof the emailed link would give.
 3. On the server:
 
@@ -577,7 +585,7 @@ Then the pilot signs in and creates the studio.
 
 With a studio created (its address is `https://<slug>.tattoodrip.page`):
 
-1. **Sign-in cookie.** Sign in at `https://tattoodrip.app`. In the browser's DevTools, Application, Cookies, `__Host-td-session` shows Secure, HttpOnly, SameSite Lax and an empty Domain.
+1. **Sign-in cookie.** Sign in at `https://app.tattoodrip.app`. In the browser's DevTools, Application, Cookies, `__Host-td-session` shows Secure, HttpOnly, SameSite Lax and an empty Domain.
 2. **Studio page.** Open `https://<slug>.tattoodrip.page`. Then:
 
    ```bash
@@ -588,8 +596,8 @@ With a studio created (its address is `https://<slug>.tattoodrip.page`):
 3. **The API's answers.**
 
    ```bash
-   curl -sI https://tattoodrip.app/api/v1/tenants/<slug> | grep -i -E '^(HTTP|cache-control|x-ratelimit|cf-cache-status|age)'
-   curl -sI -H 'Cache-Control: no-cache' https://tattoodrip.app/api/v1/tenants/<slug> | grep -i -E '^(HTTP|cf-cache-status|age)'
+   curl -sI https://api.tattoodrip.app/api/v1/tenants/<slug> | grep -i -E '^(HTTP|cache-control|x-ratelimit|cf-cache-status|age)'
+   curl -sI -H 'Cache-Control: no-cache' https://api.tattoodrip.app/api/v1/tenants/<slug> | grep -i -E '^(HTTP|cf-cache-status|age)'
    ```
 
    **You should see:** `200`, `cache-control: public...`, no `x-ratelimit` header, and in both answers no `age` header and a `cf-cache-status` of `DYNAMIC` or `BYPASS`, never `HIT`. (Cloudflare does not store JSON unless told to; if you ever see `HIT`, add the cache rule deploy.md describes.)
@@ -620,7 +628,7 @@ With a studio created (its address is `https://<slug>.tattoodrip.page`):
 From your computer, send a made-up address to both apps, and look up your own:
 
 ```bash
-curl -4 -s -o /dev/null -H 'X-Forwarded-For: 203.0.113.9' https://tattoodrip.app/login
+curl -4 -s -o /dev/null -H 'X-Forwarded-For: 203.0.113.9' https://app.tattoodrip.app/login
 curl -4 -s -o /dev/null -H 'X-Forwarded-For: 203.0.113.9' https://<slug>.tattoodrip.page/
 curl -4 -s https://ifconfig.me; echo
 ```
@@ -646,11 +654,11 @@ sudo reboot
 Wait two minutes, log in again, and run:
 
 ```bash
-docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml --profile discover ps
 systemctl list-timers tattoo-drip-backup.timer
 ```
 
-**You should see:** the same six containers up (the three with checks `healthy` after a minute), the timer listed with a next run, and the site answering again. Nothing was started by hand.
+**You should see:** the same eight containers up as in 4.4 (`postgres`, `web`, `storefront` and `discover` `healthy` after a minute), the timer listed with a next run, and the site answering again. Nothing was started by hand.
 
 Still at the quiet hour, check that Docker Compose gives a recreated `web` and `storefront` their fixed addresses back (nginx looks for them only there; section 5, "Changing a setting"). The dashboard is down for the half minute `web` takes to start:
 
@@ -660,7 +668,7 @@ docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps web
 docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$(docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps -q web)"
 ```
 
-**You should see:** `ps` shows `web` as `Up ... (healthy)` within a minute (repeat it until it does), and the address is `172.30.42.11`. Then the same three commands with `storefront` in place of `web`: `healthy`, and `172.30.42.12`. Open `https://tattoodrip.app/login` and a studio page: both answer. If an address differs, nginx cannot reach that app (`502` or `504`): run `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml down`, then `/srv/tattoo-drip/app/deploy/deploy.sh "$(cat /srv/tattoo-drip/deployed)"`, and report it: every later recreate would hit the same.
+**You should see:** `ps` shows `web` as `Up ... (healthy)` within a minute (repeat it until it does), and the address is `172.30.42.11`. Then the same three commands with `storefront` in place of `web`: `healthy`, and `172.30.42.12`. Open `https://app.tattoodrip.app/login` and a studio page: both answer. If an address differs, nginx cannot reach that app (`502` or `504`): run `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml down`, then `/srv/tattoo-drip/app/deploy/deploy.sh "$(cat /srv/tattoo-drip/deployed)"`, and report it: every later recreate would hit the same.
 
 ### 4.11 Nothing else answers
 
@@ -678,7 +686,7 @@ for port in 22 80 443 3333 3000 5432; do nc -z -w 5 <server-ip> $port && echo "p
 - A backup is in R2 and the heartbeat registered (6.4).
 - A practice restore matched (7.3).
 - The reboot test and the recreate check passed (4.10) and only port 22 answers (4.11).
-- You have a copy of the six settings files in your password manager (2.4).
+- You have a copy of the seven settings files in your password manager (2.4).
 
 ---
 
@@ -702,7 +710,7 @@ If a step fails, `deploy.sh` says which one, what state that leaves (a failed bu
 /srv/tattoo-drip/app/deploy/deploy.sh "$(cat /srv/tattoo-drip/deployed)"
 ```
 
-After a deploy that worked but turned out bad, the file names that bad release; the deploy's own last lines named the one before it ("to go back to the release before"). Any earlier commit works the same way (`git -C /srv/tattoo-drip/app log --oneline origin/main` lists them):
+After a deploy that worked but turned out bad, the file names that bad release; the deploy's own last lines named the one before it ("to go back to the release before"). Any earlier commit works the same way (`git -C /srv/tattoo-drip/app log --oneline origin/main` lists them), but never a commit before the D11 cutover (28bb1cb9); the rollback window is closed ([domain migration](../docs/discover/domain-migration.md), H):
 
 ```bash
 /srv/tattoo-drip/app/deploy/deploy.sh <earlier commit>
@@ -742,7 +750,13 @@ docker compose -f deploy/compose.yml exec -T postgres sh -c \
 
 From this release on, Reviews and Fresh ink is always on: clients post reviews, photos and videos through the review links studios send ([deploy.md](../apps/platform/docs/deploy.md#platform-settings), the deploy prerequisites). Before the first `deploy.sh` with it:
 
-1. **R2:** on `tattoo-drip-private`, the lifecycle rule on `work_video_upload/` and the CORS policy at the end of 3.2, then the CORS check there. If the check shows the wildcard isn't honoured, 3.2 says what to do.
+1. **R2:** on `tattoo-drip-private`, the lifecycle rule on `work_video_upload/` and the CORS policy at the end of 3.2:
+
+   ```json
+   [{ "AllowedOrigins": ["https://app.tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
+   ```
+
+   No `https://tattoodrip.app`: the D11 rollback window is closed (3.2). Then the CORS check there, with a studio page's origin and, for the dashboard, `Origin: https://app.tattoodrip.app`. If the check shows the wildcard isn't honoured, 3.2 says what to do.
 2. **No log line records the review link's token.** It travels in the `X-Review-Token` header, never in a URL, and nginx logs no request headers but the user agent:
 
    ```bash
@@ -997,7 +1011,7 @@ If `tattoo_drip_restore` exists again (you made a scratch database since), that 
 If the server is gone:
 
 1. Buy and set up a new one: section 1, and the clone update of 2.1 (the first command and the `ls`).
-2. Do not run 2.2: it would make a new `APP_KEY` and new database passwords. Put the six settings files from your password manager into `/srv/tattoo-drip/env`, so that sessions and deposit links keep working and the passwords match. From your computer, with the saved copies in `~/tattoo-drip-env` (2.4):
+2. Do not run 2.2: it would make a new `APP_KEY` and new database passwords. Put the seven settings files (`discover.env` too) from your password manager into `/srv/tattoo-drip/env`, so that sessions and deposit links keep working and the passwords match. From your computer, with the saved copies in `~/tattoo-drip-env` (2.4):
 
    ```bash
    scp -i ~/.ssh/tattoo_drip_vps ~/tattoo-drip-env/*.env haru@<new-server-ip>:/srv/tattoo-drip/env/
@@ -1027,7 +1041,7 @@ Replace `web` with `worker`, `storefront`, `nginx`, `cloudflared` or `postgres`.
 | The site shows a Cloudflare error page (for example 1033 or 502) | The tunnel is not connected: look at its status in the Cloudflare dashboard (4.5). `logs cloudflared` shows only an error that kept it from starting; to see more, 8.9. A 502 or 504 with a connected tunnel means nginx cannot reach `web` or `storefront`: check `ps`. |
 | `web`, `worker` or `storefront` keeps restarting, and the log names a variable | A setting is missing or malformed. The message names the variable, never its value; fix it in the file (2.4) and recreate the service (section 5, "Changing a setting"). |
 | Studio pages show "try again" or a 500 | `logs storefront`; then `logs web` for "server key this API does not accept": `STOREFRONT_SERVER_KEY` and `STOREFRONT_SERVER_KEYS` must hold the same value. |
-| Every studio page says "This page can't load right now" (a 503), and `logs storefront` has `Studio lookup failed` lines with `status: 403` (or `503`) and `code: 'unknown_error'` | A Cloudflare security setting on `tattoodrip.app` challenges the storefront's own server: Bot Fight Mode, I'm Under Attack, or a challenge or WAF rule. Switch it off (3.7). |
+| Every studio page says "This page can't load right now" (a 503), and `logs storefront` has `Studio lookup failed` lines with `status: 403` (or `503`) and `code: 'unknown_error'` | A Cloudflare security setting on `api.tattoodrip.app` (or the whole `tattoodrip.app` zone) challenges the storefront's own server: Bot Fight Mode, I'm Under Attack, or a challenge or WAF rule. Switch it off (3.7). |
 | Studio pages show no photos (logo, cover, work, flash) while the dashboard shows them | The storefront's `MEDIA_URL` is not `https://media.tattoodrip.app` (2.3). Fix it in `storefront.env` and recreate `storefront` (section 5, "Changing a setting"). |
 | Everyone is locked out of sign-in or the request form after a few tries | `TRUST_PROXY` is not nginx's address, so every visitor looks like one. It must be `172.30.42.10`. |
 | Photos do not upload, or the log says R2 | The R2 token, the bucket names or `R2_ACCOUNT_ID` (3.1 to 3.3). |
@@ -1088,7 +1102,7 @@ The Card Ledger stack, or anything else, must use a different Compose project na
 - Cloudflare's free plan waits at most 100 seconds for an answer. A dashboard upload slower than that shows Cloudflare's timeout page instead of the app's own message. Rare at 21 MB; accepted.
 - One server is one point of failure. If it dies, the way back is 7.6: up to a day of data lost, an hour or two of work.
 - Clients' phone numbers and reference photos are stored outside Nepal. The legal check (TAT-63) should cover that under the Individual Privacy Act 2075.
-- To be told when the site is down, add a free uptime monitor (any that emails you) on `https://tattoodrip.app/login` and `https://tattoodrip.page/`.
+- To be told when the site is down, add a free uptime monitor (any that emails you) on `https://app.tattoodrip.app/login`, `https://tattoodrip.app/healthz` (Discover) and `https://tattoodrip.page/`.
 
 ### 8.9 Looking closer at the tunnel
 
@@ -1111,7 +1125,7 @@ Never paste that log anywhere without removing the addresses first.
 
 ### 8.10 Discover
 
-Discover runs only when `/srv/tattoo-drip/env/discover.env` exists (D11). Its commands need `--profile discover`. With `dc` short for `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml`:
+Discover serves `tattoodrip.app` since the D11 cutover. It runs only when `/srv/tattoo-drip/env/discover.env` exists, and `deploy.sh` refuses the live nginx layout without that file. Its commands need `--profile discover`. With `dc` short for `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml`:
 
 ```bash
 dc --profile discover ps discover                               # Up … (healthy)
@@ -1124,9 +1138,9 @@ dc --profile discover logs --tail 50 discover
 | `Restarting`, and the log says `Discover's settings are incomplete:` | A setting in `discover.env` is missing or malformed; the log names it (never the value) | Fix it (2.4), then recreate Discover (5, "Changing a setting") |
 | `Discover API read failed: … ECONNREFUSED` or `answered 503` | Discover can't read the API: `web` is down or restarting, or the tunnel or Cloudflare between them | `dc ps web`, `dc logs --tail 50 web`; Discover recovers by itself once the API answers |
 | `Discover API read failed: … answered 429` | Rate-limited: usually the key doesn't match | `dc logs web \| grep 'server key'`: "does not accept" means `DISCOVER_SERVER_KEY` (discover.env) and `DISCOVER_SERVER_KEYS` (platform.env) differ; make them equal, recreate both |
-| Pages answer 502 at `tattoodrip.app` after the cutover | Discover isn't running | `dc --profile discover up -d discover`; never switch the nginx layout back without the rollback (domain migration, H) |
+| Pages answer 502 at `tattoodrip.app` | Discover isn't running | `dc --profile discover up -d discover`; never switch the nginx layout back: the rollback window is closed (domain migration, H) |
 
-After the cutover, add `https://tattoodrip.app/healthz` to your uptime monitor (8.8) next to the sign-in page, which moves to `https://app.tattoodrip.app/login`.
+Keep `https://tattoodrip.app/healthz` in your uptime monitor (8.8) next to the sign-in page, `https://app.tattoodrip.app/login`.
 
 ## The commands you will use most
 

@@ -337,9 +337,9 @@ for (const path of [
 	"/reset-password/abc",
 	"/t/some-studio/settings",
 ]) {
-	await check(`legacy ${path} → 307 to Studio OS`, async () => {
+	await check(`legacy ${path} → 308 to Studio OS`, async () => {
 		const response = await request(`${SITE}${path}`);
-		expectStatus(response, 307, path);
+		expectStatus(response, 308, path);
 		expect(
 			response.headers.location === `${APP}${path}`,
 			`${path} goes to ${response.headers.location}`,

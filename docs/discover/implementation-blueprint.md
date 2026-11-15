@@ -11,7 +11,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | Repository audit | Complete |
 | Product boundaries and domains | Decided |
 | Roadmap D01–D11 | Defined |
-| D01: domain migration preparation | Done: [domain migration](domain-migration.md); the production cutover is D11 |
+| D01: domain migration preparation | Done: [domain migration](domain-migration.md); the production cutover was D11 |
 | D02: discovery database foundation | Done: [database security](database-security.md) |
 | D03: public Discover API, SDK client, React hooks | Done: [Discover API](api.md); deviations in C.4 below |
 | D04: Studio OS publication controls | Done: [publication controls](publication-controls.md); deviations in C.5 below |
@@ -22,7 +22,7 @@ This file is the plan Discover prompts work from. The dated `docs/superpowers/sp
 | D08: public profiles and storefront booking hand-off | Done: [frontend](frontend.md#profiles-d08); as built in C.10 below |
 | D09: tattoo inspiration gallery and artwork detail | Done: [frontend](frontend.md#gallery-d09), [artwork pages](frontend.md#artwork-pages-d09), [API](api.md#gallery-search-and-the-artwork-read-d09); as built in C.11 below |
 | D10: SEO, accessibility, performance | Done: phase A (technical, international and structured-data SEO, sitemaps, robots, indexing and error semantics: [frontend](frontend.md#seo-and-indexing), [API](api.md#sitemap-lists-d10)) and phase B (performance, images, caching, accessibility, security headers: [performance and caching](frontend.md#performance-and-caching-d10-phase-b), [accessibility](frontend.md#accessibility-d10-phase-b), [security](frontend.md#security-headers-and-hardening-d10-phase-b)); as built and remaining items in C.12 below |
-| D11: final QA, deployment and launch | Prepared, awaiting approval for the cutover: Discover's server key, the startup check, `/healthz` and failed-read logging; `deploy.sh` deploys Discover when `discover.env` exists and guards the split layout; the launch smoke test; the staged release plan, Cloudflare changes and rollback ([domain migration](domain-migration.md#g-d11-release-plan)), rehearsed in production mode (J2). Not done: the cutover itself (stage D), indexing on, geolocation on |
+| D11: final QA, deployment and launch | Done: the cutover (stage D) was carried out in production on 2026-11-08 and its rollback window has closed; Discover is on `tattoodrip.app`, Studio OS on `app.tattoodrip.app`, the API on `api.tattoodrip.app`. Built for it: Discover's server key, the startup check, `/healthz` and failed-read logging; `deploy.sh` deploys Discover when `discover.env` exists and guards the split layout; the launch smoke test; the staged release plan, Cloudflare changes and rollback ([domain migration](domain-migration.md#g-d11-release-plan)), rehearsed in production mode (J2). Not recorded as done: indexing on, geolocation on (each its own decision, G.E). Done when the window closed: the legacy redirects are 308 and the apex is off the private bucket's CORS rule. Still pending: removing the apex `/api` proxy and `hosts.current.conf` after 30 days without apex `/api` traffic |
 
 Status legend: **Done** = in code, with tests where noted. **Partial** = exists, but not in the form Discover needs. **Planned** = only in docs. **Missing** = searched for and absent. **Unverified** = not checked against a running system.
 
@@ -57,7 +57,7 @@ Status legend: **Done** = in code, with tests where noted. **Partial** = exists,
   - The repo is a pnpm monorepo. One AdonisJS 7 modular monolith (`apps/platform`) owns all data and serves the Studio OS dashboard (Inertia + React, SSR off), the public REST API `/api/v1` and a queue worker.
   - A TanStack Start storefront (`apps/storefront`) serves `*.tattoodrip.page`.
   - `packages/{types,sdk,react}` hold the contract, the client and the hooks.
-  - Production is one self-hosted server: Docker Compose + nginx behind a Cloudflare Tunnel (`deploy/`). `tattoodrip.app` currently serves the dashboard and the API.
+  - Production is one self-hosted server: Docker Compose + nginx behind a Cloudflare Tunnel (`deploy/`). `tattoodrip.app` served the dashboard and the API until the D11 cutover; it now serves Discover, with Studio OS on `app.tattoodrip.app` and the API on `api.tattoodrip.app`.
 - **The constraint:**
   - Every public read is single-tenant: PostgreSQL row-level security scopes the app role to one `app.tenant_id` per transaction.
   - The SDK client is bound to one tenant.
@@ -83,7 +83,7 @@ Status legend: **Done** = in code, with tests where noted. **Partial** = exists,
 | `packages/types` / `sdk` / `react` | Contract + generated types; one-tenant client; TanStack Query hooks | Done | `packages/*/src` |
 | `packages/ui` | Shared UI | Missing ("added when the first component is actually shared", `docs/architecture.md`) | — |
 | CI | Biome, typecheck, types drift, build, migrate, schema drift, tests | Done | `.github/workflows/ci.yml` |
-| Deploy | Compose `postgres`, `web`, `worker`, `storefront`, `nginx`, `cloudflared`. nginx sends `tattoodrip.app` to web and `tattoodrip.page` / `*.tattoodrip.page` to storefront. Media on `media.tattoodrip.app` (R2) | Done | `deploy/compose.yml`, `deploy/nginx/` (`common.conf`, `hosts.current.conf`), `deploy/README.md` |
+| Deploy | Compose `postgres`, `web`, `worker`, `storefront`, `nginx`, `cloudflared` (and `discover` since D11). At the audit nginx sent `tattoodrip.app` to web; since the D11 cutover it sends `app.` and `api.` to web, the apex to Discover and `tattoodrip.page` / `*.tattoodrip.page` to storefront. Media on `media.tattoodrip.app` (R2) | Done | `deploy/compose.yml`, `deploy/nginx/` (`common.conf`, `hosts.split.conf`; `hosts.current.conf`, the old layout, kept as a record), `deploy/README.md` |
 | Vercel | `apps/storefront/vercel.json`, a row in `docs/architecture.md` | Stale | Replaced by `docs/superpowers/specs/2026-10-31-single-server-deploy-design.md` |
 
 **How the parts communicate:**
