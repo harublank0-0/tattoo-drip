@@ -82,7 +82,7 @@ node ace discover:restore black-needle [--photo <photo id>]
 ```
 
 - A slug may be current or old (`tenant_for_slug()`); the action runs in that business's own context.
-- `--reason` (1–500 characters) is stored in `discovery_suspension_note` on the tenant or the photo, for operators only: no dashboard page or API sends it. The owner sees only "Removed by TattooDrip" and that their studio page is unaffected.
+- `--reason` (1–500 characters) is stored in `discovery_suspension_note` on the tenant or the photo, for operators only: no studio dashboard page or API sends it; only the admin studio page shows it, to platform operators. The owner sees only "Removed by TattooDrip" and that their studio page is unaffected.
 - A takedown overrides the owner's switch; the owner can still change their switch, which takes effect when the takedown is lifted. Restoring never lists anything: a business whose owner turned the listing off stays off.
 - A photo takedown removes that photo from Discover only. It stays on the studio page and in the portfolio.
 - Each action is logged with the tenant and photo ids (no names or reasons in the log).
