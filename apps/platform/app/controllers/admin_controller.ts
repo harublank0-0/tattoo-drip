@@ -117,7 +117,7 @@ export default class AdminController {
 				if (!tenant) return;
 				const subscription = await this.billing.latestSubscription(tenant);
 				const access = await this.billing.access(tenant);
-				const entitlement = await this.entitlements.for(tenant);
+				const entitlement = await this.entitlements.forLoaded(tenant);
 				studios.push({
 					tenantId,
 					name: tenant.name,

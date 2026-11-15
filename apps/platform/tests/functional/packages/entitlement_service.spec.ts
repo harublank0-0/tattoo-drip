@@ -87,6 +87,30 @@ test.group("Packages: EntitlementService", (group) => {
 		);
 	});
 
+	// The admin page loads each studio once and passes it in, so the service
+	// doesn't read the tenant again per studio.
+	test("forLoaded resolves from the studio it is given, without reading it again", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("ent-loaded", "Ent Loaded");
+		const loaded = await inTenant(tenant, async () => {
+			await tenant.refresh();
+			return tenant;
+		});
+		await createdLongAgo(tenant);
+		const service = await app.container.make(EntitlementService);
+
+		// Read again, the studio is long past its trial; as given, it is new.
+		assert.equal(
+			(await inTenant(tenant, () => service.for(tenant))).state,
+			"paused",
+		);
+		assert.equal(
+			(await inTenant(tenant, () => service.forLoaded(loaded))).state,
+			"trial",
+		);
+	});
+
 	test("a workspace with no package on record trials the one its type suggests", async ({
 		assert,
 	}) => {
