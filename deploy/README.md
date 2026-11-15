@@ -32,7 +32,7 @@ backup      --> R2 bucket  tattoo-drip-backups
 | Where | What |
 |---|---|
 | `/srv/tattoo-drip/app` | The git clone of the repo (read-only deploy key). Never edit files in it. |
-| `/srv/tattoo-drip/env` | The seven settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env` `discover.env` (`discover.env` required since the D11 cutover: its presence makes `deploy.sh` deploy Discover, and `deploy.sh` refuses the live nginx layout without it. Folder mode 700, files mode 600. Keep `discover.env` in the password manager with the others. |
+| `/srv/tattoo-drip/env` | The seven settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env` `discover.env` (`discover.env` required since the D11 cutover: its presence makes `deploy.sh` deploy Discover, and `deploy.sh` refuses the live nginx layout without it). Folder mode 700, files mode 600. Keep `discover.env` in the password manager with the others. |
 | `/srv/tattoo-drip/deployed` | One line: the commit of the last successful deploy, written by `deploy.sh`. Going back (5) and a restore (7.5) read it. |
 | `/srv/tattoo-drip/restore` | Downloaded backups, only while you restore. They hold clients' data: delete them afterwards. |
 | Docker volume `tattoo-drip-prod_postgres_data` | The database. |
@@ -317,11 +317,11 @@ ls -l /srv/tattoo-drip/env
 
 **You should see:** `... created` seven times (on a second run, `... exists, skipped`), then seven files, each `-rw-------` and owned by `haru`. `discover.env` is required since the D11 cutover: `deploy.sh` refuses the live nginx layout without it.
 
-**On a server that already runs without `discover.env`** (set up before this step listed it): the loop creates only `discover.env` and skips the rest. Don't run 2.2's block then; it would leave the other files alone but is meant for a fresh set. Give the new file and `platform.env` Discover's key by hand instead, as in the [domain migration](../docs/discover/domain-migration.md), G.A steps 4 and 5.
+**On a server that already runs without `discover.env`** (set up before this step listed it): the loop creates only `discover.env` and skips the rest. Don't run 2.2's block then: it would put a key in `discover.env` that `platform.env` does not have, so Discover would count as one client. Give the new file and `platform.env` Discover's key by hand instead, as in the [domain migration](../docs/discover/domain-migration.md), G.A steps 4 and 5, but keep the template's `API_URL=https://api.tattoodrip.app` (step 5's apex value was for before the cutover).
 
 ### 2.2 Make the secrets you generate yourself
 
-Some values must be the same in two or three files: the database owner's password (`postgres.env`, `migrate.env`, `backup.env`), the app role's password (`postgres.env`, `platform.env`) the storefront's key (`platform.env`, `storefront.env`) and Discover's key (`platform.env`, `discover.env`). This block makes each one once and writes it to every file, so you never type a secret and the copies cannot differ. Run it once, right after 2.1 made the files. It only replaces a `CHANGE_ME`, so a second run changes nothing in a file that is filled in; but never use it to repair one file (for example after deleting it): that file would get a password the other files and the existing database do not have.
+Some values must be the same in two or three files: the database owner's password (`postgres.env`, `migrate.env`, `backup.env`), the app role's password (`postgres.env`, `platform.env`), the storefront's key (`platform.env`, `storefront.env`) and Discover's key (`platform.env`, `discover.env`). This block makes each one once and writes it to every file, so you never type a secret and the copies cannot differ. Run it once, right after 2.1 made the files. It only replaces a `CHANGE_ME`, so a second run changes nothing in a file that is filled in; but never use it to repair one file (for example after deleting it): that file would get a password the other files and the existing database do not have.
 
 ```bash
 cd /srv/tattoo-drip/env
