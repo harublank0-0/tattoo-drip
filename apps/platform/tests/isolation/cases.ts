@@ -3,6 +3,7 @@ import drive from "@adonisjs/drive/services/main";
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
+import ArtistService from "#modules/artists/services/artist_service";
 import { videoUploadToken } from "#modules/artists/video_uploads";
 import Client from "#modules/clients/models/client";
 import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
@@ -967,6 +968,36 @@ export const isolationCases: IsolationCase[] = [
 		pattern: "/t/:tenant/artists/:id",
 		resource: "artistProfile",
 		actor: "owner",
+		ownStatus: 302,
+		snapshot: artistRows,
+	},
+	// Archiving (studio packages, phase 2): the seeded profile is active, so
+	// archiving changes it; restoring an active profile changes nothing but
+	// still answers its own studio and refuses another's.
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/:id/archive",
+		resource: "artistProfile",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: artistRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/:id/restore",
+		resource: "artistProfile",
+		actor: "owner",
+		// The sending studio's profile is archived first, so restoring it is
+		// a write the snapshot sees (archived_at cleared, updated_at moved).
+		body: async (own) => {
+			await inTenant(own.tenant, () =>
+				new ArtistService(new ImageService()).archive(
+					own.tenant,
+					own.artistProfile.id,
+				),
+			);
+			return {};
+		},
 		ownStatus: 302,
 		snapshot: artistRows,
 	},

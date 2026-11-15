@@ -149,6 +149,8 @@ export interface ApiDefinition {
       edit: typeof routes['tenant.artists.edit']
       update: typeof routes['tenant.artists.update']
       destroy: typeof routes['tenant.artists.destroy']
+      archive: typeof routes['tenant.artists.archive']
+      restore: typeof routes['tenant.artists.restore']
       discover: {
         update: typeof routes['tenant.artists.discover.update']
       }

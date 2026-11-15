@@ -35,6 +35,9 @@ import { InvalidImageError } from "#modules/media/errors";
 import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
+import { PackageRuleError } from "#modules/packages/errors";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PackageGate from "#modules/packages/services/package_gate";
 import { formatMoney, todayIn } from "#modules/projects/quotes";
 import {
 	dayBounds,
@@ -79,6 +82,7 @@ export default class ArtistsController {
 		private calendar: CalendarService,
 		private hours: OpeningHoursService,
 		private publication: PublicationService,
+		private packages: PackageGate,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -171,6 +175,13 @@ export default class ArtistsController {
 		const { tenant } = tenantContext(ctx);
 		const user = ctx.auth.getUserOrFail();
 		const data = await ctx.request.validateUsing(createArtistValidator);
+		// A new artist is active: the package's limit and the paused state
+		// apply (observe mode only logs).
+		if (!(await this.passesGate(ctx, tenant))) {
+			return ctx.response
+				.redirect()
+				.toRoute("tenant.artists", { tenant: tenant.slug });
+		}
 
 		const artist = await asFieldErrors(() =>
 			this.artists.create(tenant, toInput(data), user),
@@ -356,6 +367,58 @@ export default class ArtistsController {
 	}
 
 	/**
+	 * Archives the artist (studio packages, phase 2): they keep their history,
+	 * leave the studio's page and get no new work.
+	 */
+	async archive(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const artist = await this.artists.archive(tenant, ctx.params.id);
+
+		ctx.session.flash("success", `"${artist.name}" archived.`);
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.artists", { tenant: tenant.slug });
+	}
+
+	/**
+	 * Restores an archived artist through the package gate; they stay hidden
+	 * until the owner shows them again.
+	 */
+	async restore(ctx: HttpContext) {
+		const { tenant } = tenantContext(ctx);
+		const artist = await this.artists.findFor(tenant, ctx.params.id);
+		if (artist.archivedAt && !(await this.passesGate(ctx, tenant))) {
+			return ctx.response
+				.redirect()
+				.toRoute("tenant.artists", { tenant: tenant.slug });
+		}
+		const restored = await this.artists.restore(tenant, artist.id);
+
+		ctx.session.flash(
+			"success",
+			`"${restored.name}" is active again. They stay hidden until you show them on your page.`,
+		);
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.artists", { tenant: tenant.slug });
+	}
+
+	/**
+	 * The package gate for an artist becoming active; a refusal (enforce mode
+	 * only) is flashed, never a server error.
+	 */
+	private async passesGate(ctx: HttpContext, tenant: Tenant) {
+		try {
+			await this.packages.checkArtistActivation(tenant);
+			return true;
+		} catch (error) {
+			if (!(error instanceof PackageRuleError)) throw error;
+			ctx.session.flash("error", error.message);
+			return false;
+		}
+	}
+
+	/**
 	 * Whether the user already has a live profile in the tenant.
 	 */
 	private async hasProfile(tenant: { id: string }, userId: string) {
@@ -381,6 +444,8 @@ export default class ArtistsController {
 					)
 				: null,
 			visible: artist.visible,
+			// Archived (studio packages, phase 2): kept, hidden, no new work.
+			archived: artist.archivedAt !== null,
 			acceptingInquiries: artist.acceptingInquiries,
 			isMine: artist.userId === userId,
 			// The artist's own page (TAT-101); a hidden artist has none.

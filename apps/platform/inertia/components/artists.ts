@@ -7,6 +7,8 @@ export type ArtistRowProps = {
 	/** The photo's 320 px copy (TAT-112), or the photo itself when it has none. */
 	photoUrl: string | null;
 	visible: boolean;
+	/** Archived (studio packages): kept with their history, hidden, no new work. */
+	archived: boolean;
 	acceptingInquiries: boolean;
 	/** Linked to the signed-in user. */
 	isMine: boolean;
