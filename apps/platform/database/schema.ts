@@ -181,6 +181,11 @@ export class BillingAccessPeriodSchema extends BaseModel {
 		"endsAt",
 		"id",
 		"invoiceId",
+		"livemode",
+		"planId",
+		"revokedAt",
+		"revokedByUserId",
+		"revokedReason",
 		"startsAt",
 		"tenantId",
 	] as const;
@@ -193,6 +198,16 @@ export class BillingAccessPeriodSchema extends BaseModel {
 	declare id: string;
 	@column()
 	declare invoiceId: string;
+	@column()
+	declare livemode: boolean;
+	@column()
+	declare planId: string | null;
+	@column.dateTime()
+	declare revokedAt: DateTime | null;
+	@column()
+	declare revokedByUserId: string | null;
+	@column()
+	declare revokedReason: string | null;
 	@column.dateTime()
 	declare startsAt: DateTime;
 	@column()
@@ -271,6 +286,7 @@ export class BillingInvoiceSchema extends BaseModel {
 		"paidAt",
 		"periodEnd",
 		"periodStart",
+		"planId",
 		"providerInvoiceId",
 		"status",
 		"subscriptionId",
@@ -305,6 +321,8 @@ export class BillingInvoiceSchema extends BaseModel {
 	declare periodEnd: DateTime | null;
 	@column.dateTime()
 	declare periodStart: DateTime | null;
+	@column()
+	declare planId: string | null;
 	@column()
 	declare providerInvoiceId: string;
 	@column()

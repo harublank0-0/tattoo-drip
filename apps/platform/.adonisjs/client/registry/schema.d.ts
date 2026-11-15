@@ -2095,6 +2095,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['billingIndex']>>>
     }
   }
+  'admin.billing.end_access': {
+    methods: ["POST"]
+    pattern: '/admin/billing/end-access'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['endAccess']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_controller').default['endAccess']>>>
+    }
+  }
   'admin.payments': {
     methods: ["GET","HEAD"]
     pattern: '/admin/payments'

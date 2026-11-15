@@ -1,0 +1,14 @@
+Hi,
+
+@if(kind === 'reversed')
+A paid {{{ mode }}} invoice of the studio “{{{ studioSlug }}}” was {{{ reasonText }}} at PayBridgeNP, so the paid period it granted has ended. The record stays on the admin Billing page.
+
+If the studio should still have access, check the invoice in PayBridgeNP.
+@else
+A paid {{{ mode }}} invoice of the studio “{{{ studioSlug }}}” granted no access: Tattoo Drip can't tell which period it paid for. The period read with it doesn't fit its dates, and the plan it billed isn't one Tattoo Drip knows in this mode (or it names none).
+
+Check the invoice and the studio's subscription in PayBridgeNP.
+@end
+Open billing: {{{ url }}}
+
+You get these emails as a Tattoo Drip platform admin.

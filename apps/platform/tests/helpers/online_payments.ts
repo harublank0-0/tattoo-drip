@@ -20,7 +20,16 @@ import { inTenant } from "#tests/helpers/tenants";
  */
 
 /** The catalogue's plans in sandbox, as `billing:sync-plans` stores them. */
-export async function sandboxPlans() {
+export function sandboxPlans() {
+	return catalogPlans(false);
+}
+
+/** The same plans in live mode (`billing:sync-plans` with a live key). */
+export function livePlans() {
+	return catalogPlans(true);
+}
+
+async function catalogPlans(livemode: boolean) {
 	const plans: BillingPlan[] = [];
 	for (const [code, amount, unit] of [
 		["studio-monthly", 250_000, "month"],
@@ -28,20 +37,20 @@ export async function sandboxPlans() {
 	] as const) {
 		const existing = await BillingPlan.query()
 			.where("code", code)
-			.where("livemode", false)
+			.where("livemode", livemode)
 			.first();
 		if (existing?.providerPlanId) {
 			paybridge.plans.set(existing.providerPlanId, {
 				id: existing.providerPlanId,
-				livemode: false,
+				livemode,
 			});
 			plans.push(existing);
 			continue;
 		}
-		const providerPlanId = `bpl_test_${code}`;
+		const providerPlanId = `bpl_${livemode ? "live" : "test"}_${code}`;
 		paybridge.plans.set(providerPlanId, {
 			id: providerPlanId,
-			livemode: false,
+			livemode,
 		});
 		const values = {
 			code,
@@ -51,7 +60,7 @@ export async function sandboxPlans() {
 			intervalUnit: unit,
 			intervalCount: 1,
 			trialDays: 0,
-			livemode: false,
+			livemode,
 			providerPlanId,
 			active: true,
 		};
@@ -103,6 +112,7 @@ export async function seedBilling(tenant: Pick<Tenant, "id">) {
 		paybridge.customers.set(customer.providerCustomerId, {
 			id: customer.providerCustomerId,
 			externalCustomerId: tenant.id,
+			livemode: false,
 		});
 		paybridge.subscriptions.set(subscription.providerSubscriptionId, {
 			id: subscription.providerSubscriptionId,
@@ -138,6 +148,7 @@ export async function seedBilling(tenant: Pick<Tenant, "id">) {
 			customerId: customer.providerCustomerId,
 			customerExternalId: tenant.id,
 			subscriptionId: subscription.providerSubscriptionId,
+			planId: monthly.providerPlanId,
 			periodStart: subscription.currentPeriodStart?.toISO() ?? null,
 			periodEnd: subscription.currentPeriodEnd?.toISO() ?? null,
 			livemode: false,

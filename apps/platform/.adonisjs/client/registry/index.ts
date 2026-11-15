@@ -1050,6 +1050,12 @@ const routes = {
     tokens: [{"old":"/admin/billing","type":0,"val":"admin","end":""},{"old":"/admin/billing","type":0,"val":"billing","end":""}],
     types: placeholder as Registry['admin.billing']['types'],
   },
+  'admin.billing.end_access': {
+    methods: ["POST"],
+    pattern: '/admin/billing/end-access',
+    tokens: [{"old":"/admin/billing/end-access","type":0,"val":"admin","end":""},{"old":"/admin/billing/end-access","type":0,"val":"billing","end":""},{"old":"/admin/billing/end-access","type":0,"val":"end-access","end":""}],
+    types: placeholder as Registry['admin.billing.end_access']['types'],
+  },
   'admin.payments': {
     methods: ["GET","HEAD"],
     pattern: '/admin/payments',
