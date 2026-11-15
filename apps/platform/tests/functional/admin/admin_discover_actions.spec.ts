@@ -122,6 +122,29 @@ test.group("Admin Discover actions", (group) => {
 		assert.lengthOf(status.removedPhotos, 0);
 	});
 
+	test("a refused reason comes back under the bag the form named", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant, photos } = await studio("adm-bag");
+		const admin = await adminUser();
+		const bag = `photo-${photos[0].id}`;
+		// Followed like the browser does: the redirect's GET keeps the header.
+		const page = await client
+			.post(`/admin/studios/${tenant.slug}/photos/${photos[0].id}/suspend`)
+			.withCsrfToken()
+			.form({ reason: "   " })
+			.withInertia()
+			.header("x-inertia-error-bag", bag)
+			.header("referer", `/admin/studios/${tenant.slug}`)
+			.loginAs(admin)
+			.redirects(1);
+		page.assertStatus(200);
+		const errors = page.inertiaProps.errors as Record<string, unknown>;
+		assert.deepEqual(Object.keys(errors), [bag]);
+		assert.property(errors[bag] as object, "reason");
+	});
+
 	test("another studio's photo under this slug is refused and left alone", async ({
 		client,
 		assert,

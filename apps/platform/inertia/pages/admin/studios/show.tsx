@@ -215,8 +215,10 @@ function TakedownForm({ target }: { target: Target }) {
 		</>
 	);
 	const className = "flex flex-col gap-2";
+	// Each form names its own error bag, so a refused reason shows only under it.
 	return target.photo ? (
 		<Form
+			errorBag={idPrefix}
 			route="admin.studios.photos.suspend"
 			routeParams={{ slug: target.slug, photo: target.photo }}
 			className={className}
@@ -225,6 +227,7 @@ function TakedownForm({ target }: { target: Target }) {
 		</Form>
 	) : (
 		<Form
+			errorBag={idPrefix}
 			route="admin.studios.discover.suspend"
 			routeParams={{ slug: target.slug }}
 			className={className}
