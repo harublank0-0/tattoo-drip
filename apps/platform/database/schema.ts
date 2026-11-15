@@ -1708,6 +1708,36 @@ export class PaymentSchema extends BaseModel {
 	declare verifiedByUserId: string | null;
 }
 
+export class PilotGrantSchema extends BaseModel {
+	static $columns = [
+		"allowanceBundleId",
+		"createdAt",
+		"endsAt",
+		"id",
+		"note",
+		"package",
+		"startsAt",
+		"tenantId",
+	] as const;
+	$columns = PilotGrantSchema.$columns;
+	@column()
+	declare allowanceBundleId: string;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare endsAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare note: string;
+	@column()
+	declare package: string;
+	@column.dateTime()
+	declare startsAt: DateTime;
+	@column()
+	declare tenantId: string;
+}
+
 export class PlaceSchema extends BaseModel {
 	static $columns = [
 		"countryCode",
