@@ -2,7 +2,7 @@
 
 Date: 2026-11-15
 Status: **design, agreed with the product owner in conversation; not built.** Prices, allowance quantities, the mid-month allowance increase, the storage reserve's size and the pilot transition terms are open business decisions ([Open decisions](#open-decisions)), to be set together before pricing goes public.
-Builds on: SaaS billing ([payments](../../payments-paybridgenp.md)) with the November 2026 audit fixes (branch `fix/billing-mode-and-reversals`: billing reads one mode, each paid period records the plan its invoice billed, reversals end a period); the AI Design Lab's usage ledger ([design-lab](../../design-lab.md)); tenant types (`studio`, `independent`) and members and roles (TAT-30, TAT-33).
+Builds on: SaaS billing ([payments](../../payments-paybridgenp.md)) with the November 2026 audit fixes (merged in #141: billing reads one mode, each paid period records the plan its invoice billed, reversals end a period); the AI Design Lab's usage ledger ([design-lab](../../design-lab.md)); tenant types (`studio`, `independent`) and members and roles (TAT-30, TAT-33).
 Replaces: the single "Studio" catalogue plan (`studio-monthly`, `studio-yearly`, placeholder prices) and the payments doc's "Enforcing a paid plan on the dashboard: … no route is gated yet".
 
 ## Goal
@@ -46,11 +46,11 @@ Customer-facing promise:
    |---|---|
    | The public page and inquiry submission | Converting an inquiry into a project |
    | Reading, organising and declining inquiries | Creating projects directly |
-   | Finishing existing projects, recording payments, completing healing checks | New standalone bookings |
+   | Finishing existing projects, recording payments, completing healing checks | New direct bookings |
    | Keeping, rescheduling or cancelling existing appointments | Design Lab generation and automated SMS |
    | Records, exports, account and billing settings | Adding active artists |
 
-   - **Everything on an existing project continues**: quotes and their revisions, deposits, accepting a quote, resuming a project on hold, and the sessions it needs, its first one included (a client midway through a tattoo may need another session or a touch-up). The paywall sits only at starting new client work: a new project, from an inquiry or directly, and a standalone booking. Some imperfect enforcement is accepted here, as with shared profiles.
+   - **Everything on an existing project continues**: quotes and their revisions, deposits, accepting a quote, resuming a project on hold, and the sessions it needs, its first one included (a client midway through a tattoo may need another session or a touch-up). The paywall sits only at starting new client work: a new project, from an inquiry, directly, or through a direct booking (which creates a project with its session), and any later booking flow that starts new client work. Some imperfect enforcement is accepted here, as with shared profiles.
    - **Deposit links stay usable and payment confirmations are always processed**: subscription status must never leave a client's payment unrecorded.
    - **Intake stays open, with its obligations**: owners still see new inquiries and get the normal email and in-app alerts, and the form promises an inquiry, never a confirmed appointment. A permanently abandoned account must not collect inquiries forever: a separate inactivity and retention policy is required before launch.
    - A useful page and inbox remain without payment. It isn't marketed as a free package, but some people will use it that way; the commercial bet is that running projects and bookings inside Tattoo Drip is worth paying for.
@@ -70,7 +70,7 @@ Customer-facing promise:
 12. **Allowances: stop the costly action, keep existing work, explain how to continue.**
     - **Meters differ.** Images and SMS have a reset window; storage measures what is currently kept and doesn't reset monthly.
     - **Images**: a hard stop at the limit; existing images stay available. Show usage and the exact reset date. Offer Studio only when it gives more usable allowance, and extra credits only once buying them works. Failed generations don't consume allowance.
-    - **Storage**: new discretionary uploads stop (portfolio photos, videos, Design Lab uploads), but a bounded path stays open for payment proofs and files needed to finish existing projects; that reserve is defined explicitly ([Storage](#storage)).
+    - **Storage**: new discretionary uploads stop (portfolio photos, videos, Design Lab uploads), but required uploads continue into a bounded reserve: payment proofs, payment-method QR images and clients' own uploads (inquiry reference images, review and Fresh ink posts); the reserve is defined explicitly ([Storage](#storage)).
     - **SMS** (built in V1): when exhausted, automated sends stop, each unsent message is recorded as such and the studio sees why. Appointments, in-app reminders and records stay intact. Stale reminders are never sent later when credits return.
     - **Warn before the limit** with the remaining capacity. **At the limit**, name the blocked action, say what still works, and give a real next step.
     - **Allowance bundles are versioned.** Pilot allowances can be tuned explicitly; editing a default never reduces an allowance already bought for a paid period.
@@ -103,7 +103,7 @@ Three ways to decide what a studio may do were weighed:
 `EntitlementService.for(tenant, at = now)` returns the state (ruling 7), the package, the allowance bundle, until when, and the artist limit, in the active billing mode (`accessMode`). Resolution, first match wins:
 
 1. An active **pilot grant** → Pilot, with the grant's package and bundle; if paid periods also cover `at`, the higher package of the two applies.
-2. **Paid periods** covering `at` (not revoked) → Paid. Where several cover it (an upgrade inside a Solo period), the highest package wins for the time it covers.
+2. **Paid periods** covering `at` (not revoked by `at`) → Paid. Where several cover it (an upgrade inside a Solo period), the highest package wins for the time it covers.
 3. **Grace**: the latest paid coverage ended in an ordinary lapse (not revoked, not refunded) less than 7 days before `at` → Grace with the highest package of the periods that ended then.
 4. **Trial**: within 14 days of the workspace's creation and never paid → Trial with the package chosen at signup.
 5. Otherwise → **Paused**. A paused studio keeps the allowance bundle of its last state (paid, grace, pilot or trial) for what still works, such as storage for the uploads it may still make.
@@ -114,10 +114,10 @@ It is pure computation over rows, so it is unit-testable with fixed dates, and e
 
 - **Route capability map** next to `TENANT_ROUTE_ROLES`: every tenant route is classified (always open, new work, Design Lab, …), a guard test fails for an unclassified route, and middleware after the role check refuses what the current state doesn't allow.
 - **Service checks** (authoritative, also asking the entitlement service):
-  - converting an inquiry into a project, creating a project directly, a standalone booking: refused when paused;
+  - converting an inquiry into a project, creating a project directly, a direct booking: refused when paused;
   - everything on an existing project (quotes, deposits, its sessions, its healing check): allowed when paused (ruling 8);
   - activating or adding an artist: refused when paused, and refused above the package's artist limit (offering the upgrade on Solo);
-  - Design Lab: refused when paused and at the image allowance;
+  - Design Lab: refused when paused or at the image allowance;
   - uploads: discretionary ones refused at the storage limit; required ones use the reserve.
 - **Always allowed, whatever the state**: the public studio page, inquiry submission and its alerts, deposit links and deposit pages, payment webhooks and syncs, exports, and the Billing and account settings.
 - A refusal names the blocked action, says what still works, and links to the next step (pay, upgrade, archive an artist, wait for the reset date).
@@ -130,30 +130,30 @@ A new artist state, separate from hidden and deleted: archived artists keep thei
 
 - **Upgrade** follows ruling 10: preview with `previewProration`, then `changePlan` with `create_prorations`. PayBridgeNP ignores `Idempotency-Key` on plan changes (payments doc), so Tattoo Drip records the outstanding upgrade (subscription, target plan, invoice) before calling, under the studio's billing lock, and a retry finds that record and shows its invoice instead of charging again. The upgrade's period is granted from its payment to the end of the current period, with the Studio plan.
 - **Downgrade** follows ruling 11 with today's next-renewal `changePlan` (`prorationBehavior: "none"`), after the eligibility check.
-- **Sandbox check before shipping the upgrade**: how previews, immediate plan changes, unpaid upgrade invoices, their coverage dates (and how a proration invoice is told apart), payment events and reversals actually behave; in particular, that an unpaid upgrade doesn't disturb the Solo period already bought.
+- **Sandbox check before shipping the upgrade**: how previews, immediate plan changes, unpaid upgrade invoices, their coverage dates (and how a proration invoice is told apart), payment events and reversals actually behave; in particular, that an unpaid upgrade doesn't disturb the Solo period already bought, and what happens when `changePlan` returns no proration invoice (the SDK types it as nullable). The same check settles how an unpaid upgrade is abandoned: the subscription is already on Studio, so unless it is moved back its next renewal bills Studio.
 
 ### Allowances
 
-- **Images**: the package bundle's monthly allowance replaces `DESIGN_LAB_MONTHLY_LIMIT` as each studio's cap once enforcement is on (until then the setting stays in force), on the existing reservation ledger (reserve, settle, release: failed generations are released). The window stays the calendar month (UTC), so the reset date is the first of the next month.
+- **Images**: the package bundle's monthly allowance replaces `DESIGN_LAB_MONTHLY_LIMIT` as each studio's cap once enforcement is on and the image meter has shipped (phase 5; until then the setting stays in force), on the existing reservation ledger (reserve, settle, release: failed generations are released). The window stays the calendar month (UTC), so the reset date is the first of the next month.
 - **Storage**: retained bytes per studio. Stored files don't record their size today, so sizes are recorded when files are stored and backfilled for existing files. Discretionary uploads stop at the bundle's storage limit; required uploads continue into the reserve ([Storage](#storage)).
 - **SMS**: specified now (ruling 12), built with SMS in V1.
 - **Warnings** before a limit; **refusals** at it (ruling 12).
 
 ### Storage
 
-Discretionary uploads stop at the limit: portfolio photos and videos, the studio's cover and logo, Design Lab uploads (none exist yet). Required uploads are never stopped by the limit itself: payment proofs (a client's deposit screenshot), clients' inquiry reference images and their review and Fresh ink posts (the public intake and client links keep working), and the photos needed to finish an existing project, such as a healed photo for its healing check. Required uploads count toward retained storage and are bounded by the bundle's reserve; per-file sizes and rate limits already bound each one.
+Discretionary uploads stop at the limit: portfolio photos and videos (healed photos included), flash designs, artist profile photos, the studio's cover and logo, and Design Lab uploads (none exist yet). Design Lab's generated images count toward retained storage, and generation stops at the storage limit as well as at the image allowance. Required uploads continue past the limit into the bundle's reserve: payment proofs (a client's deposit screenshot), payment-method QR images (shown on deposit pages), clients' inquiry reference images and their review and Fresh ink posts (the public intake and client links keep working). Per-file sizes and rate limits already bound each one. What happens when the reserve itself is used up is decided with its size ([Open decisions](#open-decisions)), and must never leave a client's payment unrecorded (ruling 8).
 
 ### Notices
 
-In-app (a banner on the dashboard) and by email to the studio's owners: 3 days and 1 day before the trial ends; 3 days before a paid period ends when its renewal invoice is unpaid; when grace starts and 1 day before it ends. A pilot gets the same notices before its transition date.
+In-app (a banner on the dashboard) and by email to the studio's owners: 3 days and 1 day before the trial ends; 3 days before paid coverage ends, unless a later paid period already continues it (PayBridgeNP issues the renewal invoice only at the new period's start, and a subscription cancelled at period end gets none); when grace starts and 1 day before it ends. A pilot gets the same notices before its transition date. Notices are sent only once enforcement is on; in observe mode they are logged with the refusals.
 
 ### Pilots
 
-Staff-managed pilot grants: the studio, the package, the allowance bundle, start and end dates, a note, and who granted it. Existing pilot studios get theirs before any enforcement is switched on. When a grant ends, the studio is Paid if it pays, otherwise Paused (its trial was long ago).
+Staff-managed pilot grants: the studio, the package, the allowance bundle, start and end dates, a note, and who granted it. Existing pilot studios get theirs before any enforcement is switched on. When a grant ends, the studio is Paid if it pays, otherwise Paused (or Trial, if the grant ends within 14 days of the workspace's creation and it never paid).
 
 ### Enforcement switch
 
-Enforcement ships off. In observe mode the service computes every decision and logs what it would refuse, so pilots and pricing can be checked against real use. It is switched on only once every pilot has its grant, prices and quantities are set, **and the upgrade (phase 4) has shipped**: refusing a Solo studio's second artist with nothing to upgrade to would break the promise "Upgrade when you need another artist".
+Enforcement ships off. In observe mode the service computes every decision and logs what it would refuse, so pilots and pricing can be checked against real use. It is switched on only once every pilot has its grant, prices and quantities are set, **and the upgrade (phase 4) has shipped**: refusing a Solo studio's second artist with nothing to upgrade to would break the promise "Upgrade when you need another artist". Allowance limits apply only as their meters ship (phase 5): until then Design Lab keeps `DESIGN_LAB_MONTHLY_LIMIT` and storage isn't limited.
 
 ### Data (summary)
 
@@ -168,8 +168,8 @@ Enforcement ships off. In observe mode the service computes every decision and l
 
 1. **Catalogue and entitlement core, observe mode**: packages, bundles, versioned plans with the existing Studio plans mapped, the entitlement service, the package chosen at signup, pilot grants, the state on the Billing page and the admin Billing page. Nothing is refused.
 2. **Archiving artists and the active-artist limit** (refusing only once enforcement is on).
-3. **Paused rules and the route capability map, with notices**, still in observe mode.
-4. **Sandbox check of proration, then upgrade and downgrade.** Enforcement can be switched on after this phase, once every pilot has a grant and prices and quantities are set.
+3. **Paused rules and the route capability map, with notices**, still in observe mode (notices logged, not sent).
+4. **Sandbox check of proration, then upgrade and downgrade.** Enforcement can be switched on after this phase, once every pilot has a grant and prices and quantities are set; allowance limits follow as each meter ships in phase 5.
 5. **Allowance meters**: images per package, then storage (sizes, backfill, reserve).
 
 Later: extra credits, the SMS allowance (with SMS), annual packages, a restricted helper role, the inactivity and retention policy.
@@ -185,7 +185,7 @@ Later: extra credits, the SMS allowance (with SMS), annual packages, a restricte
 For the product owner, together, before pricing goes public:
 
 - Prices: Solo and Studio, monthly (annual later).
-- Allowance quantities per bundle: images per month, storage, the storage reserve (SMS later).
+- Allowance quantities per bundle: images per month, storage, the storage reserve (SMS later), and what happens when the reserve is used up.
 - The mid-month allowance increase on upgrade.
 - Pilot transition terms: dates and the transition benefit.
 - Extra credits: purchase and expiry rules.
@@ -199,9 +199,9 @@ Not discussed explicitly; the product owner should check them:
 - Pre-existing paid periods with no plan on record count as **Studio**: the only plans that ever existed were Studio's.
 - **One trial per business** means one per workspace at launch; repeat trials through new workspaces are a known gap, watched rather than prevented.
 - Trial and grace live in Tattoo Drip (catalogue plans keep `trialDays: 0`), not in PayBridgeNP's subscription trial, so a trial needs no subscription.
-- The **storage split** between discretionary and required uploads ([Storage](#storage)), including the cover and logo as discretionary and client posts as required.
-- **Notice timing**: 3 and 1 days before the trial ends, 3 days before an unpaid renewal, at grace start and 1 day before it ends.
-- **Enforcement ships off**, in observe mode, until pilots have grants and prices are set.
+- The **storage split** between discretionary and required uploads ([Storage](#storage)): artist profile photos, flash designs, the cover and logo as discretionary; payment-method QR images, inquiry reference images and client posts as required; Design Lab's generated images counting toward storage.
+- **Notice timing**: 3 and 1 days before the trial ends, 3 days before paid coverage ends unless already continued, at grace start and 1 day before it ends.
+- **Enforcement ships off**, in observe mode, until every pilot has a grant, prices and quantities are set, and the upgrade (phase 4) has shipped. Notices are logged, not sent, until then.
 - The image window stays the **calendar month (UTC)**.
 - `DESIGN_LAB_MONTHLY_LIMIT` gives way to the bundle's allowance as each studio's cap.
 
