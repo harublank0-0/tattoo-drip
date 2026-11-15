@@ -5,7 +5,8 @@ import type { CommandOptions } from "@adonisjs/core/types/ace";
  * Confirms an account's email address without a link (TAT-18): the
  * operator's way to let a pilot studio in while the platform can't send
  * email yet (TAT-20). It skips the proof the link gives, so check who is
- * asking some other way first. Prints no token, id or link.
+ * asking some other way first. Prints no token, id or link. The admin
+ * Accounts page (/admin/accounts) does the same.
  *
  *   node ace account:verify owner@example.com           (development)
  *   node build/ace.js account:verify owner@example.com  (production)

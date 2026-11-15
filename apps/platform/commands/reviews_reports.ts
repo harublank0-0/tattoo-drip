@@ -11,6 +11,7 @@ import { terminalText } from "#services/terminal_text";
  * as the app role in its studio's own context. Everything a studio or a
  * client typed (the studio's name, the note, the review and the name shown)
  * is printed through `terminalText`, so it can't drive the terminal.
+ * The admin Reports page (/admin/reports) shows the same list.
  *
  *   node ace reviews:reports
  *   node build/ace.js reviews:reports   (production)

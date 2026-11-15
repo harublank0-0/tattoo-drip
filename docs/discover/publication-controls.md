@@ -12,7 +12,8 @@ Discover is optional. A business can use Studio OS and publish its studio page w
 | Owner | Settings → Discover → Preview (`…/settings/discover/preview`) | What a Discover profile would show, from the business's own records, listed or not |
 | Owner, or the artist on their own profile | Artist profile → Discover (`PUT /t/:tenant/artists/:id/discover`) | The artist's own Discover switch |
 | Owner, artist | Portfolio → a photo's details | The photo's Discover state |
-| Operator (server shell) | `node ace discover:suspend` / `discover:restore` / `discover:status` | Takedowns |
+| Operator (admin pages) | Admin → Studios → a studio (`/admin/studios/:slug`) | Take the listing, or one photo, off Discover with a reason, lift it, and see its state |
+| Operator (server shell) | `node ace discover:suspend` / `discover:restore` / `discover:status` | The same takedowns |
 
 The settings routes are owners only (`TENANT_ROUTE_ROLES`); an artist and anyone outside the studio get the same 404 as an unknown URL. Each route has a cross-tenant isolation case (`tests/isolation/cases.ts`). Code: `PublicationService` (`#modules/discovery/services/publication_service`), the pure rules in `#modules/discovery/publication`, `DiscoverSettingsController`, `ArtistDiscoverController`.
 
@@ -71,7 +72,7 @@ A photo shows on Discover while its artist shows, it is published (not `hidden`)
 
 ## Takedowns (operators)
 
-Operators work from the server shell, as for `account:verify`; there is no admin UI and no tenant route can set or clear a takedown.
+Operators use the admin pages (Admin → Studios → a studio: listing and photo takedown and restore, with a reason) or the server shell commands below; both call the same `PublicationService`. No tenant route can set or clear a takedown.
 
 ```sh
 node ace discover:suspend black-needle --reason "Copyright complaint #12"
@@ -103,4 +104,3 @@ Owners only. Built from the business's own records in its own context, by Discov
 - **Consent re-acceptance** after a new version is not forced; see Consent versions.
 - **Hiding an artist removes their reviews and Fresh ink from Discover** (Reviews and Fresh ink, ruling 11: a review or post shows only while its artist is shown on Discover). An artist who opts out of Discover, or whom the studio hides on its page, takes their clients' reviews out of the studio's Discover list and rating as well, and back when shown again. A known trade-off: a studio could lower its visible reviews by hiding an artist, at the cost of that artist's whole Discover presence; the studio's own page (`listReviews`) is not affected. **Decided (2026-11-14, product owner): kept as the spec says** (ruling 11 makes the artist being shown a condition). A Discover review names and links its artist, so showing it would show that artist against the studio's or the artist's choice; showing it untagged, as the studio's own page does, was not chosen.
 - **Cache latency.** A change reaches the API at once, but public caches can serve the old answer for up to 2 minutes; there is no CDN purge.
-- **No moderation UI** beyond the three commands, by design.

@@ -1,22 +1,26 @@
 import { Link } from "@inertiajs/react";
 import { cn } from "cn";
+import { urlFor } from "~/client";
 
 const ITEMS = [
-	{ key: "studios", label: "Studios", href: "/admin/studios" },
-	{ key: "reports", label: "Review reports", href: "/admin/reports" },
-	{ key: "metrics", label: "Pilot metrics", href: "/admin/metrics" },
-	{ key: "accounts", label: "Accounts", href: "/admin/accounts" },
-	{ key: "billing", label: "TattooDrip billing", href: "/admin/billing" },
+	{ key: "studios", label: "Studios", href: urlFor("admin.studios") },
+	{ key: "reports", label: "Review reports", href: urlFor("admin.reports") },
+	{ key: "metrics", label: "Pilot metrics", href: urlFor("admin.metrics") },
+	{ key: "accounts", label: "Accounts", href: urlFor("admin.accounts") },
+	{
+		key: "billing",
+		label: "TattooDrip billing",
+		href: urlFor("admin.billing"),
+	},
 	{
 		key: "payments",
 		label: "Studio payment connections",
-		href: "/admin/payments",
+		href: urlFor("admin.payments"),
 	},
 ] as const;
 
 /**
  * The platform admin pages' sub-nav; `current` is the page being shown.
- * Plain hrefs until every admin route exists (then `urlFor`).
  */
 export default function AdminNav({
 	current,

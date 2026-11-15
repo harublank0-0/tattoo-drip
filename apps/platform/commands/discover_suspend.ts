@@ -7,6 +7,7 @@ import type { CommandOptions } from "@adonisjs/core/types/ace";
  * business's listing, or one of its photos, off Discover. Nothing is
  * deleted and the studio page is unchanged; the owner can't lift it. The
  * reason is stored for operators only (no dashboard page shows it).
+ * The admin Studios pages (/admin/studios) do the same.
  *
  *   node ace discover:suspend black-needle --reason "Copyright complaint #12"
  *   node ace discover:suspend black-needle --photo <photo id> --reason "..."

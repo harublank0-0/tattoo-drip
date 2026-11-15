@@ -893,7 +893,7 @@ router
 router
 	.group(() => {
 		router
-			.get("/", ({ response }) => response.redirect("/admin/studios"))
+			.get("/", ({ response }) => response.redirect().toRoute("admin.studios"))
 			.as("admin.index");
 		router
 			.get("studios", [controllers.AdminStudios, "index"])
