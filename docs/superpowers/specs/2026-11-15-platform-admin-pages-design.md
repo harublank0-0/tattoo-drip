@@ -1,6 +1,6 @@
 # Platform admin pages: replacing the operator shell commands
 
-Date: 2026-11-15. Status: draft for approval.
+Date: 2026-11-15. Status: draft for approval. Builder check done; nothing was left for the admin to decide.
 
 ## Intent
 
@@ -89,7 +89,7 @@ Success flashes repeat the command's warnings: public caches can keep a takedown
 - *Take down*: reason (select from `TAKEDOWN_REASONS`, defaulting to the report's reason), optional note. Closes the report.
 - *Keep it up*: dismiss.
 
-Taking down a reply or a post isn't reachable from a report (reports are about reviews). Those are taken down from the studio page: section 3 also lists the studio's live reviews with replies and its published posts, each with *Take down*. (Builder: keep that list short, e.g. most recent first with a "show more", since it's for acting on a complaint the admin already has in hand.)
+Reports only cover reviews, so the studio page is where everything else is taken down (a client asking for their own review to come down, a reply, a Fresh ink post). Section 3 of the studio page also lists the studio's live reviews and published posts, most recent first with a "show more". Every live review has *Take down*, and so does its reply when there is one; every published post has *Take down*. *(Designer's call: without this, a takedown with no report behind it, such as `client_request`, would still need SSH.)*
 
 Action routes: `POST /admin/reviews/:id/takedown`, `POST /admin/reviews/:id/dismiss`, `POST /admin/reviews/:id/reply/takedown`, `POST /admin/posts/:id/takedown`, plus the matching `/restore` routes. A post takedown that fails because storage couldn't delete the public copies shows the command's message: nothing changed, try again once storage recovers.
 
@@ -109,6 +109,7 @@ One email field and the warning from the command: confirm only after checking wh
 
 ### Tests
 
+- Add the new admin routes to the route list in `tests/functional/identity/account_routes.spec.ts`, which fails for any route outside a studio that no list names.
 - Every new route: a non-admin and an unconfirmed admin email get 404; signed-out gets the sign-in redirect (like `billing.spec.ts` covers the existing admin pages).
 - Each action through the page route, checked at the effect the command tests already check (e.g. the public Discover API no longer returns the studio; the review shows as taken down; the report is closed).
 - Validation: missing/too-long reason, unknown reason, bad uuid, unknown slug or id, a photo id from another studio (must 404 or refuse, not act).
@@ -117,6 +118,7 @@ One email field and the warning from the command: confirm only after checking wh
 
 ### Docs
 
+- `ReviewOperatorService`'s doc comment ("the operator commands only… never the web or the worker") and ruling 11 of the TAT-70 pilot metrics spec ("not a web page"): both now say the admin pages use them too, keeping the rule that a request never uses the owner connection. *(Designer's call: this design deliberately reverses those two statements.)*
 - `docs/discover/publication-controls.md`: the operator row and "Takedowns (operators)" say the admin pages do this too; drop "no moderation UI by design".
 - `apps/platform/docs/deploy.md` account email section: confirm accounts from `/admin/accounts` (the command remains).
 - The commands' doc comments can mention the page equivalent.
