@@ -34,6 +34,8 @@ type Props = {
 	}[];
 	takenDown: Item[];
 	live: Item[];
+	/** More live items exist than are listed. */
+	hasMore: boolean;
 	reports: {
 		reviewId: string;
 		reportedText: string;
@@ -56,6 +58,7 @@ export default function AdminStudio({
 	photos,
 	takenDown,
 	live,
+	hasMore,
 	reports,
 }: Props) {
 	return (
@@ -108,7 +111,7 @@ export default function AdminStudio({
 			<Section title="Reviews and Fresh ink">
 				<ItemList title="Taken down" items={takenDown} />
 				<ItemList title="Live" items={live} />
-				{live.length >= 20 && (
+				{hasMore && (
 					<Link
 						href={`${urlFor("admin.studios.show", { slug: studio.slug })}?more=1`}
 						className="text-sm underline underline-offset-4"

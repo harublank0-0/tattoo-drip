@@ -1,11 +1,14 @@
 import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
+import { DateTime } from "luxon";
 import PublicationService from "#modules/discovery/services/publication_service";
 import ClientReview from "#modules/reviews/models/client_review";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { adminUser } from "#tests/helpers/admin";
+import { makeProject } from "#tests/helpers/pipeline";
+import { seedReview } from "#tests/helpers/reviews";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
 
 function report(studio: Studio) {
@@ -111,5 +114,52 @@ test.group("Admin studios", (group) => {
 		(
 			await client.get(`/admin/studios/${a.tenant.slug}`).loginAs(admin)
 		).assertStatus(404);
+	});
+
+	async function addReviews(studio: Studio, count: number) {
+		await inTenant(studio.tenant, async () => {
+			for (let i = 0; i < count; i++) {
+				const project = await makeProject(
+					studio.tenant,
+					studio.pipeline.client,
+					{
+						status: "completed",
+						artistId: studio.artistProfile.id,
+					},
+				);
+				await seedReview(studio.tenant, project, {
+					createdAt: DateTime.now().minus({ minutes: i }),
+				});
+			}
+		});
+	}
+
+	test("Show more appears only when more live items exist than are listed", async ({
+		client,
+		assert,
+	}) => {
+		const { a, b } = await twoStudios();
+		const admin = await adminUser();
+		const live = async (slug: string, query = "") =>
+			(
+				await client
+					.get(`/admin/studios/${slug}${query}`)
+					.loginAs(admin)
+					.withInertia()
+			).inertiaProps as { live: unknown[]; hasMore: boolean };
+
+		const before = (await live(a.tenant.slug)).live.length;
+		assert.isBelow(before, 20);
+		assert.isFalse((await live(a.tenant.slug)).hasMore);
+
+		await addReviews(a, 22);
+		const first = await live(a.tenant.slug);
+		assert.lengthOf(first.live, 20);
+		assert.isTrue(first.hasMore);
+		const all = await live(a.tenant.slug, "?more=1");
+		assert.lengthOf(all.live, before + 22);
+		assert.isFalse(all.hasMore);
+
+		assert.isFalse((await live(b.tenant.slug)).hasMore);
 	});
 });

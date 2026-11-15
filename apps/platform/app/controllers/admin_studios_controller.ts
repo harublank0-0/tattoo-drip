@@ -126,9 +126,13 @@ export default class AdminStudiosController {
 
 		const status = await this.publication.operatorStatus(slug);
 		const photos = await this.publication.operatorPhotos(slug);
+		const limit =
+			ctx.request.input("more") === "1" ? MORE_LIVE_ITEMS : LIVE_ITEMS;
+		// One past the limit tells whether more exist.
 		const items = await this.reviews.studioItems(tenant.id, {
-			limit: ctx.request.input("more") === "1" ? MORE_LIVE_ITEMS : LIVE_ITEMS,
+			limit: limit + 1,
 		});
+		const hasMore = items.live.length > limit;
 		const reports = (await this.reviews.openReports()).filter(
 			(report) => report.tenantId === tenant.id,
 		);
@@ -154,7 +158,8 @@ export default class AdminStudiosController {
 				})),
 			),
 			takenDown: items.takenDown.map(itemProps),
-			live: items.live.map(itemProps),
+			live: items.live.slice(0, limit).map(itemProps),
+			hasMore,
 			reports: reports.map((report) => ({
 				reviewId: report.reviewId,
 				reportedText: at(report.reportedAt),
