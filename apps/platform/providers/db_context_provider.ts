@@ -40,7 +40,7 @@ export class ContextAdapter extends Adapter {
  * The ace commands that refuse to run as a role that bypasses RLS: the
  * worker, and the operator commands that read or write each studio in its
  * own context (metrics:pilot, TAT-70; the reviews commands, Reviews and
- * Fresh ink slice 2).
+ * Fresh ink slice 2; packages:pilot, studio packages phase 1).
  */
 const GUARDED_COMMANDS = new Set([
 	"queue:work",
@@ -49,6 +49,7 @@ const GUARDED_COMMANDS = new Set([
 	"reviews:restore",
 	"reviews:dismiss",
 	"reviews:reports",
+	"packages:pilot",
 ]);
 
 export default class DbContextProvider {
