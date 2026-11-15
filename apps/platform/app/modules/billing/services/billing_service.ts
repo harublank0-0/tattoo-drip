@@ -29,6 +29,7 @@ import BillingSubscription, {
 } from "#modules/billing/models/billing_subscription";
 import { PLAN_CATALOGUE } from "#modules/billing/plans";
 import BillingReviewMail from "#modules/notifications/emails/billing_review_mail";
+import { bundleIdsByKey } from "#modules/packages/bundles";
 import type Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -564,6 +565,9 @@ export default class BillingService {
 		const api = this.api();
 		const livemode = api.mode === "live";
 		const synced: SyncedPlan[] = [];
+		const bundles = await bundleIdsByKey(
+			PLAN_CATALOGUE.map((entry) => entry.bundleKey),
+		);
 		for (const entry of PLAN_CATALOGUE) {
 			const existing = await BillingPlan.query()
 				.where("code", entry.code)
@@ -601,6 +605,8 @@ export default class BillingService {
 				livemode,
 				providerPlanId: created.id,
 				active: true,
+				package: entry.package,
+				allowanceBundleId: bundles.get(entry.bundleKey) as string,
 			};
 			if (existing) await existing.merge(values).save();
 			else await BillingPlan.create(values);

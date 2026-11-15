@@ -34,6 +34,36 @@ export class AccountTokenSchema extends BaseModel {
 	declare userId: string;
 }
 
+export class AllowanceBundleSchema extends BaseModel {
+	static $columns = [
+		"createdAt",
+		"id",
+		"imagesPerMonth",
+		"key",
+		"package",
+		"smsPerMonth",
+		"storageMegabytes",
+		"storageReserveMegabytes",
+	] as const;
+	$columns = AllowanceBundleSchema.$columns;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare imagesPerMonth: number | null;
+	@column()
+	declare key: string;
+	@column()
+	declare package: string;
+	@column()
+	declare smsPerMonth: number | null;
+	@column()
+	declare storageMegabytes: number | null;
+	@column()
+	declare storageReserveMegabytes: number | null;
+}
+
 export class ArtistWorkPhotoSchema extends BaseModel {
 	static $columns = [
 		"alt",
@@ -340,6 +370,7 @@ export class BillingInvoiceSchema extends BaseModel {
 export class BillingPlanSchema extends BaseModel {
 	static $columns = [
 		"active",
+		"allowanceBundleId",
 		"amount",
 		"code",
 		"createdAt",
@@ -349,6 +380,7 @@ export class BillingPlanSchema extends BaseModel {
 		"intervalUnit",
 		"livemode",
 		"name",
+		"package",
 		"providerPlanId",
 		"trialDays",
 		"updatedAt",
@@ -356,6 +388,8 @@ export class BillingPlanSchema extends BaseModel {
 	$columns = BillingPlanSchema.$columns;
 	@column()
 	declare active: boolean;
+	@column()
+	declare allowanceBundleId: string;
 	@column()
 	declare amount: number;
 	@column()
@@ -374,6 +408,8 @@ export class BillingPlanSchema extends BaseModel {
 	declare livemode: boolean;
 	@column()
 	declare name: string;
+	@column()
+	declare package: string;
 	@column()
 	declare providerPlanId: string | null;
 	@column()
@@ -2294,6 +2330,7 @@ export class TenantSchema extends BaseModel {
 		"name",
 		"placeId",
 		"policiesUpdatedAt",
+		"selectedPackage",
 		"slug",
 		"storefrontClaimedFlash",
 		"storefrontSections",
@@ -2374,6 +2411,8 @@ export class TenantSchema extends BaseModel {
 	declare placeId: string | null;
 	@column.dateTime()
 	declare policiesUpdatedAt: DateTime | null;
+	@column()
+	declare selectedPackage: string;
 	@column()
 	declare slug: string;
 	@column()

@@ -14,11 +14,15 @@ test.group("guard functions", () => {
 		const { rows } = await sql(
 			{},
 			`select proname, proconfig from pg_proc
-			 where proname in ('billing_access_periods_guard', 'inquiries_guard_update', 'payments_guard')
+			 where proname in ('allowance_bundles_guard', 'billing_access_periods_guard', 'inquiries_guard_update', 'payments_guard')
 			 order by proname`,
 		);
 
 		assert.deepEqual(rows, [
+			{
+				proname: "allowance_bundles_guard",
+				proconfig: ["search_path=pg_catalog, pg_temp"],
+			},
 			{
 				proname: "billing_access_periods_guard",
 				proconfig: ["search_path=pg_catalog, pg_temp"],
