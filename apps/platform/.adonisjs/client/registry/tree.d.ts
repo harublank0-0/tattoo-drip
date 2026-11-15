@@ -339,6 +339,7 @@ export interface ApiDefinition {
       takedown: typeof routes['admin.posts.takedown']
       restore: typeof routes['admin.posts.restore']
     }
+    metrics: typeof routes['admin.metrics']
     billing: typeof routes['admin.billing'] & {
       endAccess: typeof routes['admin.billing.end_access']
     }

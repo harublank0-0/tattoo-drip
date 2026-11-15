@@ -17,7 +17,8 @@ import ReviewOperatorService from "#modules/reviews/services/review_operator_ser
 import Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
-import { dbClient, withDbContext } from "#services/db_context";
+import { withDbContext } from "#services/db_context";
+import { forEachLiveStudio } from "#services/live_studios";
 import { discoverReasonValidator } from "#validators/admin";
 
 /** Live items the studio page lists; `?more=1` raises it. */
@@ -83,51 +84,20 @@ export default class AdminStudiosController {
 	) {}
 
 	async index(ctx: HttpContext) {
-		const { rows } = await dbClient().rawQuery(
-			"select tenant_id from public.package_tenants()",
-		);
 		const open = new Map<string, number>();
 		for (const report of await this.reviews.openReports()) {
 			open.set(report.tenantId, (open.get(report.tenantId) ?? 0) + 1);
 		}
-		const found: {
-			createdAt: DateTime;
-			id: string;
-			row: {
-				slug: string;
-				name: string;
-				type: Tenant["type"];
-				discoverStatus: string;
-				takenDown: boolean;
-				openReports: number;
-			};
-		}[] = [];
-		for (const { tenant_id: tenantId } of rows as { tenant_id: string }[]) {
-			await withDbContext({ tenantId }, async () => {
-				const tenant = await Tenant.find(tenantId);
-				if (!tenant) return;
-				const overview = await this.publication.overview(tenant);
-				found.push({
-					createdAt: tenant.createdAt,
-					id: tenant.id,
-					row: {
-						slug: tenant.slug,
-						name: tenant.name,
-						type: tenant.type,
-						discoverStatus: overview.status,
-						takenDown: tenant.discoverySuspendedAt !== null,
-						openReports: open.get(tenant.id) ?? 0,
-					},
-				});
-			});
-		}
-		found.sort(
-			(a, b) =>
-				a.createdAt.toMillis() - b.createdAt.toMillis() ||
-				a.id.localeCompare(b.id),
-		);
+		const studios = await forEachLiveStudio(async (tenant) => ({
+			slug: tenant.slug,
+			name: tenant.name,
+			type: tenant.type,
+			discoverStatus: (await this.publication.overview(tenant)).status,
+			takenDown: tenant.discoverySuspendedAt !== null,
+			openReports: open.get(tenant.id) ?? 0,
+		}));
 		return ctx.inertia.render("admin/studios/index", {
-			studios: found.map(({ row }) => row),
+			studios: studios.map(({ value }) => value),
 		});
 	}
 

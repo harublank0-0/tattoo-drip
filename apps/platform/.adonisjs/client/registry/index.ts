@@ -1134,6 +1134,12 @@ const routes = {
     tokens: [{"old":"/admin/posts/:id/restore","type":0,"val":"admin","end":""},{"old":"/admin/posts/:id/restore","type":0,"val":"posts","end":""},{"old":"/admin/posts/:id/restore","type":1,"val":"id","end":""},{"old":"/admin/posts/:id/restore","type":0,"val":"restore","end":""}],
     types: placeholder as Registry['admin.posts.restore']['types'],
   },
+  'admin.metrics': {
+    methods: ["GET","HEAD"],
+    pattern: '/admin/metrics',
+    tokens: [{"old":"/admin/metrics","type":0,"val":"admin","end":""},{"old":"/admin/metrics","type":0,"val":"metrics","end":""}],
+    types: placeholder as Registry['admin.metrics']['types'],
+  },
   'admin.billing': {
     methods: ["GET","HEAD"],
     pattern: '/admin/billing',

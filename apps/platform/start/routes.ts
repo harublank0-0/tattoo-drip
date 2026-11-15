@@ -959,6 +959,9 @@ router
 			.post("posts/:id/restore", [controllers.AdminReviews, "restorePost"])
 			.as("admin.posts.restore");
 		router
+			.get("metrics", [controllers.AdminMetrics, "index"])
+			.as("admin.metrics");
+		router
 			.get("billing", [controllers.Admin, "billingIndex"])
 			.as("admin.billing");
 		router

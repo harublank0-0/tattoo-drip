@@ -2263,6 +2263,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restorePost']>>>
     }
   }
+  'admin.metrics': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/metrics'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_metrics_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_metrics_controller').default['index']>>>
+    }
+  }
   'admin.billing': {
     methods: ["GET","HEAD"]
     pattern: '/admin/billing'
