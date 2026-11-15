@@ -59,7 +59,7 @@ export class FakePaybridge extends PaymentProviders {
 	plans = new Map<string, { id: string; livemode: boolean }>();
 	customers = new Map<
 		string,
-		{ id: string; externalCustomerId: string | null }
+		{ id: string; externalCustomerId: string | null; livemode: boolean }
 	>();
 	subscriptions = new Map<string, ProviderSubscription>();
 	invoices = new Map<string, ProviderInvoice>();
@@ -78,6 +78,11 @@ export class FakePaybridge extends PaymentProviders {
 	/** The next call of each method fails with this error. */
 	failures = new Map<string, ProviderError>();
 	platformEnabled = true;
+	/**
+	 * The platform key's mode. Like the real API, a key sees only its own
+	 * mode's objects: a sandbox subscription is not found with a live key.
+	 */
+	platformMode: ProviderMode = "sandbox";
 
 	reset() {
 		this.calls = [];
@@ -93,6 +98,7 @@ export class FakePaybridge extends PaymentProviders {
 		this.replays.clear();
 		this.failures.clear();
 		this.platformEnabled = true;
+		this.platformMode = "sandbox";
 	}
 
 	/** Makes the next call of `method` fail, e.g. failNext("checkout.create", "unavailable"). */
@@ -152,9 +158,10 @@ export class FakePaybridge extends PaymentProviders {
 	override platform(): BillingApi | null {
 		if (!this.platformEnabled) return null;
 		const fake = this;
-		const live = false;
+		const mode = this.platformMode;
+		const live = mode === "live";
 		return {
-			mode: "sandbox",
+			mode,
 			async account() {
 				fake.record("account");
 				return PLATFORM_ACCOUNT;
@@ -212,14 +219,18 @@ export class FakePaybridge extends PaymentProviders {
 			async getSubscription(subscriptionId) {
 				fake.record("subscriptions.get");
 				const found = fake.subscriptions.get(subscriptionId);
-				if (!found)
+				if (!found || found.livemode !== live)
 					throw new ProviderError("not_found", "not_found", 404, "req_fake");
 				return { ...found };
 			},
 			async listSubscriptions(customerId) {
 				fake.record("subscriptions.list");
 				return [...fake.subscriptions.values()]
-					.filter((subscription) => subscription.customerId === customerId)
+					.filter(
+						(subscription) =>
+							subscription.customerId === customerId &&
+							subscription.livemode === live,
+					)
 					.map((subscription) => ({ ...subscription }));
 			},
 			async cancelAtPeriodEnd(subscriptionId) {
@@ -241,14 +252,18 @@ export class FakePaybridge extends PaymentProviders {
 			async getInvoice(invoiceId) {
 				fake.record("invoices.get");
 				const found = fake.invoices.get(invoiceId);
-				if (!found)
+				if (!found || found.livemode !== live)
 					throw new ProviderError("not_found", "not_found", 404, "req_fake");
 				return { ...found };
 			},
 			async listInvoices(subscriptionId) {
 				fake.record("invoices.list");
 				return [...fake.invoices.values()]
-					.filter((invoice) => invoice.subscriptionId === subscriptionId)
+					.filter(
+						(invoice) =>
+							invoice.subscriptionId === subscriptionId &&
+							invoice.livemode === live,
+					)
 					.map((invoice) => ({ ...invoice }));
 			},
 		};
@@ -276,6 +291,7 @@ export class FakePaybridge extends PaymentProviders {
 			customerId: subscription.customerId,
 			customerExternalId: subscription.customerExternalId,
 			subscriptionId,
+			planId: subscription.planId,
 			periodStart: subscription.currentPeriodStart,
 			periodEnd: subscription.currentPeriodEnd,
 			livemode: subscription.livemode,
@@ -283,6 +299,43 @@ export class FakePaybridge extends PaymentProviders {
 		this.invoices.set(invoice.id, invoice);
 		subscription.latestInvoiceId = invoice.id;
 		return invoice;
+	}
+
+	/**
+	 * Renews the subscription into the period `[start, end)`: a plan change
+	 * scheduled for the renewal takes effect, and the period's invoice is
+	 * issued. Earlier invoices keep their own plan, but (like the real API)
+	 * read back with the subscription's period as it is now.
+	 */
+	nextPeriod(
+		subscriptionId: string,
+		period: { start: string; end: string; amount: number },
+	): ProviderInvoice {
+		const subscription = this.subscriptions.get(subscriptionId);
+		if (!subscription) throw new Error("no such subscription");
+		if (subscription.pendingPlanId) {
+			subscription.planId = subscription.pendingPlanId;
+			subscription.pendingPlanId = null;
+		}
+		subscription.currentPeriodStart = period.start;
+		subscription.currentPeriodEnd = period.end;
+		subscription.nextInvoiceAt = period.end;
+		for (const invoice of this.invoices.values()) {
+			if (invoice.subscriptionId !== subscriptionId) continue;
+			invoice.periodStart = period.start;
+			invoice.periodEnd = period.end;
+		}
+		return this.issueInvoice(subscriptionId, period.amount);
+	}
+
+	/** PayBridgeNP (or its dashboard) voided, wrote off or gave up on the invoice. */
+	voidInvoice(
+		invoiceId: string,
+		status: "void" | "uncollectible" | "write_off" = "void",
+	) {
+		const invoice = this.invoices.get(invoiceId);
+		if (!invoice) throw new Error("no such invoice");
+		invoice.status = status;
 	}
 
 	/** The customer paid the invoice on PayBridgeNP's page (in full unless `amount`). */

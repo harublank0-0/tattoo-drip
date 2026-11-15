@@ -83,6 +83,7 @@ const SIGNED_IN = [
 	// TattooDrip's own staff pages (docs/payments-paybridgenp.md): signed in,
 	// then platformAdmin, which 404s anyone not in PLATFORM_ADMIN_EMAILS.
 	"GET /admin/billing",
+	"POST /admin/billing/end-access",
 	"GET /admin/payments",
 	"POST /admin/payments/review",
 ];

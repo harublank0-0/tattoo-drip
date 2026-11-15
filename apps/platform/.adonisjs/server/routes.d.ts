@@ -178,6 +178,7 @@ export type ScannedRoutes = {
     'account.password.update': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
+    'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
     'admin.payments.review': { paramsTuple?: []; params?: {} }
     'api.v1.webhooks.platform': { paramsTuple?: []; params?: {} }
@@ -480,6 +481,7 @@ export type ScannedRoutes = {
     'onboarding.store': { paramsTuple?: []; params?: {} }
     'invitations.accept': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
+    'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments.review': { paramsTuple?: []; params?: {} }
     'api.v1.webhooks.platform': { paramsTuple?: []; params?: {} }
     'api.v1.webhooks.studio': { paramsTuple: [ParamValue]; params: {'key': ParamValue} }

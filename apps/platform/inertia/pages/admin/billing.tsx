@@ -1,9 +1,14 @@
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
+import { useState } from "react";
 import { urlFor } from "~/client";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import AppLayout from "~/layouts/app";
+
+const selectClass =
+	"min-h-11 min-w-0 rounded-md border bg-background px-3 text-sm lg:min-h-9";
 
 type Props = {
 	configured: boolean;
@@ -17,6 +22,7 @@ type Props = {
 	}[];
 	invoices: {
 		id: string;
+		tenantId: string;
 		studio: string;
 		number: string | null;
 		status: string;
@@ -25,7 +31,11 @@ type Props = {
 		paid: string | null;
 		issuedText: string | null;
 		paidText: string | null;
+		grant: "granted" | "ended" | null;
+		grantText: string | null;
 	}[];
+	/** Why staff may end a paid period (a refund PayBridgeNP shows on no invoice). */
+	reasons: { value: string; text: string }[];
 };
 
 /**
@@ -37,6 +47,7 @@ export default function AdminBilling({
 	totals,
 	studios,
 	invoices,
+	reasons,
 }: Props) {
 	return (
 		<Page
@@ -109,7 +120,19 @@ export default function AdminBilling({
 										Issued {invoice.issuedText ?? "—"}
 										{invoice.paidText && ` · paid ${invoice.paidText}`}
 									</span>
+									{invoice.grantText && (
+										<span className="block text-muted-foreground">
+											{invoice.grantText}
+										</span>
+									)}
 								</span>
+								{invoice.grant === "granted" && (
+									<EndAccess
+										tenantId={invoice.tenantId}
+										invoiceId={invoice.id}
+										reasons={reasons}
+									/>
+								)}
 								<span className="flex items-center gap-2">
 									<Badge
 										variant={
@@ -130,6 +153,74 @@ export default function AdminBilling({
 				)}
 			</Section>
 		</Page>
+	);
+}
+
+/**
+ * Ends an invoice's paid period now, for a reason PayBridgeNP doesn't show
+ * on the invoice (a refund, a chargeback). It can't be undone, so the reason
+ * is chosen, never preset, and the admin confirms. The record stays, marked
+ * ended.
+ */
+function EndAccess({
+	tenantId,
+	invoiceId,
+	reasons,
+}: {
+	tenantId: string;
+	invoiceId: string;
+	reasons: Props["reasons"];
+}) {
+	const [reason, setReason] = useState("");
+	const [processing, setProcessing] = useState(false);
+	const end = () => {
+		if (
+			!window.confirm(
+				"End this studio's paid access for this invoice now? This can't be undone.",
+			)
+		) {
+			return;
+		}
+		router.post(
+			urlFor("admin.billing.end_access"),
+			{ tenantId, invoiceId, reason },
+			{
+				preserveScroll: true,
+				onStart: () => setProcessing(true),
+				onFinish: () => setProcessing(false),
+			},
+		);
+	};
+	return (
+		<span className="flex items-center gap-2">
+			<label className="sr-only" htmlFor={`end-reason-${invoiceId}`}>
+				Why end access
+			</label>
+			<select
+				id={`end-reason-${invoiceId}`}
+				value={reason}
+				onChange={(event) => setReason(event.target.value)}
+				className={selectClass}
+			>
+				<option value="" disabled>
+					Reason…
+				</option>
+				{reasons.map((option) => (
+					<option key={option.value} value={option.value}>
+						{option.text}
+					</option>
+				))}
+			</select>
+			<Button
+				type="button"
+				variant="outline"
+				className="h-11 lg:h-9"
+				disabled={!reason || processing}
+				onClick={end}
+			>
+				{processing ? "Ending…" : "End access"}
+			</Button>
+		</span>
 	);
 }
 

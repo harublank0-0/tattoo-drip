@@ -1,10 +1,12 @@
 import { inject } from "@adonisjs/core";
+import app from "@adonisjs/core/services/app";
 import logger from "@adonisjs/core/services/logger";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 import {
 	type Access,
 	accessAt,
+	accessMode,
 	isPaidInFull,
 	paidPeriod,
 } from "#modules/billing/access";
@@ -16,6 +18,8 @@ import BillingInvoice, {
 	INVOICE_STATUSES,
 	type InvoiceStatus,
 	PAYABLE_STATUSES,
+	REVERSED_STATUSES,
+	type ReversedStatus,
 } from "#modules/billing/models/billing_invoice";
 import BillingPlan from "#modules/billing/models/billing_plan";
 import BillingSubscription, {
@@ -24,18 +28,39 @@ import BillingSubscription, {
 	type SubscriptionStatus,
 } from "#modules/billing/models/billing_subscription";
 import { PLAN_CATALOGUE } from "#modules/billing/plans";
+import BillingReviewMail from "#modules/notifications/emails/billing_review_mail";
 import type Tenant from "#modules/tenancy/models/tenant";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient, withDbContext, withTransaction } from "#services/db_context";
+import { sendMailInTransaction } from "#services/mail_in_transaction";
 import PaymentProviders, {
 	type BillingApi,
 	isHostedPaymentUrl,
 	ProviderError,
 	type ProviderEvent,
 	type ProviderInvoice,
+	type ProviderMode,
 	type ProviderSubscription,
 } from "#services/paybridge";
+import env from "#start/env";
 
 type TenantRef = Pick<Tenant, "id">;
+
+/** Why staff end a paid period by hand (PayBridgeNP shows no refund on an invoice). */
+export const STAFF_REVOCATION_REASONS = [
+	"refund",
+	"chargeback",
+	"other",
+] as const;
+export type StaffRevocationReason = (typeof STAFF_REVOCATION_REASONS)[number];
+
+/** What PayBridgeNP did to a paid invoice, in the staff email's words. */
+const REVERSED_TEXT: Record<ReversedStatus, string> = {
+	void: "voided",
+	uncollectible: "marked uncollectible",
+	write_off: "written off",
+};
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -69,17 +94,30 @@ export type SyncedPlan = {
  * from objects read back from its API (a create's answer, or a retrieve
  * after a signed webhook or an explicit sync), never from a webhook body.
  * Paid access is granted per billing period, only once that period's
- * invoice reads back as paid in full (#modules/billing/access). Every
- * write for a studio runs under its billing lock, so a webhook and a sync
- * never interleave their reads and writes.
+ * invoice reads back as paid in full (#modules/billing/access), and ends
+ * early if that invoice is reversed. Every read and write is about one
+ * mode, the platform key's (accessMode): sandbox records never count once
+ * billing runs live. Every write for a studio runs under its billing lock,
+ * so a webhook and a sync never interleave their reads and writes.
  */
 @inject()
 export default class BillingService {
-	constructor(private providers: PaymentProviders) {}
+	constructor(
+		private providers: PaymentProviders,
+		private tenancy: TenancyService,
+	) {}
 
 	/** Whether subscription billing is set up (PAYBRIDGE_SECRET_KEY). */
 	configured(): boolean {
 		return this.providers.platform() !== null;
+	}
+
+	/** The mode whose records count now: the key's, else live in production, else none. */
+	activeMode(): ProviderMode | null {
+		return accessMode(
+			this.providers.platform()?.mode ?? null,
+			app.inProduction,
+		);
 	}
 
 	private api(): BillingApi {
@@ -96,20 +134,23 @@ export default class BillingService {
 		now = DateTime.utc(),
 	): Promise<BillingOverview> {
 		const api = this.providers.platform();
-		const livemode = api?.mode === "live";
+		const mode = this.activeMode();
 		const plans = api
 			? await BillingPlan.query()
-					.where("livemode", livemode)
+					.where("livemode", api.mode === "live")
 					.where("active", true)
 					.whereNotNull("provider_plan_id")
 					.orderBy("amount")
 			: [];
 		const subscription = await this.latestSubscription(tenant);
-		const invoices = await BillingInvoice.query()
-			.where("tenant_id", tenant.id)
-			.orderBy("created_at", "desc")
-			.orderBy("id", "desc")
-			.limit(INVOICE_HISTORY);
+		const invoices = mode
+			? await BillingInvoice.query()
+					.where("tenant_id", tenant.id)
+					.where("livemode", mode === "live")
+					.orderBy("created_at", "desc")
+					.orderBy("id", "desc")
+					.limit(INVOICE_HISTORY)
+			: [];
 		return {
 			configured: api !== null,
 			mode: api?.mode ?? null,
@@ -120,33 +161,50 @@ export default class BillingService {
 		};
 	}
 
-	/** The studio's access now: paid periods first, then a trial (#modules/billing/access). */
+	/**
+	 * The studio's access now, in the active mode: paid periods first (a
+	 * revoked one only until its revocation), then a trial
+	 * (#modules/billing/access). None when no mode is active.
+	 */
 	async access(tenant: TenantRef, now = DateTime.utc()): Promise<Access> {
+		const mode = this.activeMode();
+		if (!mode) return { state: "none" };
+		const at = now.toSQL() as string;
 		const periods = await BillingAccessPeriod.query()
 			.where("tenant_id", tenant.id)
-			.where("ends_at", ">", now.toSQL() as string);
-		const live = await this.liveSubscription(tenant);
+			.where("livemode", mode === "live")
+			.where("ends_at", ">", at)
+			.where((query) =>
+				query.whereNull("revoked_at").orWhere("revoked_at", ">", at),
+			);
+		const live = await this.liveSubscription(tenant, mode);
 		return accessAt(periods, live, now);
 	}
 
-	/** The subscription that can still bill, or null. */
+	/** The subscription in `mode` (the active one by default) that can still bill, or null. */
 	async liveSubscription(
 		tenant: TenantRef,
+		mode: ProviderMode | null = this.activeMode(),
 	): Promise<BillingSubscription | null> {
+		if (!mode) return null;
 		return BillingSubscription.query()
 			.where("tenant_id", tenant.id)
+			.where("livemode", mode === "live")
 			.whereNotIn("status", ENDED_STATUSES as SubscriptionStatus[])
 			.first();
 	}
 
-	/** The live subscription, else the latest one. */
+	/** The live subscription in the active mode, else that mode's latest one. */
 	async latestSubscription(
 		tenant: TenantRef,
 	): Promise<BillingSubscription | null> {
+		const mode = this.activeMode();
+		if (!mode) return null;
 		return (
-			(await this.liveSubscription(tenant)) ??
+			(await this.liveSubscription(tenant, mode)) ??
 			(await BillingSubscription.query()
 				.where("tenant_id", tenant.id)
+				.where("livemode", mode === "live")
 				.orderBy("created_at", "desc")
 				.orderBy("id", "desc")
 				.first())
@@ -173,7 +231,7 @@ export default class BillingService {
 		// step of its own, so the answer below is the provider's.
 		await withTransaction(async (trx) => {
 			await lockBilling(trx, tenant.id);
-			const live = await this.liveSubscription(tenant);
+			const live = await this.liveSubscription(tenant, api.mode);
 			if (!live) return;
 			const fresh = await provider(() =>
 				api.getSubscription(live.providerSubscriptionId),
@@ -185,7 +243,7 @@ export default class BillingService {
 		// webhooks always find the studio.
 		const { plan, customer } = await withTransaction(async (trx) => {
 			await lockBilling(trx, tenant.id);
-			if (await this.liveSubscription(tenant)) {
+			if (await this.liveSubscription(tenant, api.mode)) {
 				throw new BillingRuleError("already_subscribed");
 			}
 			return {
@@ -195,7 +253,7 @@ export default class BillingService {
 		});
 		return withTransaction(async (trx) => {
 			await lockBilling(trx, tenant.id);
-			if (await this.liveSubscription(tenant)) {
+			if (await this.liveSubscription(tenant, api.mode)) {
 				throw new BillingRuleError("already_subscribed");
 			}
 			// A subscription PayBridgeNP made for an earlier try whose answer was
@@ -247,7 +305,7 @@ export default class BillingService {
 		const api = this.api();
 		return withTransaction(async (trx) => {
 			await lockBilling(trx, tenant.id);
-			const live = await this.liveSubscription(tenant);
+			const live = await this.liveSubscription(tenant, api.mode);
 			if (!live) throw new BillingRuleError("no_subscription");
 			await provider(() => api.cancelAtPeriodEnd(live.providerSubscriptionId));
 			// The cancel answer has no expanded customer: read the record back.
@@ -269,7 +327,7 @@ export default class BillingService {
 		const api = this.api();
 		return withTransaction(async (trx) => {
 			await lockBilling(trx, tenant.id);
-			const live = await this.liveSubscription(tenant);
+			const live = await this.liveSubscription(tenant, api.mode);
 			if (!live) throw new BillingRuleError("no_subscription");
 			const plan = await this.availablePlan(api, planCode);
 			if (plan.id === live.planId && !live.pendingPlanId) {
@@ -291,7 +349,8 @@ export default class BillingService {
 	/**
 	 * Where to pay an invoice: its hosted page, read fresh from the API (the
 	 * link can rotate). Null when it turned out to be paid meanwhile; the
-	 * fresh copy is stored either way.
+	 * fresh copy is stored either way. An invoice of the other mode is
+	 * unknown here, like any other: the key can't read it.
 	 */
 	async payUrl(tenant: TenantRef, invoiceId: string): Promise<string | null> {
 		const api = this.api();
@@ -300,6 +359,7 @@ export default class BillingService {
 			const invoice = await BillingInvoice.query()
 				.where("tenant_id", tenant.id)
 				.where("id", invoiceId)
+				.where("livemode", api.mode === "live")
 				.firstOrFail();
 			const fresh = await provider(() =>
 				api.getInvoice(invoice.providerInvoiceId),
@@ -317,13 +377,18 @@ export default class BillingService {
 		});
 	}
 
-	/** Reads the studio's subscriptions and their invoices back from the API (the owner's "Check for updates", the daily reconciliation). */
+	/**
+	 * Reads the studio's subscriptions in the key's mode and their invoices
+	 * back from the API (the owner's "Check for updates", the daily
+	 * reconciliation). Another mode's records don't exist for this key.
+	 */
 	async syncTenant(tenant: TenantRef): Promise<void> {
 		const api = this.api();
 		await withTransaction(async (trx) => {
 			await lockBilling(trx, tenant.id);
 			const subscriptions = await BillingSubscription.query()
 				.where("tenant_id", tenant.id)
+				.where("livemode", api.mode === "live")
 				.where((query) =>
 					query
 						.whereNotIn("status", ENDED_STATUSES as SubscriptionStatus[])
@@ -340,6 +405,43 @@ export default class BillingService {
 				const stored = await this.storeSubscription(api, tenant.id, fresh);
 				await this.syncInvoices(api, tenant.id, stored);
 			}
+		});
+	}
+
+	// -------------------------------------------------------------------------
+	// Staff actions
+
+	/**
+	 * A platform admin ends the paid period of the studio's invoice
+	 * `invoiceId` now, for `reason` (a refund or chargeback PayBridgeNP shows
+	 * on no invoice). The period stays, revoked, with who ended it; one that
+	 * was already over keeps its days and records why. False when the studio
+	 * has no period for that invoice in the active mode, or it was already
+	 * ended.
+	 */
+	async endAccess(
+		tenant: TenantRef,
+		invoiceId: string,
+		reason: StaffRevocationReason,
+		staffUserId: string,
+	): Promise<boolean> {
+		const mode = this.activeMode();
+		if (!mode) return false;
+		return withTransaction(async (trx) => {
+			await lockBilling(trx, tenant.id);
+			const { rows } = await trx.rawQuery(
+				`update billing_access_periods
+				 set revoked_at = now(), revoked_reason = ?, revoked_by_user_id = ?
+				 where tenant_id = ? and invoice_id = ? and livemode = ? and revoked_at is null
+				 returning id`,
+				[reason, staffUserId, tenant.id, invoiceId, mode === "live"],
+			);
+			if (rows.length === 0) return false;
+			logger.info(
+				{ tenantId: tenant.id, invoiceId, reason, staffUserId },
+				"Paid period ended by staff",
+			);
+			return true;
 		});
 	}
 
@@ -667,6 +769,7 @@ export default class BillingService {
 		if (!(ENDED_STATUSES as string[]).includes(status)) {
 			const stale = await BillingSubscription.query()
 				.where("tenant_id", tenantId)
+				.where("livemode", livemode)
 				.whereNotIn("status", ENDED_STATUSES as SubscriptionStatus[])
 				.first();
 			if (stale) {
@@ -705,9 +808,11 @@ export default class BillingService {
 
 	/**
 	 * Upserts an invoice read from the API and, once it is paid in full,
-	 * grants its period (once: unique per invoice). The period is stored the
-	 * first time the invoice is seen and never moved. An invoice of another
-	 * customer, another mode or no subscription is ignored.
+	 * grants its period (once: unique per invoice); once it reads back
+	 * reversed, ends that period (once). The period is stored the first time
+	 * the invoice is seen and never moved; its plan is the invoice's own,
+	 * recorded once known. An invoice of another customer, another mode or
+	 * no subscription is ignored.
 	 */
 	private async storeInvoice(
 		api: BillingApi,
@@ -737,8 +842,12 @@ export default class BillingService {
 			.where("tenant_id", tenantId)
 			.where("provider_invoice_id", fresh.id)
 			.first();
+		// "Paid" with less than due is not paid: the first read that finds it
+		// paid in full is the one that may tell the admins it granted nothing.
+		const wasPaid = existing ? isPaidInFull(existing) : false;
 		const values = {
 			subscriptionId: subscription.id,
+			planId: existing?.planId ?? (await this.planIdOf(fresh.planId, livemode)),
 			number: fresh.number?.slice(0, 64) ?? null,
 			status: asInvoiceStatus(fresh.status, existing?.status),
 			amountDue: safeAmount(fresh.amountDue),
@@ -763,39 +872,123 @@ export default class BillingService {
 					...values,
 				});
 		if (isPaidInFull(fresh)) {
-			await this.grant(tenantId, invoice, subscription);
+			await this.grant(tenantId, invoice, !wasPaid);
+		} else if (isReversed(invoice.status)) {
+			await this.revoke(tenantId, invoice, invoice.status);
 		}
 		return invoice;
 	}
 
+	/** Our plan for PayBridgeNP's plan id, in `livemode`; null when unknown. */
+	private async planIdOf(
+		providerPlanId: string | null,
+		livemode: boolean,
+	): Promise<string | null> {
+		if (!providerPlanId) return null;
+		const plan = await BillingPlan.query()
+			.where("provider_plan_id", providerPlanId)
+			.where("livemode", livemode)
+			.first();
+		return plan?.id ?? null;
+	}
+
+	/**
+	 * Grants the paid invoice's period, with its plan and mode (once: unique
+	 * per invoice). When neither the stored period nor the invoice's plan
+	 * tells which period it paid for, grants nothing and, the first time it
+	 * reads paid in full, tells the platform admins rather than guess.
+	 */
 	private async grant(
 		tenantId: string,
 		invoice: BillingInvoice,
-		subscription: BillingSubscription,
+		firstPaid: boolean,
 	) {
-		const plan = subscription.planId
-			? await BillingPlan.find(subscription.planId)
-			: null;
+		const plan = invoice.planId ? await BillingPlan.find(invoice.planId) : null;
 		const period = paidPeriod(invoice, plan);
 		if (!period) {
 			logger.warn(
 				{ tenantId, invoiceId: invoice.id },
-				"Paid invoice without a period or plan: no access granted",
+				"Paid invoice without a sound period or its plan: no access granted",
 			);
+			if (firstPaid) await this.tellAdmins(tenantId, invoice, null);
 			return;
 		}
 		await dbClient().rawQuery(
-			`insert into billing_access_periods (tenant_id, invoice_id, starts_at, ends_at, created_at)
-			 values (?, ?, ?, ?, now())
+			`insert into billing_access_periods (tenant_id, invoice_id, livemode, plan_id, starts_at, ends_at, created_at)
+			 values (?, ?, ?, nullif(?, '')::uuid, ?, ?, now())
 			 on conflict (invoice_id) do nothing`,
 			[
 				tenantId,
 				invoice.id,
+				invoice.livemode,
+				invoice.planId ?? "",
 				period.startsAt.toUTC().toISO() as string,
 				period.endsAt.toUTC().toISO() as string,
 			],
 		);
 	}
+
+	/**
+	 * Ends the period a reversed invoice granted, now (once), and tells the
+	 * platform admins. A period already over keeps its days; the reversal is
+	 * recorded all the same.
+	 */
+	private async revoke(
+		tenantId: string,
+		invoice: BillingInvoice,
+		reason: ReversedStatus,
+	) {
+		const { rows } = await dbClient().rawQuery(
+			`update billing_access_periods set revoked_at = now(), revoked_reason = ?
+			 where tenant_id = ? and invoice_id = ? and revoked_at is null
+			 returning id`,
+			[reason, tenantId, invoice.id],
+		);
+		if (rows.length === 0) return;
+		logger.warn(
+			{ tenantId, invoiceId: invoice.id, reason },
+			"Paid invoice reversed: its period ended",
+		);
+		await this.tellAdmins(tenantId, invoice, reason);
+	}
+
+	/**
+	 * Emails each platform admin about a paid invoice: reversed (`reason`)
+	 * or not granted (null). With the studio's slug and the mode only, in
+	 * the transaction that records it, so a rollback sends nothing.
+	 */
+	private async tellAdmins(
+		tenantId: string,
+		invoice: BillingInvoice,
+		reason: ReversedStatus | null,
+	) {
+		if (env.get("ALERT_EMAILS") === false) return;
+		const admins = env.get("PLATFORM_ADMIN_EMAILS");
+		if (admins.length === 0) return;
+		const studio = await this.tenancy.find(tenantId);
+		if (!studio) return;
+		const url = new URL("/admin/billing", env.get("APP_URL")).toString();
+		await withTransaction(async (trx) => {
+			for (const to of admins) {
+				await sendMailInTransaction(
+					new BillingReviewMail({
+						to,
+						kind: reason ? "reversed" : "unresolved",
+						studioSlug: studio.slug,
+						mode: invoice.livemode ? "live" : "sandbox",
+						reason,
+						reasonText: reason ? REVERSED_TEXT[reason] : null,
+						url,
+					}),
+					trx,
+				);
+			}
+		});
+	}
+}
+
+function isReversed(status: string): status is ReversedStatus {
+	return (REVERSED_STATUSES as readonly string[]).includes(status);
 }
 
 /** The studio's billing lock, held to the end of the transaction. */

@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import type { IntervalUnit } from "#modules/billing/models/billing_plan";
+import type { ProviderMode } from "#services/paybridge";
 
 /**
  * Paid access from paid invoices only (docs/payments-paybridgenp.md).
@@ -7,10 +8,29 @@ import type { IntervalUnit } from "#modules/billing/models/billing_plan";
  * for a billing period on that period's `invoice.paid` event or paid
  * invoice record." A subscription's `active` status therefore grants
  * nothing here; a stored access period does, and a period is stored only
- * once its invoice was read back from the API as paid in full.
+ * once its invoice was read back from the API as paid in full. A period
+ * whose invoice was reversed (voided, written off, or ended by staff for a
+ * refund) counts only until its revocation.
  */
 
-export type AccessPeriod = { startsAt: DateTime; endsAt: DateTime };
+export type AccessPeriod = {
+	startsAt: DateTime;
+	endsAt: DateTime;
+	revokedAt?: DateTime | null;
+};
+
+/**
+ * The billing mode whose records decide access: the platform key's mode;
+ * with no key, live in production (a sandbox key is refused there, so its
+ * records are live ones) and none elsewhere, so a missing setting never
+ * turns sandbox records into paid access.
+ */
+export function accessMode(
+	keyMode: ProviderMode | null,
+	production: boolean,
+): ProviderMode | null {
+	return keyMode ?? (production ? "live" : null);
+}
 
 export type Access =
 	| { state: "paid"; until: DateTime }
@@ -27,9 +47,13 @@ export function accessAt(
 	subscription: { status: string; trialEndsAt: DateTime | null } | null,
 	now: DateTime = DateTime.utc(),
 ): Access {
-	const sorted = [...periods].sort(
-		(a, b) => a.startsAt.toMillis() - b.startsAt.toMillis(),
-	);
+	const sorted = periods
+		.map(({ startsAt, endsAt, revokedAt }) => ({
+			startsAt,
+			endsAt: revokedAt && revokedAt < endsAt ? revokedAt : endsAt,
+		}))
+		.filter((period) => period.endsAt > period.startsAt)
+		.sort((a, b) => a.startsAt.toMillis() - b.startsAt.toMillis());
 	const covering = sorted.find(
 		(period) => period.startsAt <= now && now < period.endsAt,
 	);
@@ -68,25 +92,39 @@ export function isPaidInFull(invoice: {
 	);
 }
 
+/** How long before its period an invoice may be issued and still be that period's. */
+const ISSUED_EARLY = { days: 1 };
+
 /**
- * The period a paid invoice grants: its stored period when it has a sound
- * one, else one plan interval from when it was paid.
+ * The period a paid invoice grants. Its stored period (the subscription's,
+ * as read the first time the invoice was seen) when that is sound and holds
+ * the invoice's issue date: PayBridgeNP issues an invoice as its period
+ * starts. A stored period that doesn't hold it was read after a renewal
+ * (docs/payments-paybridgenp.md), so the period is then one interval of the
+ * invoice's own plan from its issue date, or from its payment when it has
+ * no issue date. Null when neither is sound: never a guess from today.
  */
 export function paidPeriod(
 	invoice: {
 		periodStart: DateTime | null;
 		periodEnd: DateTime | null;
+		issuedAt: DateTime | null;
 		paidAt: DateTime | null;
 	},
 	plan: { intervalUnit: IntervalUnit; intervalCount: number } | null,
-	now: DateTime = DateTime.utc(),
 ): AccessPeriod | null {
-	const { periodStart, periodEnd } = invoice;
-	if (periodStart && periodEnd && periodEnd > periodStart) {
+	const { periodStart, periodEnd, issuedAt } = invoice;
+	if (
+		periodStart &&
+		periodEnd &&
+		periodEnd > periodStart &&
+		(!issuedAt ||
+			(periodStart.minus(ISSUED_EARLY) <= issuedAt && issuedAt < periodEnd))
+	) {
 		return { startsAt: periodStart, endsAt: periodEnd };
 	}
-	if (!plan) return null;
-	const startsAt = invoice.paidAt ?? now;
+	const startsAt = issuedAt ?? invoice.paidAt;
+	if (!plan || !startsAt) return null;
 	const unit = plan.intervalUnit === "quarter" ? "month" : plan.intervalUnit;
 	const count =
 		plan.intervalUnit === "quarter"

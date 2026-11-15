@@ -896,6 +896,9 @@ router
 			.get("billing", [controllers.Admin, "billingIndex"])
 			.as("admin.billing");
 		router
+			.post("billing/end-access", [controllers.Admin, "endAccess"])
+			.as("admin.billing.end_access");
+		router
 			.get("payments", [controllers.Admin, "gatewaysIndex"])
 			.as("admin.payments");
 		router
