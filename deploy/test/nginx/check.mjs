@@ -348,7 +348,7 @@ async function checkTokenPaths() {
 
 /**
  * The D11 layout only: links made before the cutover keep working. Old
- * dashboard and account addresses on the apex are sent to Studio OS (307, same
+ * dashboard and account addresses on the apex are sent to Studio OS (308, same
  * path and query, method kept); the old API address is proxied, not
  * redirected; the API host serves /api only; the dashboard host does not
  * redirect again (no loop); the old service worker is replaced.
@@ -379,8 +379,8 @@ async function checkLegacy() {
 					: {},
 		});
 		check(
-			`apex ${method} ${path.replace(/tok-canary-\d+/, "<token>")} is a 307 to Studio OS with the same path`,
-			answer.status === 307 &&
+			`apex ${method} ${path.replace(/tok-canary-\d+/, "<token>")} is a 308 to Studio OS with the same path`,
+			answer.status === 308 &&
 				answer.headers?.location === `${STUDIO_OS}${path}` &&
 				answer.json === undefined,
 			`status ${answer.status}, location ${answer.headers?.location}`,

@@ -74,7 +74,7 @@ Values for nginx; set the equivalent on the host's proxy.
 
 ### R2 and video uploads
 
-- Video angles upload with a presigned PUT straight from the dashboard to the private bucket (`R2_PRIVATE_BUCKET`), under `work_video_upload/`. The browser sends it cross-origin, so the private bucket needs a CORS rule (Cloudflare dashboard, R2, the bucket, Settings, CORS policy) allowing the dashboard's origin (`APP_URL`'s origin: `https://app.tattoodrip.app` in this deploy since the D11 cutover; the runbook's 3.2 has this deploy's full policy, which keeps the old origin `https://tattoodrip.app` only until the cutover's rollback window closes, [domain migration](../../../docs/discover/domain-migration.md)), method `PUT`, header `Content-Type`, with `MaxAgeSeconds` of 3600 and no exposed headers needed:
+- Video angles upload with a presigned PUT straight from the dashboard to the private bucket (`R2_PRIVATE_BUCKET`), under `work_video_upload/`. The browser sends it cross-origin, so the private bucket needs a CORS rule (Cloudflare dashboard, R2, the bucket, Settings, CORS policy) allowing the dashboard's origin (`APP_URL`'s origin: `https://app.tattoodrip.app` in this deploy since the D11 cutover; the runbook's 3.2 has this deploy's full policy; the old origin `https://tattoodrip.app` was dropped when the cutover's rollback window closed, [domain migration](../../../docs/discover/domain-migration.md)), method `PUT`, header `Content-Type`, with `MaxAgeSeconds` of 3600 and no exposed headers needed:
 
   ```json
   [{ "AllowedOrigins": ["<APP_URL's origin>"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]

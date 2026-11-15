@@ -402,10 +402,10 @@ On `tattoo-drip-private`, under its settings, add two things before the first de
 - **CORS policy:** the browser uploads videos straight to this bucket, from the dashboard (`APP_URL`'s origin, `https://app.tattoodrip.app` since the D11 cutover) and from the studio pages (`*.tattoodrip.page`). Put `APP_URL`'s origin first:
 
   ```json
-  [{ "AllowedOrigins": ["https://app.tattoodrip.app", "https://tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
+  [{ "AllowedOrigins": ["https://app.tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
   ```
 
-  `https://tattoodrip.app` (the dashboard's origin before the cutover) stays only until the cutover's rollback window closes, so a rollback can still upload. **Pending:** once the window is over, remove it, leaving `["https://app.tattoodrip.app", "https://*.tattoodrip.page"]` ([domain migration](../docs/discover/domain-migration.md), G.E step 6).
+  `https://tattoodrip.app` (the dashboard's origin before the cutover) was listed only during the cutover's rollback window; the window is closed, so if your rule still has it, remove it ([domain migration](../docs/discover/domain-migration.md), G.E step 6).
 
 **Check the CORS policy before deploying.** The wildcard for the studio pages is unverified on R2 until this check passes. From your computer, ask the bucket the question a browser asks before a client's video upload, with a real studio's slug and your account ID (3.1):
 
@@ -751,10 +751,10 @@ From this release on, Reviews and Fresh ink is always on: clients post reviews, 
 1. **R2:** on `tattoo-drip-private`, the lifecycle rule on `work_video_upload/` and the CORS policy at the end of 3.2:
 
    ```json
-   [{ "AllowedOrigins": ["https://app.tattoodrip.app", "https://tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
+   [{ "AllowedOrigins": ["https://app.tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
    ```
 
-   `https://tattoodrip.app` stays only until the D11 rollback window closes; then remove it (pending, 3.2). Then the CORS check there, with a studio page's origin and, for the dashboard, `Origin: https://app.tattoodrip.app`. If the check shows the wildcard isn't honoured, 3.2 says what to do.
+   No `https://tattoodrip.app`: the D11 rollback window is closed (3.2). Then the CORS check there, with a studio page's origin and, for the dashboard, `Origin: https://app.tattoodrip.app`. If the check shows the wildcard isn't honoured, 3.2 says what to do.
 2. **No log line records the review link's token.** It travels in the `X-Review-Token` header, never in a URL, and nginx logs no request headers but the user agent:
 
    ```bash
@@ -1136,7 +1136,7 @@ dc --profile discover logs --tail 50 discover
 | `Restarting`, and the log says `Discover's settings are incomplete:` | A setting in `discover.env` is missing or malformed; the log names it (never the value) | Fix it (2.4), then recreate Discover (5, "Changing a setting") |
 | `Discover API read failed: … ECONNREFUSED` or `answered 503` | Discover can't read the API: `web` is down or restarting, or the tunnel or Cloudflare between them | `dc ps web`, `dc logs --tail 50 web`; Discover recovers by itself once the API answers |
 | `Discover API read failed: … answered 429` | Rate-limited: usually the key doesn't match | `dc logs web \| grep 'server key'`: "does not accept" means `DISCOVER_SERVER_KEY` (discover.env) and `DISCOVER_SERVER_KEYS` (platform.env) differ; make them equal, recreate both |
-| Pages answer 502 at `tattoodrip.app` | Discover isn't running | `dc --profile discover up -d discover`; never switch the nginx layout back without the rollback (domain migration, H; only while its window is open) |
+| Pages answer 502 at `tattoodrip.app` | Discover isn't running | `dc --profile discover up -d discover`; never switch the nginx layout back: the rollback window is closed (domain migration, H) |
 
 Keep `https://tattoodrip.app/healthz` in your uptime monitor (8.8) next to the sign-in page, `https://app.tattoodrip.app/login`.
 

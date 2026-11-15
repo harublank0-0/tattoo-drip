@@ -2,8 +2,8 @@
 
 How Tattoo Drip moved from one platform host to three: Discover on `tattoodrip.app`, Studio OS on `app.tattoodrip.app`, the API on `api.tattoodrip.app`.
 - **D01 (done):** prepared the configuration, routing and tests, and rehearsed the layout locally. It changed nothing in production.
-- **D11 (done):** the server key, `/healthz`, Discover in `deploy.sh`, the launch smoke test, the release plan (G) and rollback (H), rehearsed in production mode (J2). The cutover (G, stage D) has been carried out in production: `https://tattoodrip.app` serves Discover, `https://app.tattoodrip.app` Studio OS and `https://api.tattoodrip.app` the API.
-- **Rollback window: still open.** The rollback (H) stays available until it closes. Pending until then (G.E step 6): the legacy redirects' 307 → 308, and removing `https://tattoodrip.app` from the private bucket's CORS rule (G.C step 5).
+- **D11 (done):** the server key, `/healthz`, Discover in `deploy.sh`, the launch smoke test, the release plan (G) and rollback (H), rehearsed in production mode (J2). The cutover (G, stage D) was carried out in production on 2026-11-08: `https://tattoodrip.app` serves Discover, `https://app.tattoodrip.app` Studio OS and `https://api.tattoodrip.app` the API.
+- **Rollback window: closed** with no rollback; the product owner decided there is no moving back. The legacy redirects are 308 and the private bucket's CORS rule no longer lists `https://tattoodrip.app` (G.E step 6). Still to do: remove the apex `/api` proxy and `hosts.current.conf` after 30 days with no apex `/api` traffic.
 
 Plan and decisions: [implementation blueprint](implementation-blueprint.md). Server operations: [server runbook](../../deploy/README.md). Platform settings: [platform deploy](../../apps/platform/docs/deploy.md).
 
@@ -15,7 +15,7 @@ The split layout, live since the D11 cutover:
 visitor ─TLS─► Cloudflare (Always Use HTTPS, edge certificate)
           └─ tunnel public hostnames: tattoodrip.app, app.tattoodrip.app, api.tattoodrip.app, tattoodrip.page, *.tattoodrip.page
                └─► cloudflared (172.30.42.20) ─► nginx (.10, deploy/nginx/nginx.conf → hosts.split.conf)
-                     tattoodrip.app                 → discover (.13:3000): Discover; legacy dashboard paths 307 to app.; /api proxied to web
+                     tattoodrip.app                 → discover (.13:3000): Discover; legacy dashboard paths 308 to app.; /api proxied to web
                      app.tattoodrip.app             → web (.11:3333): Studio OS (dashboard, sign-in, account links)
                      api.tattoodrip.app             → web (.11:3333): /api only, anything else nginx's 404
                      tattoodrip.page, *.tattoodrip.page → storefront (.12:3000)
@@ -46,13 +46,13 @@ media.tattoodrip.app → R2 public bucket (Cloudflare, not through the server)
 - **Cookies:** the dashboard's were host-only on `tattoodrip.app`.
 - **The installed dashboard app:** its manifest has `start_url /dashboard`, and its service worker `/sw.js` was registered on `tattoodrip.app`.
 
-The rollback (H) returns to this layout while the rollback window is open.
+The rollback (H) returned to this layout while the rollback window was open; it closed with no rollback.
 
 ## B. Hosts (live since D11)
 
 | Host | nginx (`hosts.split.conf`) | Serves |
 |---|---|---|
-| `tattoodrip.app` | `discover` upstream (172.30.42.13:3000, reserved for D05) | Discover. Legacy dashboard and account paths get a 307 to `app.` (308 once the rollback window closes); `/api/` is proxied to web; `/sw.js` unregisters the old worker |
+| `tattoodrip.app` | `discover` upstream (172.30.42.13:3000, reserved for D05) | Discover. Legacy dashboard and account paths get a 308 to `app.` (307 during the rollback window); `/api/` is proxied to web; `/sw.js` unregisters the old worker |
 | `app.tattoodrip.app` | web | Studio OS: dashboard, sign-in, account links. The platform still answers `/api` there, but nothing calls it |
 | `api.tattoodrip.app` | web, `/api/` only; everything else is nginx's 404 | The public API `/api/v1`. The platform also refuses non-`/api` paths on this host |
 | `tattoodrip.page`, `*.tattoodrip.page` | storefront | Studio pages (unchanged) |
@@ -162,7 +162,7 @@ The legacy redirects and the proxy are in `deploy/nginx/hosts.split.conf`, live 
 
 ## G. D11 release plan
 
-**Status:** stages A to D have been carried out in production (the cutover is done). Stage E's step 6 is **pending** until the rollback window closes; the rest of stage E (the hour of watching, the checks, and the separate decisions on indexing and geolocation) is not recorded here. The plan below is kept as the record of how the cutover ran.
+**Status:** stages A to D were carried out in production on 2026-11-08 (the cutover is done). Stage E's step 6 is done for the rollback window (308s, the CORS rule); its 30-day `/api` step is still to do; the rest of stage E (the hour of watching, the checks, and the separate decisions on indexing and geolocation) is not recorded here. The plan below is kept as the record of how the cutover ran.
 
 The launch runs in five stages. A and B change nothing visitors see. C adds two hostnames that answer nothing yet. **D (the cutover) and everything after it need the product owner's explicit approval on the day.** Commands run on the server, in `/srv/tattoo-drip/app`, unless they say otherwise. Write `dc` for `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml`.
 
@@ -232,11 +232,11 @@ Any one of these stops the launch (stage D) or triggers the rollback (H):
    - No challenge (Bot Fight Mode, Under Attack, a challenge rule) on `app.` or `api.`: Discover's and the studio pages' servers read `https://api.tattoodrip.app` from the server's own address and cannot solve one.
    - Add `app.tattoodrip.app` to the optional sign-in rate-limiting rule (3.8) beside the apex; never aim a rule at `/api/`.
    - No cache rule on any host (I, "Edge caching of `/api`"): Cloudflare's defaults cache only the hashed `/assets/*` and the brand files, never Discover's HTML, the API's JSON, robots or sitemaps.
-5. R2, `tattoo-drip-private`, CORS policy (runbook 3.2): the dashboard uploads videos straight to the bucket from `APP_URL`'s origin, so add `https://app.tattoodrip.app` to `AllowedOrigins` beside `https://tattoodrip.app` and `https://*.tattoodrip.page`. The policy while the rollback window is open:
+5. R2, `tattoo-drip-private`, CORS policy (runbook 3.2): the dashboard uploads videos straight to the bucket from `APP_URL`'s origin, so `AllowedOrigins` lists `https://app.tattoodrip.app` and `https://*.tattoodrip.page`. The policy now that the rollback window is closed:
    ```json
-   [{ "AllowedOrigins": ["https://app.tattoodrip.app", "https://tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
+   [{ "AllowedOrigins": ["https://app.tattoodrip.app", "https://*.tattoodrip.page"], "AllowedMethods": ["PUT"], "AllowedHeaders": ["Content-Type"], "MaxAgeSeconds": 3600 }]
    ```
-   `https://tattoodrip.app` stays only until the rollback window closes, so a rollback still uploads; then remove it (**pending**, E.6). Run the runbook's CORS check (3.2) with `Origin: https://app.tattoodrip.app`. **You should see:** `200` and `access-control-allow-origin` naming it. Without it every video angle upload fails after the cutover, before any byte is sent.
+   During the rollback window it also listed `https://tattoodrip.app`, so a rollback could still upload; that was removed when the window closed (E.6). Run the runbook's CORS check (3.2) with `Origin: https://app.tattoodrip.app`. **You should see:** `200` and `access-control-allow-origin` naming it. Without it every video angle upload fails after the cutover, before any byte is sent.
 6. The functional switch itself happens in one step (D). There is no useful half state: Studio OS on `app.` with the API still on the apex would split sessions and CORS. The full split layout was rehearsed in production mode instead (J2).
 
 ### D. Cutover (approval required) — done
@@ -265,15 +265,15 @@ Any one of these stops the launch (stage D) or triggers the rollback (H):
    docker inspect -f '{{.Name}} restarts={{.RestartCount}}' $(dc --profile discover ps -q)
    ```
    Expected: sign-ins and a few "Invalid or expired CSRF token" (open tabs, E above); `/api` traffic on the apex from cached pages (it is proxied); no 5xx beyond the restart's seconds, no "API read failed", no restarts.
-2. **A new password reset email** links to `https://app.tattoodrip.app/…`; an old link opened on the apex still works (307).
+2. **A new password reset email** links to `https://app.tattoodrip.app/…`; an old link opened on the apex still works (a 307 during the rollback window, 308 since).
 3. **The visitor's address** on the new hosts is real (runbook 4.8, with `app.tattoodrip.app`).
 4. **Discover is launched** when 1–3 hold. Indexing stays off until the product owner decides (blueprint J). Then set `DISCOVER_INDEXING=on` in `discover.env`, recreate it (`dc --profile discover up -d --force-recreate discover`), rerun the smoke test with `SMOKE_INDEXING=on`, and submit `https://tattoodrip.app/sitemap.xml` in Search Console. Each of those is its own decision.
 5. **Geolocation** stays off until a request with a made-up `CF-IPCountry: IN` from outside Nepal reaches Discover with Cloudflare's own value (`curl -H 'CF-IPCountry: IN' https://tattoodrip.app/` and the country it shows). Then set `DISCOVER_GEO_HEADER=X-Discover-Country` and recreate Discover.
-6. **Later (pending: the rollback window is still open):** legacy 307 → 308 when the rollback window closes (14 days), and then remove `https://tattoodrip.app` from the private bucket's CORS `AllowedOrigins` (C.5); remove the apex `/api` proxy and `hosts.current.conf` after 30 days with no apex `/api` traffic.
+6. **Later:** legacy 307 → 308 when the rollback window closes, and remove `https://tattoodrip.app` from the private bucket's CORS `AllowedOrigins` (C.5): **done**, the window closed with no rollback. Still to do: remove the apex `/api` proxy and `hosts.current.conf` after 30 days with no apex `/api` traffic.
 
 ## H. Rollback
 
-**Status:** available while the rollback window is open (G.E step 6). Once it closes, this section no longer applies and stays as a record.
+**Status:** no longer applies. The rollback window closed with no rollback and the legacy redirects are now 308, which browsers may remember; this section stays as a record.
 
 **When:** any release gate (G) that a small fix can't clear within the hour: Studio OS sign-in or writes failing, studio pages or bookings failing, private or hidden data visible, repeated 5xx or a redirect loop.
 
