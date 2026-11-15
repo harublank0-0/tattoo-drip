@@ -54,8 +54,8 @@
 #   TD_STATE_DIR      absolute path of the folder that holds the release record
 #                     ("deployed"), default /srv/tattoo-drip
 #
-# Discover (D11): deployed only when TD_ENV_DIR has discover.env, so the stack is exactly
-# as before until that file is added (domain-migration.md, "D11 release plan", stage B).
+# Discover (D11): deployed only when TD_ENV_DIR has discover.env, which production has had
+# since the cutover (domain-migration.md, "D11 release plan", stage B).
 # A commit whose deploy/nginx/nginx.conf includes the split layout (hosts.split.conf)
 # is refused without it, before anything changes: its apex would answer 502.
 #

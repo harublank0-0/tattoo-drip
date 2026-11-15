@@ -13,7 +13,8 @@ import env from "#start/env";
  * The hosts that serve the public API and nothing else (Discover D01): the
  * API's own host (API_URL, when it is not APP_URL's) and Discover's
  * (DISCOVER_URL, where the platform only ever sees the legacy /api proxy).
- * Empty in the live layout, so every host answers as before.
+ * Empty in the single-host layout (neither set), so every host answers
+ * everything.
  */
 const API_ONLY = apiOnlyHosts({
 	appUrl: env.get("APP_URL"),
