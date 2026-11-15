@@ -182,7 +182,7 @@ async function checkHosts() {
 			`status ${status}, upstream ${json?.upstream}, url ${json?.url}`,
 		);
 	}
-	// The live layout answers no new host before the cutover; neither layout
+	// The rollback layout (current) answers no new host; neither layout
 	// answers a name it does not list.
 	const unknown = [
 		"evil.example",

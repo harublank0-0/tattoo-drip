@@ -101,7 +101,7 @@ check_layout() { # nginx.conf | nginx.current.conf | nginx.split.conf
 		expect_lines 'proxy_set_header X-Discover-Country $discover_country' 1 # D06.5, Discover's location only
 	else
 		upstreams=2
-		expect_lines 'server 172.30.42.13:3000' 0 # the live layout never names Discover
+		expect_lines 'server 172.30.42.13:3000' 0 # the rollback layout never names Discover
 		expect_lines 'proxy_set_header X-Discover-Country $discover_country' 0
 	fi
 	expect_lines 'keepalive_timeout 4s' "$upstreams" # one in each upstream
