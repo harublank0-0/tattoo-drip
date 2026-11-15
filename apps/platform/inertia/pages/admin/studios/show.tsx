@@ -4,6 +4,7 @@ import { urlFor } from "~/client";
 import {
 	KeepItUp,
 	LiftItemTakedown,
+	type ReasonOption,
 	ReviewTakedownForm,
 } from "~/components/admin_moderation";
 import AdminNav from "~/components/admin_nav";
@@ -18,18 +19,19 @@ type Takedown = { atText: string; note: string | null };
 
 type Item = {
 	kind: "review" | "reply" | "post";
+	kindLabel: string;
 	id: string;
 	atText: string;
 	shownName: string;
 	rating: number | null;
 	excerpt: string;
-	takedown: (Takedown & { reason: string }) | null;
+	takedown: (Takedown & { reasonLabel: string }) | null;
 };
 
 type Props = {
 	studio: { slug: string; name: string };
 	discover: {
-		status: string;
+		statusLabel: string;
 		optedIn: boolean;
 		publiclyVisible: boolean;
 		takedown: Takedown | null;
@@ -53,12 +55,13 @@ type Props = {
 		reviewId: string;
 		reportedText: string;
 		reason: string;
+		reasonLabel: string;
 		note: string | null;
 		rating: number | null;
 		shownName: string;
 		body: string;
 	}[];
-	takedownReasons: string[];
+	takedownReasons: ReasonOption[];
 };
 
 /**
@@ -85,7 +88,7 @@ export default function AdminStudio({
 		>
 			<Section title="Discover listing">
 				<p className="flex flex-wrap items-center gap-2 text-sm">
-					<Badge variant="outline">{discover.status}</Badge>
+					<Badge variant="outline">{discover.statusLabel}</Badge>
 					<span>{discover.optedIn ? "Opted in" : "Not opted in"}</span>
 					<span>
 						{discover.publiclyVisible ? "Publicly visible" : "Not public"}
@@ -183,7 +186,7 @@ export default function AdminStudio({
 								</span>
 								<span>{report.body}</span>
 								<span className="text-muted-foreground">
-									Reported {report.reportedText} for {report.reason}
+									Reported {report.reportedText} for {report.reasonLabel}
 									{report.note ? `: ${report.note}` : ""}
 								</span>
 								<ReviewTakedownForm
@@ -295,7 +298,7 @@ function ItemList({
 }: {
 	title: string;
 	items: Item[];
-	reasons: string[];
+	reasons: ReasonOption[];
 }) {
 	return (
 		<div className="flex flex-col gap-2">
@@ -310,7 +313,7 @@ function ItemList({
 							className="flex flex-col gap-1 py-3 text-sm"
 						>
 							<span className="flex flex-wrap items-center gap-2">
-								<Badge variant="outline">{item.kind}</Badge>
+								<Badge variant="outline">{item.kindLabel}</Badge>
 								<span className="font-medium">{item.shownName}</span>
 								{item.rating !== null && <span>{item.rating}/5</span>}
 								<span className="text-muted-foreground">{item.atText}</span>
@@ -318,8 +321,8 @@ function ItemList({
 							<span>{item.excerpt}</span>
 							{item.takedown && (
 								<span className="text-muted-foreground">
-									Taken down {item.takedown.atText} ({item.takedown.reason})
-									{item.takedown.note ? `: ${item.takedown.note}` : ""}
+									Taken down {item.takedown.atText} ({item.takedown.reasonLabel}
+									){item.takedown.note ? `: ${item.takedown.note}` : ""}
 								</span>
 							)}
 							{item.takedown ? (

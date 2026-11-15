@@ -4,6 +4,9 @@ import { Input } from "~/components/ui/input";
 
 export type ItemKind = "review" | "reply" | "post";
 
+/** A takedown reason as the server labels it. */
+export type ReasonOption = { value: string; label: string };
+
 /** The takedown and restore route of each kind; the id is the review's or the post's. */
 const ROUTES = {
 	review: {
@@ -36,7 +39,7 @@ export function ReviewTakedownForm({
 	kind: ItemKind;
 	id: string;
 	idPrefix: string;
-	reasons: string[];
+	reasons: ReasonOption[];
 	defaultReason?: string;
 }) {
 	return (
@@ -61,16 +64,17 @@ export function ReviewTakedownForm({
 						id={`${idPrefix}-reason`}
 						name="reason"
 						defaultValue={
-							defaultReason && reasons.includes(defaultReason)
+							defaultReason &&
+							reasons.some((reason) => reason.value === defaultReason)
 								? defaultReason
-								: reasons[0]
+								: reasons[0]?.value
 						}
 						className={selectClass}
 						aria-invalid={!!errors.reason}
 					>
 						{reasons.map((reason) => (
-							<option key={reason} value={reason}>
-								{reason}
+							<option key={reason.value} value={reason.value}>
+								{reason.label}
 							</option>
 						))}
 					</select>

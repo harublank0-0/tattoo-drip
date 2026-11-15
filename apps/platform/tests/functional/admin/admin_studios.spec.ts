@@ -3,8 +3,10 @@ import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import { LIVE_ITEMS } from "#controllers/admin_studios_controller";
+import { STATUS_WORDS } from "#modules/discovery/publication";
 import PublicationService from "#modules/discovery/services/publication_service";
 import ClientReview from "#modules/reviews/models/client_review";
+import ReviewOperatorService from "#modules/reviews/services/review_operator_service";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { adminUser } from "#tests/helpers/admin";
@@ -13,11 +15,11 @@ import { makeProject } from "#tests/helpers/pipeline";
 import { seedReview } from "#tests/helpers/reviews";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
 
-function report(studio: Studio) {
+function report(studio: Studio, reason = "hate") {
 	return inTenant(studio.tenant, () =>
 		ClientReview.withTrashed()
 			.where("id", studio.clientReview.id)
-			.update({ reported_at: new Date(), report_reason: "hate" }),
+			.update({ reported_at: new Date(), report_reason: reason }),
 	);
 }
 
@@ -72,7 +74,7 @@ test.group("Admin studios", (group) => {
 		const props = page.inertiaProps as any;
 		const publication = await app.container.make(PublicationService);
 		const status = await publication.operatorStatus(a.tenant.slug);
-		assert.equal(props.discover.status, status.status);
+		assert.equal(props.discover.statusLabel, STATUS_WORDS[status.status].label);
 		const photo = props.photos.find(
 			(item: { id: string }) => item.id === a.workPhoto.id,
 		);
@@ -134,6 +136,62 @@ test.group("Admin studios", (group) => {
 			}
 		});
 	}
+
+	test("both pages show words for the stored keys: status, type, kind and reasons", async ({
+		client,
+		assert,
+	}) => {
+		const { a } = await twoStudios();
+		assert.equal(a.tenant.type, "studio");
+		const publication = await app.container.make(PublicationService);
+		await publication.suspendStudio(a.tenant.slug, "Copyright complaint");
+		const operator = await app.container.make(ReviewOperatorService);
+		await operator.takedown("reply", a.clientReview.id, "client_request", null);
+		await report(a, "off_topic");
+		const admin = await adminUser();
+
+		const list = await client
+			.get("/admin/studios")
+			.loginAs(admin)
+			.withInertia();
+		const row = (list.inertiaProps.studios as Record<string, unknown>[]).find(
+			(studio) => studio.slug === a.tenant.slug,
+		);
+		assert.equal(row?.typeLabel, "Studio");
+		assert.equal(row?.discoverStatusLabel, "Removed by TattooDrip");
+		// The status already says it is taken down; no second badge.
+		assert.notProperty(row, "takenDown");
+
+		const page = await client
+			.get(`/admin/studios/${a.tenant.slug}`)
+			.loginAs(admin)
+			.withInertia();
+		const props = page.inertiaProps as any;
+		assert.equal(props.discover.statusLabel, "Removed by TattooDrip");
+		assert.equal(props.reports[0].reasonLabel, "Off-topic");
+		const reply = props.takenDown.find(
+			(item: { kind: string }) => item.kind === "reply",
+		);
+		assert.equal(reply.kindLabel, "Reply");
+		assert.equal(reply.takedown.reasonLabel, "Client's request");
+		const kinds = props.live.map(
+			(item: { kind: string; kindLabel: string }) => [
+				item.kind,
+				item.kindLabel,
+			],
+		);
+		assert.deepInclude(kinds, ["review", "Review"]);
+		assert.deepInclude(kinds, ["post", "Fresh ink post"]);
+		assert.deepEqual(props.takedownReasons, [
+			{ value: "hate", label: "Hate" },
+			{ value: "threats", label: "Threats" },
+			{ value: "personal_data", label: "Personal data" },
+			{ value: "off_topic", label: "Off-topic" },
+			{ value: "not_a_client", label: "Not a client" },
+			{ value: "client_request", label: "Client's request" },
+			{ value: "other", label: "Other" },
+		]);
+	});
 
 	test("an old slug redirects to the current one", async ({ client }) => {
 		const { a } = await twoStudios();

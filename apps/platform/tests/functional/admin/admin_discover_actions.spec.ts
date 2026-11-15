@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import ArtistService from "#modules/artists/services/artist_service";
+import { STATUS_WORDS } from "#modules/discovery/publication";
 import PublicationService from "#modules/discovery/services/publication_service";
 import ImageService from "#modules/media/services/image_service";
 import { adminUser } from "#tests/helpers/admin";
@@ -49,7 +50,7 @@ test.group("Admin Discover actions", (group) => {
 		on.assertStatus(302);
 		on.assertFlashMessage(
 			"success",
-			`Takedown lifted. The listing is now: ${(await publication().operatorStatus(tenant.slug)).status}.`,
+			`Takedown lifted. The listing is now: ${STATUS_WORDS[(await publication().operatorStatus(tenant.slug)).status].label}.`,
 		);
 		assert.equal(await publicStatus(client, `/studios/${tenant.slug}`), 200);
 		assert.isNull((await publication().operatorStatus(tenant.slug)).takedown);
@@ -65,7 +66,7 @@ test.group("Admin Discover actions", (group) => {
 		const on = await send(client, admin, "post", `${base}/restore`);
 		on.assertFlashMessage(
 			"success",
-			`Takedown lifted. The listing is now: ${(await publication().operatorStatus(tenant.slug)).status} (the owner's listing is off).`,
+			`Takedown lifted. The listing is now: ${STATUS_WORDS[(await publication().operatorStatus(tenant.slug)).status].label} (the owner's listing is off).`,
 		);
 	});
 

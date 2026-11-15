@@ -3,8 +3,8 @@ import type { HttpContext } from "@adonisjs/core/http";
 import type { DateTime } from "luxon";
 import { ImageDeleteError } from "#modules/media/errors";
 import {
-	REPORT_LABELS,
-	TAKEDOWN_REASONS,
+	reportReasonLabel,
+	TAKEDOWN_REASON_OPTIONS,
 	type TakedownKind,
 } from "#modules/reviews/rules";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -35,15 +35,13 @@ export default class AdminReviewsController {
 				reviewId: report.reviewId,
 				reportedText: at(report.reportedAt),
 				reason: report.reason,
-				reasonLabel:
-					REPORT_LABELS[report.reason as keyof typeof REPORT_LABELS] ??
-					report.reason,
+				reasonLabel: reportReasonLabel(report.reason),
 				note: report.note,
 				rating: report.rating,
 				shownName: report.shownName,
 				body: report.body,
 			})),
-			takedownReasons: [...TAKEDOWN_REASONS],
+			takedownReasons: TAKEDOWN_REASON_OPTIONS,
 		});
 	}
 

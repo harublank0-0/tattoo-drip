@@ -12,9 +12,8 @@ type Props = {
 	studios: {
 		slug: string;
 		name: string;
-		type: "studio" | "independent";
-		discoverStatus: string;
-		takenDown: boolean;
+		typeLabel: string;
+		discoverStatusLabel: string;
 		openReports: number;
 	}[];
 };
@@ -60,13 +59,10 @@ export default function AdminStudios({ studios }: Props) {
 									{studio.name}
 								</Link>
 								<span className="text-muted-foreground">{studio.slug}</span>
-								<Badge variant="outline">{studio.type}</Badge>
+								<Badge variant="outline">{studio.typeLabel}</Badge>
 								<Badge variant="outline">
-									Discover: {studio.discoverStatus}
+									Discover: {studio.discoverStatusLabel}
 								</Badge>
-								{studio.takenDown && (
-									<Badge variant="outline">Taken down</Badge>
-								)}
 								{studio.openReports > 0 && (
 									<Badge variant="secondary">
 										{studio.openReports} open{" "}

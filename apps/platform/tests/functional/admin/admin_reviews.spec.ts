@@ -68,7 +68,11 @@ test.group("Admin reviews", (group) => {
 		const rowA = rows.find((row) => row.reviewId === a.clientReview.id);
 		assert.equal(rowA?.studioName, a.tenant.name);
 		assert.equal(rowA?.reasonLabel, "Hate");
-		assert.include(props.takedownReasons, "hate");
+		assert.deepInclude(props.takedownReasons, { value: "hate", label: "Hate" });
+		assert.deepInclude(props.takedownReasons, {
+			value: "client_request",
+			label: "Client's request",
+		});
 	});
 
 	test("taking a reported review down records the reason and note and closes the report; restoring lifts it", async ({

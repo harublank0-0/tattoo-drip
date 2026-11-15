@@ -2,6 +2,7 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@adonisjs/core/http";
 import type { DateTime } from "luxon";
+import { STATUS_WORDS } from "#modules/discovery/publication";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import PublicationService, {
 	OperatorTargetError,
@@ -11,7 +12,12 @@ import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
 import { VIDEO_PURPOSE } from "#modules/media/services/video_service";
-import { TAKEDOWN_REASONS } from "#modules/reviews/rules";
+import {
+	reportReasonLabel,
+	TAKEDOWN_KIND_LABELS,
+	TAKEDOWN_LABELS,
+	TAKEDOWN_REASON_OPTIONS,
+} from "#modules/reviews/rules";
 import type { OperatorItem } from "#modules/reviews/services/review_operator_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ReviewOperatorService from "#modules/reviews/services/review_operator_service";
@@ -57,15 +63,25 @@ const takedownProps = (takedown: { at: DateTime; note: string | null }) => ({
 	note: takedown.note,
 });
 
+/** What the studio list calls each business type. */
+const TYPE_LABELS: Record<string, string> = {
+	studio: "Studio",
+	independent: "Independent artist",
+};
+
 const itemProps = (item: OperatorItem) => ({
 	kind: item.kind,
+	kindLabel: TAKEDOWN_KIND_LABELS[item.kind],
 	id: item.id,
 	atText: at(item.at),
 	shownName: item.shownName,
 	rating: item.rating,
 	excerpt: item.excerpt,
 	takedown: item.takedown
-		? { ...takedownProps(item.takedown), reason: item.takedown.reason }
+		? {
+				...takedownProps(item.takedown),
+				reasonLabel: TAKEDOWN_LABELS[item.takedown.reason],
+			}
 		: null,
 });
 
@@ -92,9 +108,10 @@ export default class AdminStudiosController {
 		const studios = await forEachLiveStudio(async (tenant) => ({
 			slug: tenant.slug,
 			name: tenant.name,
-			type: tenant.type,
-			discoverStatus: (await this.publication.overview(tenant)).status,
-			takenDown: tenant.discoverySuspendedAt !== null,
+			typeLabel: TYPE_LABELS[tenant.type] ?? tenant.type,
+			// A taken-down listing's status is "Removed by TattooDrip".
+			discoverStatusLabel:
+				STATUS_WORDS[(await this.publication.overview(tenant)).status].label,
 			openReports: open.get(tenant.id) ?? 0,
 		}));
 		return ctx.inertia.render("admin/studios/index", {
@@ -134,7 +151,7 @@ export default class AdminStudiosController {
 		return ctx.inertia.render("admin/studios/show", {
 			studio: { slug: tenant.slug, name: tenant.name },
 			discover: {
-				status: status.status,
+				statusLabel: STATUS_WORDS[status.status].label,
 				optedIn: status.optedIn,
 				publiclyVisible: status.publiclyVisible,
 				takedown: status.takedown ? takedownProps(status.takedown) : null,
@@ -169,12 +186,13 @@ export default class AdminStudiosController {
 				reviewId: report.reviewId,
 				reportedText: at(report.reportedAt),
 				reason: report.reason,
+				reasonLabel: reportReasonLabel(report.reason),
 				note: report.note,
 				rating: report.rating,
 				shownName: report.shownName,
 				body: report.body,
 			})),
-			takedownReasons: [...TAKEDOWN_REASONS],
+			takedownReasons: TAKEDOWN_REASON_OPTIONS,
 		});
 	}
 
@@ -210,7 +228,7 @@ export default class AdminStudiosController {
 
 	private async liftedMessage(slug: string) {
 		const status = await this.publication.operatorStatus(slug);
-		return `Takedown lifted. The listing is now: ${status.status}${status.optedIn ? "" : " (the owner's listing is off)"}.`;
+		return `Takedown lifted. The listing is now: ${STATUS_WORDS[status.status].label}${status.optedIn ? "" : " (the owner's listing is off)"}.`;
 	}
 
 	/** Runs a takedown action; the service's refusals become an error flash. */

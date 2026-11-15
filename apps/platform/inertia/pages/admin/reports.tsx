@@ -1,6 +1,10 @@
 import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
-import { KeepItUp, ReviewTakedownForm } from "~/components/admin_moderation";
+import {
+	KeepItUp,
+	type ReasonOption,
+	ReviewTakedownForm,
+} from "~/components/admin_moderation";
 import AdminNav from "~/components/admin_nav";
 import Page from "~/components/page";
 import Section from "~/components/section";
@@ -19,7 +23,7 @@ type Props = {
 		shownName: string;
 		body: string;
 	}[];
-	takedownReasons: string[];
+	takedownReasons: ReasonOption[];
 };
 
 /**
