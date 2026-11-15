@@ -32,3 +32,8 @@ export const takedownValidator = vine.create({
 		.optional()
 		.transform((value) => value || null),
 });
+
+/** The address of the account to confirm; the service canonicalises it. */
+export const verifyAccountValidator = vine.create({
+	email: vine.string().trim().email().maxLength(254),
+});

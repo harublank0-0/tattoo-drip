@@ -340,6 +340,9 @@ export interface ApiDefinition {
       restore: typeof routes['admin.posts.restore']
     }
     metrics: typeof routes['admin.metrics']
+    accounts: typeof routes['admin.accounts'] & {
+      verify: typeof routes['admin.accounts.verify']
+    }
     billing: typeof routes['admin.billing'] & {
       endAccess: typeof routes['admin.billing.end_access']
     }

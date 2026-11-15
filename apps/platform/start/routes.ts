@@ -962,6 +962,12 @@ router
 			.get("metrics", [controllers.AdminMetrics, "index"])
 			.as("admin.metrics");
 		router
+			.get("accounts", [controllers.AdminAccounts, "index"])
+			.as("admin.accounts");
+		router
+			.post("accounts/verify", [controllers.AdminAccounts, "verify"])
+			.as("admin.accounts.verify");
+		router
 			.get("billing", [controllers.Admin, "billingIndex"])
 			.as("admin.billing");
 		router

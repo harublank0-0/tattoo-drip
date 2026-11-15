@@ -2275,6 +2275,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_metrics_controller').default['index']>>>
     }
   }
+  'admin.accounts': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/accounts'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_accounts_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_accounts_controller').default['index']>>>
+    }
+  }
+  'admin.accounts.verify': {
+    methods: ["POST"]
+    pattern: '/admin/accounts/verify'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/admin').verifyAccountValidator)>>
+      paramsTuple: []
+      params: {}
+      query: ExtractQuery<InferInput<(typeof import('#validators/admin').verifyAccountValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_accounts_controller').default['verify']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_accounts_controller').default['verify']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
   'admin.billing': {
     methods: ["GET","HEAD"]
     pattern: '/admin/billing'

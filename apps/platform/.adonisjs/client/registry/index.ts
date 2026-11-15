@@ -1140,6 +1140,18 @@ const routes = {
     tokens: [{"old":"/admin/metrics","type":0,"val":"admin","end":""},{"old":"/admin/metrics","type":0,"val":"metrics","end":""}],
     types: placeholder as Registry['admin.metrics']['types'],
   },
+  'admin.accounts': {
+    methods: ["GET","HEAD"],
+    pattern: '/admin/accounts',
+    tokens: [{"old":"/admin/accounts","type":0,"val":"admin","end":""},{"old":"/admin/accounts","type":0,"val":"accounts","end":""}],
+    types: placeholder as Registry['admin.accounts']['types'],
+  },
+  'admin.accounts.verify': {
+    methods: ["POST"],
+    pattern: '/admin/accounts/verify',
+    tokens: [{"old":"/admin/accounts/verify","type":0,"val":"admin","end":""},{"old":"/admin/accounts/verify","type":0,"val":"accounts","end":""},{"old":"/admin/accounts/verify","type":0,"val":"verify","end":""}],
+    types: placeholder as Registry['admin.accounts.verify']['types'],
+  },
   'admin.billing': {
     methods: ["GET","HEAD"],
     pattern: '/admin/billing',

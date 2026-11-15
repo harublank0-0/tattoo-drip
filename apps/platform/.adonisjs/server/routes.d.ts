@@ -193,6 +193,8 @@ export type ScannedRoutes = {
     'admin.posts.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.posts.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.metrics': { paramsTuple?: []; params?: {} }
+    'admin.accounts': { paramsTuple?: []; params?: {} }
+    'admin.accounts.verify': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
@@ -308,6 +310,7 @@ export type ScannedRoutes = {
     'admin.studios.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
     'admin.reports': { paramsTuple?: []; params?: {} }
     'admin.metrics': { paramsTuple?: []; params?: {} }
+    'admin.accounts': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
@@ -407,6 +410,7 @@ export type ScannedRoutes = {
     'admin.studios.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
     'admin.reports': { paramsTuple?: []; params?: {} }
     'admin.metrics': { paramsTuple?: []; params?: {} }
+    'admin.accounts': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
@@ -518,6 +522,7 @@ export type ScannedRoutes = {
     'admin.reviews.reply.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.posts.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.posts.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.accounts.verify': { paramsTuple?: []; params?: {} }
     'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments.review': { paramsTuple?: []; params?: {} }
     'api.v1.webhooks.platform': { paramsTuple?: []; params?: {} }
