@@ -32,12 +32,16 @@ This work lets an owner refund an online payment from the project's Payments car
 
 ## Constraints
 
-- **PayBridgeNP API** (SDK `@paybridge-np/sdk`): `refunds.create({ paymentId, amount, reason, notes?, mobileNumber? }, idempotencyKey)`.
+- **PayBridgeNP API** (SDK `@paybridge-np/sdk` 5.7.0): `refunds.create({ paymentId, amount, reason, notes?, mobileNumber? }, idempotencyKey)`.
   - `reason` is one of `customer_request`, `duplicate`, `fraudulent`, `other`.
-  - A refund is `pending`, `succeeded` or `failed`; some (eSewa) stay pending until finished in PayBridgeNP.
-  - `409 refund_outcome_unknown` must not be retried.
+  - A refund's status is `processing`, `succeeded`, `failed` or `requires_action` (the SDK's `RefundStatus`, already allowed by `gateway_refunds`).
   - Idempotency keys last at least 24 hours.
   - `refund.succeeded` and `payment.refunded` webhooks already reach `GatewayCheckoutService.recordRefunds`.
+- **How each provider refunds** (docs.paybridgenp.com, "Create a refund"):
+  - **Khalti:** fully automated; the answer is `succeeded` or `failed`. If Khalti doesn't answer, the response is `502 refund_outcome_unknown` and PayBridgeNP holds the refund as `requires_action` with its amount reserved; retries answer `409` until someone marks it completed or not refunded in PayBridgeNP's dashboard. Some Khalti setups need `mobileNumber`.
+  - **eSewa:** no refund API. The refund is recorded as `requires_action`, and the money must be sent back by hand in the eSewa merchant portal (then marked completed in PayBridgeNP).
+  - **Fonepay:** not available through the API (`422`); full refunds only, from PayBridgeNP's dashboard.
+  - Partial refunds: Khalti and eSewa, several per payment, up to the payment's amount.
 - **Checkouts:** `gateway_checkouts.purpose` exists with a check of `('deposit')`, and one live checkout per project (`gateway_checkouts_one_open`). Checkout amounts are NPR 10 to NPR 1,000,000.
 - **Deposit link:** one `deposit_links` row per project. A token works for 30 days and "New link" rotates it. `issueProblem` today requires `deposit_pending`.
 - **Ledger:** `payments` is append-only, with kinds `deposit | session | balance | refund | correction`. Online rows have a null verifier. The desk refund limit is `balance.paid`.
@@ -90,7 +94,9 @@ Issuing:
 - the Settings, Messages page and its validators;
 - the `message_templates` and `tattoo_projects.last_contact_kind` checks (new migration).
 
-**Client side (the existing page, `GET /deposit/{token}`).** `depositState` gains `balance_due`, which applies when the deposit is settled, the link has a `balance_requested`, and the amount still to pay is above zero. That amount is `min(balance_requested, current balance due)`.
+**Client side (the existing page, `GET /deposit/{token}`).** `depositState` gains `balance_due`, which applies when the deposit is settled, the link has a `balance_requested`, and the amount still to pay is above zero. That amount is `min(balance_requested, current balance due)`, so a desk payment made meanwhile lowers it.
+
+A request is used up by the payment that pays it: when a `balance` checkout is recorded, the same transaction clears the link's `balance_requested`, and the page reads `paid`. So a request for part of the balance is offered once, and a later refund never reopens the page asking the client to pay again. To ask for more, the owner issues a new request (my call: it closes the "charged more than asked" gap the builder check found).
 
 `DepositPage` gains a nullable `balance` object (`requested`, `requestedText`, `due`, `dueText`). `onlinePayment.available` is true in `due` or `balance_due` when online payments are available. Once the balance due reaches zero, by this payment or a desk payment, the state is `paid` again.
 
@@ -113,13 +119,20 @@ Changes:
 - a migration adds `'balance'` to `gateway_checkouts_purpose`;
 - reuse, supersede and `guardInFlight` work the same;
 - `confirmPayment` records the ledger row with `kind = checkout.purpose`: `recordOnlineDeposit` is generalised to a deposit or a balance;
-- review reasons are unchanged; an amount above what is still due at confirmation is held as `amount_mismatch`, so it is never recorded over the balance.
+- review reasons are unchanged; an amount above what is still due at confirmation is held as `amount_mismatch`, so it is never recorded over the balance;
+- recording a balance payment clears the link's `balance_requested` (above).
 
 **Alerts.** There is a new staff alert kind, `online_balance` ("Balance paid online", owners and the project's artist, opening the Payments card), added to the kind check with its email copy. Held balance payments use the existing `online_review`.
 
 ### 2. The refund button
 
-**Where.** A row on the Payments card that PayBridgeNP made (`onlineIds`, a deposit or balance), seen by an owner, gets **"Refund online"** when:
+**What the button does per provider** (follows from the provider facts above):
+
+- **Khalti:** refunds for real; the ledger refund appears when PayBridgeNP answers `succeeded`.
+- **eSewa:** records the refund in PayBridgeNP and reserves its amount; the card then says "Send NPR X back to the client in the eSewa merchant portal, then mark it completed in PayBridgeNP." The ledger refund appears when PayBridgeNP reports it `succeeded`. (My call: still worth offering, because it keeps the refund on record and stops a second refund of the same money.)
+- **Fonepay:** no button; the row says "Fonepay refunds are made in your PayBridgeNP dashboard". A refund made there is recorded as today.
+
+**Where.** A Khalti or eSewa row on the Payments card that PayBridgeNP made (`onlineIds`, a deposit or balance), seen by an owner, gets **"Refund online"** when:
 
 - the gateway payment is recorded;
 - PayBridgeNP's status is `success` or partly refunded;
@@ -137,14 +150,16 @@ Otherwise the row says "Refund it in PayBridgeNP" when something is left but the
 The limit is the smallest of:
 
 - the payment's amount minus what PayBridgeNP has refunded;
-- minus the refunds TattooDrip requested that are still pending or unknown;
-- `balance.paid`.
+- minus the refunds still open on it (`requested`, `processing`, `requires_action`);
+- `balance.paid` minus every open online refund of the project.
+
+**Open refunds reserve money everywhere** (my call, from the builder check): the amounts of open online refunds also lower the desk refund limit (the card's `refundMax`, `PaymentService.refund`) and what a deposit outcome can give back (`recordOutcome`), so an eSewa refund waiting for days can't be refunded a second time at the desk. A refund PayBridgeNP confirms is always recorded (the money has left), even if it now exceeds what the project holds; the card's existing `over_refunded` state then shows it.
 
 **Recording requests.** `gateway_refunds` is extended so a request exists before PayBridgeNP is called:
 
 - `provider_refund_id` becomes nullable (still unique when set);
 - new `idempotency_key` (unique), `requested_by_user_id` (users, set null), `reason` and `note`;
-- `status` adds `requested` (written, PayBridgeNP not yet answered) and `unknown` (outcome unknown).
+- `status` adds only `requested` (written, PayBridgeNP not yet answered); an unknown outcome is PayBridgeNP's own `requires_action`.
 
 Refunds PayBridgeNP reports that TattooDrip didn't request keep working as now.
 
@@ -155,12 +170,13 @@ Refunds PayBridgeNP reports that TattooDrip didn't request keep working as now.
 3. Call `refunds.create` with that key.
 4. Store the answer:
    - `succeeded`: run the existing `recordRefunds`, which writes the negative ledger refund once;
-   - `pending`: wait for the webhook or a sync;
-   - `failed`: keep it with its reason, which the card shows;
-   - `refund_outcome_unknown` (or a lost answer after retries): mark it `unknown`.
+   - `processing` or `requires_action`: keep it open (amount reserved); the card says what is left to do (eSewa: send the money back in the eSewa portal; Khalti unknown outcome: check Khalti and mark it in PayBridgeNP);
+   - `failed`: keep it with its reason, which the card shows; it no longer reserves anything;
+   - `502 refund_outcome_unknown`: PayBridgeNP holds it as `requires_action`; read it back with `listRefunds` to store its id;
+   - a `422` (Fonepay, or a Khalti setup that needs `mobileNumber`): no refund was made; mark the request `failed` with a message asking the owner to refund in PayBridgeNP.
 5. Another try of a `requested` row repeats the same key, so a double click or a retry never refunds twice.
 
-The owner's "Check status" (sync) reads `listRefunds` and settles `requested` and `unknown` rows by matching PayBridgeNP's refunds for that payment. The reconciliation job does the same for rows older than 10 minutes.
+The owner's "Check status" (sync) reads `listRefunds` and settles open rows: a `requested` row matches PayBridgeNP's refund for that payment and amount that TattooDrip doesn't know yet. The reconciliation job does the same for open rows older than 10 minutes, and the existing webhooks move `requires_action` rows to `succeeded` or `failed` when the owner marks them in PayBridgeNP.
 
 **Ledger and card.** The ledger refund row stays verifier-less. The card reads "Refunded through PayBridgeNP by {owner}, {day}" when a TattooDrip request is linked to it, and the current wording otherwise. Pending requests show under the payment as "Refund of NPR X requested, waiting for PayBridgeNP".
 
@@ -176,7 +192,7 @@ The owner's "Check status" (sync) reads `listRefunds` and settles `requested` an
   - the balance state's edge cases: desk payment meanwhile, hourly quote, amount change, link reissue;
   - a balance checkout recorded as `balance`, and an over-amount held.
 - **Isolation:** `inTenantAs` tests for every new query; isolation harness cases for the new routes.
-- **The fake** (`tests/helpers/paybridge.ts`) gains `refunds.create` with idempotency and the pending, succeeded, failed and unknown outcomes.
+- **The fake** (`tests/helpers/paybridge.ts`) gains `refunds.create` with idempotency and the provider behaviours above: Khalti succeeded, failed and `502 refund_outcome_unknown`; eSewa `requires_action`; Fonepay `422`.
 - **Sandbox:** one check against the real API: create and read a refund of a sandbox payment, if a sandbox payment can be made.
 - **Docs:** `docs/payments-paybridgenp.md`, `apps/platform/docs/backend.md`, `jobs-and-email.md`, `database/README.md`, the storefront docs and the openapi descriptions.
 
@@ -187,3 +203,9 @@ The owner's "Check status" (sync) reads `listRefunds` and settles `requested` an
 - The wording of error flashes.
 - Matching rules for settling `unknown` refunds.
 - Whether the Khalti `mobileNumber` is asked for up front, or only after PayBridgeNP says it is needed. Default: only after; show a message asking the owner to refund in PayBridgeNP.
+
+## Calls made after the builder check
+
+- A balance request is used up by the payment that pays it (no repeat offers, no reopening after a refund).
+- Open online refunds reserve their amount against the desk refund limit and the deposit outcome too; a confirmed refund is always recorded.
+- Refund statuses follow PayBridgeNP's (`processing`, `succeeded`, `failed`, `requires_action`) plus a local `requested`; per-provider behaviour as above (Khalti automatic, eSewa semi-manual, Fonepay dashboard only).
