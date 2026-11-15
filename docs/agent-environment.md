@@ -12,7 +12,7 @@ Read this before running commands as a coding agent in this repository (any tool
 
 ## Node and pnpm
 
-- Node is pinned in `.nvmrc` (24.3.0). The default `node` on this machine is newer and misbehaves (the multipart parser stalls). Prefix every node or pnpm command: `PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH pnpm ...` and check `node --version`.
+- Node is pinned in `.nvmrc` (24.22.3). The default `node` on this machine is newer and misbehaves (the multipart parser stalls). Prefix every node or pnpm command: `PATH=/home/blank/.nvm/versions/node/v24.22.3/bin:$PATH pnpm ...` and check `node --version`.
 - pnpm only. Run package scripts with `pnpm --filter @tattoo-drip/<package> <script>`.
 - Packages (`packages/sdk`, `packages/react`, `packages/types`) test without a database: `pnpm --filter @tattoo-drip/sdk test`, `pnpm --filter @tattoo-drip/react test`, `pnpm --filter @tattoo-drip/sdk typecheck`. `pnpm check` (Biome) and `pnpm typecheck` run from the root.
 - Editor or language-server diagnostics go stale; `pnpm typecheck` is the authority.
@@ -23,7 +23,7 @@ Read this before running commands as a coding agent in this repository (any tool
 - Agents never create, drop or truncate a database, never run `psql`, `podman` or `docker` themselves, and never kill a process. The human does those (see "Before you run opencode" below): ask when a task needs one. A test run does start `psql` as a subprocess and changes cluster-wide roles (see "Platform tests"), which is why a full run asks.
 - The worktree has its own `apps/platform/.env`, built by the human from `.env.example` with `DB_DATABASE=tattoo_drip_oc` and `PORT=3411` set in the file, so a command that forgets the prefix below still cannot reach `tattoo_drip`. Never read, print, copy or commit `.env` files.
 - Keep the override as a second layer anyway: `DB_DATABASE=tattoo_drip_oc` goes on EVERY platform command that can reach the database (tests, migrate, ace commands) and `PORT=3412` on test runs.
-- Migrate with `PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH DB_DATABASE=tattoo_drip_oc pnpm --filter @tattoo-drip/platform migrate`. Migrating rewrites `apps/platform/database/schema.ts`. Look at `git diff -- apps/platform/database/schema.ts` first: only when the whole diff is the `import type` line may you `git checkout -- apps/platform/database/schema.ts`; any other change is the schema change of your migration, so the regenerated file is part of the commit.
+- Migrate with `PATH=/home/blank/.nvm/versions/node/v24.22.3/bin:$PATH DB_DATABASE=tattoo_drip_oc pnpm --filter @tattoo-drip/platform migrate`. Migrating rewrites `apps/platform/database/schema.ts`. Look at `git diff -- apps/platform/database/schema.ts` first: only when the whole diff is the `import type` line may you `git checkout -- apps/platform/database/schema.ts`; any other change is the schema change of your migration, so the regenerated file is part of the commit.
 - Don't start the dev server or the worker: ask the human if a ticket needs a running server. Long commands run under `timeout`, so they end by themselves.
 
 ## Before you run opencode (human setup; the agent never runs these)
@@ -31,7 +31,7 @@ Read this before running commands as a coding agent in this repository (any tool
 Run once per opencode worktree before the first opencode session; steps 2 to 7 run from the worktree root. The database is a throwaway; drop it when the ticket is done. One opencode worktree at a time: two would share `tattoo_drip_oc` and ports 3411 and 3412.
 
 1. Create the worktree from the main checkout: `git worktree add /home/blank/Coding/tattoo-drip-wt/<ticket> -b <branch> origin/main`.
-2. Install: `PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH pnpm install --frozen-lockfile`.
+2. Install: `PATH=/home/blank/.nvm/versions/node/v24.22.3/bin:$PATH pnpm install --frozen-lockfile`.
 3. Create the database and the app role's grants (`tattoo-drip_postgres_1` is the PostgreSQL container):
 
    ```bash
@@ -91,7 +91,7 @@ Verified, by reading the installed opencode v2.0.32 binary and by printing the m
 
 ## Platform tests
 
-- Run from the repo root, with the assignments in this order: `PATH=/home/blank/.nvm/versions/node/v24.3.0/bin:$PATH DB_DATABASE=tattoo_drip_oc PORT=3412 timeout -s KILL 300 pnpm -C apps/platform exec node ace test > apps/platform/tmp/test.log 2>&1` (all, about 2 minutes: run it in the background; `apps/platform/tmp/` is ignored by git) or `... node ace test functional --files=<name>.spec.ts` with a shorter timeout. Every platform test run asks the human, who reads the command.
+- Run from the repo root, with the assignments in this order: `PATH=/home/blank/.nvm/versions/node/v24.22.3/bin:$PATH DB_DATABASE=tattoo_drip_oc PORT=3412 timeout -s KILL 300 pnpm -C apps/platform exec node ace test > apps/platform/tmp/test.log 2>&1` (all, about 2 minutes: run it in the background; `apps/platform/tmp/` is ignored by git) or `... node ace test functional --files=<name>.spec.ts` with a shorter timeout. Every platform test run asks the human, who reads the command.
 - Never run a platform suite while another agent's or the user's suite is running on this PostgreSQL. `setup_roles.spec.ts` and `role_guard.spec.ts` create, alter and drop fixed cluster-wide `td_probe_*` roles, and `setup_roles.spec.ts` runs `psql` as a subprocess; `DB_DATABASE` and `PORT` do not isolate any of that, so two suites at once delete each other's probe roles and fail. Ask the human before a full run.
 - If a run fails as if `TURNSTILE_SECRET_KEY`, `STOREFRONT_SERVER_KEYS`, `TRUST_PROXY` or `ALERT_EMAILS` were set in the shell (they beat `.env.test`), tell the human: you cannot unset them for opencode.
 - A spec that imports a missing module makes Japa hang instead of failing, and a hung Japa ignores TERM: always run under `timeout -s KILL <seconds>` (as [testing](../apps/platform/docs/testing.md) says) and read the log's `Tests` line (`rg -n "Tests" <log>`), not the exit code.
