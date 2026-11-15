@@ -41,22 +41,20 @@ const TYPE_COPY: Record<string, { title: string; description: string }> = {
 	},
 };
 
-/**
- * The package a type suggests, as the server's `packageForTenantType`
- * (#modules/packages/packages): an independent artist Solo, a studio Studio.
- */
-const suggestedPackage = (type: string) =>
-	type === "independent" ? "solo" : "studio";
-
 export default function CreateTenant({
 	tenantTypes,
 	packages,
+	suggestedPackages,
+	trialDays,
 	timezones,
 	defaultTimezone,
 	addressHost,
 }: {
 	tenantTypes: string[];
 	packages: { value: string; name: string; line: string }[];
+	/** The package each type suggests (the server's `packageForTenantType`). */
+	suggestedPackages: Record<string, string>;
+	trialDays: number;
 	timezones: string[];
 	defaultTimezone: string;
 	addressHost: AddressHost;
@@ -67,7 +65,7 @@ export default function CreateTenant({
 	const [slugTouched, setSlugTouched] = useState(false);
 	const [type, setType] = useState(tenantTypes[0]);
 	// The package follows the type until the user picks one themselves.
-	const [pkg, setPkg] = useState(suggestedPackage(tenantTypes[0]));
+	const [pkg, setPkg] = useState(suggestedPackages[tenantTypes[0]]);
 	const [pkgTouched, setPkgTouched] = useState(false);
 
 	return (
@@ -116,7 +114,7 @@ export default function CreateTenant({
 								value={type}
 								onValueChange={(value) => {
 									setType(value);
-									if (!pkgTouched) setPkg(suggestedPackage(value));
+									if (!pkgTouched) setPkg(suggestedPackages[value]);
 								}}
 							>
 								{tenantTypes.map((value) => {
@@ -190,7 +188,7 @@ export default function CreateTenant({
 								))}
 							</RadioGroup>
 							<FieldDescription>
-								14 days free, no payment to start.
+								{trialDays} days free, no payment to start.
 							</FieldDescription>
 							{errors.package && <FieldError>{errors.package}</FieldError>}
 						</FieldSet>
