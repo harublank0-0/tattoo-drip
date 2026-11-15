@@ -2167,6 +2167,102 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restorePhoto']>>>
     }
   }
+  'admin.reports': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/reports'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['reports']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['reports']>>>
+    }
+  }
+  'admin.reviews.takedown': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/takedown'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownReview']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownReview']>>>
+    }
+  }
+  'admin.reviews.restore': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restoreReview']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restoreReview']>>>
+    }
+  }
+  'admin.reviews.dismiss': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/dismiss'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['dismiss']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['dismiss']>>>
+    }
+  }
+  'admin.reviews.reply.takedown': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/reply/takedown'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownReply']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownReply']>>>
+    }
+  }
+  'admin.reviews.reply.restore': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/reply/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restoreReply']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restoreReply']>>>
+    }
+  }
+  'admin.posts.takedown': {
+    methods: ["POST"]
+    pattern: '/admin/posts/:id/takedown'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownPost']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownPost']>>>
+    }
+  }
+  'admin.posts.restore': {
+    methods: ["POST"]
+    pattern: '/admin/posts/:id/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restorePost']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restorePost']>>>
+    }
+  }
   'admin.billing': {
     methods: ["GET","HEAD"]
     pattern: '/admin/billing'

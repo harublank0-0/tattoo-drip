@@ -6,6 +6,7 @@
 export const controllers = {
   Account: () => import('#controllers/account_controller'),
   Admin: () => import('#controllers/admin_controller'),
+  AdminReviews: () => import('#controllers/admin_reviews_controller'),
   AdminStudios: () => import('#controllers/admin_studios_controller'),
   Alerts: () => import('#controllers/alerts_controller'),
   ArtistDiscover: () => import('#controllers/artist_discover_controller'),

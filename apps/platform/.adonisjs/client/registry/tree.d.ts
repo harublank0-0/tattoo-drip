@@ -325,6 +325,20 @@ export interface ApiDefinition {
         restore: typeof routes['admin.studios.photos.restore']
       }
     }
+    reports: typeof routes['admin.reports']
+    reviews: {
+      takedown: typeof routes['admin.reviews.takedown']
+      restore: typeof routes['admin.reviews.restore']
+      dismiss: typeof routes['admin.reviews.dismiss']
+      reply: {
+        takedown: typeof routes['admin.reviews.reply.takedown']
+        restore: typeof routes['admin.reviews.reply.restore']
+      }
+    }
+    posts: {
+      takedown: typeof routes['admin.posts.takedown']
+      restore: typeof routes['admin.posts.restore']
+    }
     billing: typeof routes['admin.billing'] & {
       endAccess: typeof routes['admin.billing.end_access']
     }

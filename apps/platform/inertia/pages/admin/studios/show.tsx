@@ -1,6 +1,11 @@
 import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
+import {
+	KeepItUp,
+	LiftItemTakedown,
+	ReviewTakedownForm,
+} from "~/components/admin_moderation";
 import AdminNav from "~/components/admin_nav";
 import Page from "~/components/page";
 import Section from "~/components/section";
@@ -67,6 +72,7 @@ export default function AdminStudio({
 	hasMore,
 	truncated,
 	reports,
+	takedownReasons,
 }: Props) {
 	return (
 		<Page
@@ -130,8 +136,12 @@ export default function AdminStudio({
 			</Section>
 
 			<Section title="Reviews and Fresh ink">
-				<ItemList title="Taken down" items={takenDown} />
-				<ItemList title="Live" items={live} />
+				<ItemList
+					title="Taken down"
+					items={takenDown}
+					reasons={takedownReasons}
+				/>
+				<ItemList title="Live" items={live} reasons={takedownReasons} />
 				{hasMore && (
 					<Link
 						href={`${urlFor("admin.studios.show", { slug: studio.slug })}?more=1`}
@@ -166,6 +176,14 @@ export default function AdminStudio({
 									Reported {report.reportedText} for {report.reason}
 									{report.note ? `: ${report.note}` : ""}
 								</span>
+								<ReviewTakedownForm
+									kind="review"
+									id={report.reviewId}
+									idPrefix={`report-${report.reviewId}`}
+									reasons={takedownReasons}
+									defaultReason={report.reason}
+								/>
+								<KeepItUp reviewId={report.reviewId} />
 							</li>
 						))}
 					</ul>
@@ -260,7 +278,15 @@ function LiftTakedown({ target }: { target: Target }) {
 	);
 }
 
-function ItemList({ title, items }: { title: string; items: Item[] }) {
+function ItemList({
+	title,
+	items,
+	reasons,
+}: {
+	title: string;
+	items: Item[];
+	reasons: string[];
+}) {
 	return (
 		<div className="flex flex-col gap-2">
 			<h3 className="text-sm font-medium">{title}</h3>
@@ -285,6 +311,16 @@ function ItemList({ title, items }: { title: string; items: Item[] }) {
 									Taken down {item.takedown.atText} ({item.takedown.reason})
 									{item.takedown.note ? `: ${item.takedown.note}` : ""}
 								</span>
+							)}
+							{item.takedown ? (
+								<LiftItemTakedown kind={item.kind} id={item.id} />
+							) : (
+								<ReviewTakedownForm
+									kind={item.kind}
+									id={item.id}
+									idPrefix={`item-${item.kind}-${item.id}`}
+									reasons={reasons}
+								/>
 							)}
 						</li>
 					))}

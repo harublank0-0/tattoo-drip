@@ -926,6 +926,39 @@ router
 			])
 			.as("admin.studios.photos.restore");
 		router
+			.get("reports", [controllers.AdminReviews, "reports"])
+			.as("admin.reports");
+		router
+			.post("reviews/:id/takedown", [
+				controllers.AdminReviews,
+				"takedownReview",
+			])
+			.as("admin.reviews.takedown");
+		router
+			.post("reviews/:id/restore", [controllers.AdminReviews, "restoreReview"])
+			.as("admin.reviews.restore");
+		router
+			.post("reviews/:id/dismiss", [controllers.AdminReviews, "dismiss"])
+			.as("admin.reviews.dismiss");
+		router
+			.post("reviews/:id/reply/takedown", [
+				controllers.AdminReviews,
+				"takedownReply",
+			])
+			.as("admin.reviews.reply.takedown");
+		router
+			.post("reviews/:id/reply/restore", [
+				controllers.AdminReviews,
+				"restoreReply",
+			])
+			.as("admin.reviews.reply.restore");
+		router
+			.post("posts/:id/takedown", [controllers.AdminReviews, "takedownPost"])
+			.as("admin.posts.takedown");
+		router
+			.post("posts/:id/restore", [controllers.AdminReviews, "restorePost"])
+			.as("admin.posts.restore");
+		router
 			.get("billing", [controllers.Admin, "billingIndex"])
 			.as("admin.billing");
 		router
