@@ -30,6 +30,7 @@ import BillingSubscription, {
 import { PLAN_CATALOGUE } from "#modules/billing/plans";
 import BillingReviewMail from "#modules/notifications/emails/billing_review_mail";
 import { bundleIdsByKey } from "#modules/packages/bundles";
+import type { PackageKey } from "#modules/packages/packages";
 import type Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -66,6 +67,15 @@ const REVERSED_TEXT: Record<ReversedStatus, string> = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** What the studio's Billing page shows. */
+/** One paid period as packages read it (BillingService.paidCoverage). */
+export type PaidCoverage = {
+	startsAt: DateTime;
+	endsAt: DateTime;
+	revokedAt: DateTime | null;
+	package: PackageKey | null;
+	allowanceBundleId: string | null;
+};
+
 export type BillingOverview = {
 	configured: boolean;
 	mode: "sandbox" | "live" | null;
@@ -193,6 +203,43 @@ export default class BillingService {
 			.where("livemode", mode === "live")
 			.whereNotIn("status", ENDED_STATUSES as SubscriptionStatus[])
 			.first();
+	}
+
+	/**
+	 * Every access period of the studio in the active mode (none without
+	 * one), with the package and allowance bundle its plan sells: null for
+	 * a period granted before plans recorded it. What the packages module's
+	 * EntitlementService reads.
+	 */
+	async paidCoverage(tenant: TenantRef): Promise<PaidCoverage[]> {
+		const mode = this.activeMode();
+		if (!mode) return [];
+		const periods = await BillingAccessPeriod.query()
+			.where("tenant_id", tenant.id)
+			.where("livemode", mode === "live");
+		const planIds = [
+			...new Set(
+				periods
+					.map((period) => period.planId)
+					.filter((id): id is string => id !== null),
+			),
+		];
+		const plans = new Map(
+			(planIds.length > 0
+				? await BillingPlan.query().whereIn("id", planIds)
+				: []
+			).map((plan) => [plan.id, plan]),
+		);
+		return periods.map((period) => {
+			const plan = period.planId ? plans.get(period.planId) : undefined;
+			return {
+				startsAt: period.startsAt,
+				endsAt: period.endsAt,
+				revokedAt: period.revokedAt,
+				package: plan?.package ?? null,
+				allowanceBundleId: plan?.allowanceBundleId ?? null,
+			};
+		});
 	}
 
 	/** The live subscription in the active mode, else that mode's latest one. */
