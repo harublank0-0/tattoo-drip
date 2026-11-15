@@ -11,6 +11,7 @@ import Client from "#modules/clients/models/client";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
 import InventoryItem from "#modules/inventory/models/inventory_item";
+import type { PackageKey } from "#modules/packages/packages";
 import PaymentMethod from "#modules/payments/models/payment_method";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ProjectSession from "#modules/scheduling/models/project_session";
@@ -52,6 +53,8 @@ const cascade = (): LucidModel[] => [
  */
 export default class Tenant extends compose(TenantSchema, withSoftDeletes) {
 	declare type: TenantType;
+	/** The package the trial runs on, chosen at signup; null when none was (the type suggests one). */
+	declare selectedPackage: PackageKey | null;
 
 	@hasMany(() => TenantMembership)
 	declare memberships: HasMany<typeof TenantMembership>;

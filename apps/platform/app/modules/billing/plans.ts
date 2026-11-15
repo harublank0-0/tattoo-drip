@@ -1,4 +1,5 @@
 import type { IntervalUnit } from "#modules/billing/models/billing_plan";
+import type { PackageKey } from "#modules/packages/packages";
 
 /**
  * TattooDrip's paid plans for studios, in paisa (docs/payments-paybridgenp.md).
@@ -16,6 +17,10 @@ export type CataloguePlan = {
 	intervalUnit: IntervalUnit;
 	intervalCount: number;
 	trialDays: number;
+	/** The package the plan sells. */
+	package: PackageKey;
+	/** The allowance bundle it gives (`allowance_bundles.key`). */
+	bundleKey: string;
 };
 
 export const PLAN_CATALOGUE: readonly CataloguePlan[] = [
@@ -26,6 +31,8 @@ export const PLAN_CATALOGUE: readonly CataloguePlan[] = [
 		intervalUnit: "month",
 		intervalCount: 1,
 		trialDays: 0,
+		package: "studio",
+		bundleKey: "studio-v1",
 	},
 	{
 		code: "studio-yearly",
@@ -34,6 +41,8 @@ export const PLAN_CATALOGUE: readonly CataloguePlan[] = [
 		intervalUnit: "year",
 		intervalCount: 1,
 		trialDays: 0,
+		package: "studio",
+		bundleKey: "studio-v1",
 	},
 ];
 

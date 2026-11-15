@@ -19,6 +19,7 @@ type Props = {
 		planName: string | null;
 		statusText: string;
 		accessText: string;
+		packageText: string;
 	}[];
 	invoices: {
 		id: string;
@@ -96,7 +97,12 @@ export default function AdminBilling({
 										{studio.planName ?? "No plan"} · {studio.statusText}
 									</span>
 								</span>
-								<span>{studio.accessText}</span>
+								<span className="text-right">
+									<span className="block">{studio.packageText}</span>
+									<span className="block text-muted-foreground">
+										{studio.accessText}
+									</span>
+								</span>
 							</li>
 						))}
 					</ul>

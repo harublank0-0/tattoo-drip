@@ -3,6 +3,7 @@ import type { FieldContext } from "@vinejs/vine/types";
 import { IANAZone } from "luxon";
 import { IMAGE_FORMAT_MESSAGE } from "#modules/media/errors";
 import { imageFile } from "#modules/media/validators/image_file";
+import { PACKAGE_KEYS } from "#modules/packages/packages";
 import {
 	CLAIMED_FLASH_CHOICES,
 	DARK_PAPER,
@@ -120,6 +121,8 @@ export const createTenantValidator = vine.create({
 	type: vine.enum(TENANT_TYPES),
 	slug: vine.string().trim().use(tenantSlug()),
 	timezone: vine.string().trim().use(ianaTimezone()),
+	/** The package the trial runs on; without one, the type suggests it. */
+	package: vine.enum(PACKAGE_KEYS).optional(),
 });
 
 /**

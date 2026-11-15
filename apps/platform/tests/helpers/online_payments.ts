@@ -5,6 +5,7 @@ import BillingCustomer from "#modules/billing/models/billing_customer";
 import BillingInvoice from "#modules/billing/models/billing_invoice";
 import BillingPlan from "#modules/billing/models/billing_plan";
 import BillingSubscription from "#modules/billing/models/billing_subscription";
+import { bundleIdsByKey } from "#modules/packages/bundles";
 import GatewayAccount from "#modules/payments/models/gateway_account";
 import GatewayCheckout from "#modules/payments/models/gateway_checkout";
 import GatewayPayment from "#modules/payments/models/gateway_payment";
@@ -31,6 +32,9 @@ export function livePlans() {
 
 async function catalogPlans(livemode: boolean) {
 	const plans: BillingPlan[] = [];
+	const studioBundle = (await bundleIdsByKey(["studio-v1"])).get(
+		"studio-v1",
+	) as string;
 	for (const [code, amount, unit] of [
 		["studio-monthly", 250_000, "month"],
 		["studio-yearly", 2_500_000, "year"],
@@ -63,6 +67,8 @@ async function catalogPlans(livemode: boolean) {
 			livemode,
 			providerPlanId,
 			active: true,
+			package: "studio" as const,
+			allowanceBundleId: studioBundle,
 		};
 		plans.push(
 			existing

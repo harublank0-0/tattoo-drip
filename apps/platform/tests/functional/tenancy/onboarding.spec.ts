@@ -72,6 +72,62 @@ test.group("Onboarding", (group) => {
 		assert.equal(membership.role, "owner");
 	});
 
+	test("the form offers both packages with their lines", async ({
+		client,
+		assert,
+	}) => {
+		const user = await makeUser();
+		const page = await client.get("/onboarding").loginAs(user).withInertia();
+		page.assertStatus(200);
+		assert.deepEqual(page.inertiaProps.packages, [
+			{
+				value: "solo",
+				name: "Solo",
+				line: "One artist, with help running the business.",
+			},
+			{
+				value: "studio",
+				name: "Studio",
+				line: "Multiple artists working together.",
+			},
+		]);
+	});
+
+	test("the chosen package is stored", async ({ client, assert }) => {
+		const user = await makeUser();
+		(
+			await client
+				.post("/onboarding")
+				.form({ ...validTenant, type: "studio", package: "solo" })
+				.withCsrfToken()
+				.loginAs(user)
+				.redirects(0)
+		).assertStatus(302);
+		const tenant = await inUser(user, () =>
+			Tenant.findByOrFail("slug", "black-needle"),
+		);
+		assert.equal(tenant.selectedPackage, "solo");
+	});
+
+	test("without a choice the type suggests the package", async ({
+		client,
+		assert,
+	}) => {
+		const user = await makeUser();
+		(
+			await client
+				.post("/onboarding")
+				.form({ ...validTenant, type: "independent" })
+				.withCsrfToken()
+				.loginAs(user)
+				.redirects(0)
+		).assertStatus(302);
+		const tenant = await inUser(user, () =>
+			Tenant.findByOrFail("slug", "black-needle"),
+		);
+		assert.equal(tenant.selectedPackage, "solo");
+	});
+
 	test("an independent artist's new tenant comes with their profile", async ({
 		client,
 		assert,
@@ -128,6 +184,7 @@ test.group("Onboarding", (group) => {
 		["slug", "Kat"],
 		["timezone", "Mars/Olympus_Mons"],
 		["type", "agency"],
+		["package", "premium"],
 		["name", ""],
 	] as const) {
 		test(`rejects ${field} = "${value}"`, async ({ client, assert }) => {

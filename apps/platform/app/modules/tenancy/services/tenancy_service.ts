@@ -4,6 +4,10 @@ import User from "#models/user";
 import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import {
+	type PackageKey,
+	packageForTenantType,
+} from "#modules/packages/packages";
+import {
 	type ClaimedFlash,
 	type FontKey,
 	LOGO_TILE_COLOURS,
@@ -66,6 +70,8 @@ export type NewTenant = {
 	name: string;
 	slug: string;
 	timezone: string;
+	/** The package the trial runs on; the type's suggestion when not chosen. */
+	package?: PackageKey;
 };
 
 /**
@@ -165,7 +171,15 @@ export default class TenancyService {
 			const { rows } = await dbClient().rawQuery("select uuidv7() as id");
 			const id: string = rows[0].id;
 			return await withDbContext({ tenantId: id }, async (trx) => {
-				const tenant = await Tenant.create({ id, ...input }, { client: trx });
+				const { package: chosen, ...fields } = input;
+				const tenant = await Tenant.create(
+					{
+						id,
+						...fields,
+						selectedPackage: chosen ?? packageForTenantType(input.type),
+					},
+					{ client: trx },
+				);
 				await TenantMembership.create(
 					{ tenantId: tenant.id, userId: owner.id, role: "owner" },
 					{ client: trx },

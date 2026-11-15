@@ -21,6 +21,8 @@ const EXEMPT: Record<string, string> = {
 		"platform reference data (Discover D02): the cities a studio can name, the same for everyone; the app role may only read it",
 	billing_plans:
 		"platform reference data: TattooDrip's own plan catalogue, mirrored to PayBridgeNP (docs/payments-paybridgenp.md); no studio's data",
+	allowance_bundles:
+		"platform reference data: TattooDrip's versioned package allowances; no studio's data",
 	adonis_schema: "migration bookkeeping",
 	adonis_schema_versions: "migration bookkeeping",
 };
@@ -42,6 +44,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 		"tenant_isolation:ALL",
 	],
 	billing_access_periods: ["tenant_isolation:ALL"],
+	pilot_grants: ["tenant_isolation:ALL"],
 	billing_customers: ["tenant_isolation:ALL"],
 	billing_events: ["tenant_isolation:ALL"],
 	billing_invoices: ["tenant_isolation:ALL"],
@@ -128,6 +131,11 @@ const DEFINER_FUNCTIONS: Record<string, { args: string; reason: string }> = {
 		args: "",
 		reason:
 			"the ids of live studios with a billing customer, for the reconciliation job and the admin Billing page, each read in its own context",
+	},
+	"public.package_tenants": {
+		args: "",
+		reason:
+			"the ids of every live studio, for the admin Billing page's package states (studio packages), each read in its own context",
 	},
 	"public.gateway_account_tenants": {
 		args: "",
