@@ -8,17 +8,17 @@
 
 **Tech Stack:** AdonisJS 7, Lucid on PostgreSQL 18 (row-level security), VineJS, Inertia + React, Japa.
 
-**Spec:** `docs/superpowers/specs/2026-11-15-studio-packages-design.md` (rulings 3, 4, 6, 11a; Design: Archiving artists, Gating, Enforcement switch; phase 2 of Phases).
+**Spec:** `docs/superpowers/specs/2026-11-15-studio-packages-design.md` (rulings 3, 4, 6, 11; Design: Archiving artists, Gating, Enforcement switch; phase 2 of Phases).
 
 ## Global Constraints
 
-- Branch `feat/studio-packages-phase-2` from `main` at `5e6c63d9` (phase 1 merged). Commit identity `harublank00@gmail.com`.
+- Branch `feat/studio-packages-phase-2` from `main` at `5e6c63d9` (phase 1 merged), with `main` at `645ddd3` (#144) merged in. Commit identity `harublank00@gmail.com`.
 - An **active artist** is a live artist profile (not soft-deleted) that is not archived; hidden artists are active (spec ruling 4).
 - **Archived ⇒ hidden:** archiving sets `archived_at = now()` and `visible = false`; the check `artists_archived_hidden` (`archived_at is null or not visible`) makes it impossible to show an archived artist. Restoring clears `archived_at` and leaves the artist hidden; the owner shows them again on purpose. No public read, view or policy changes.
 - **Archived artists stay in `ArtistService.list`** (members finish their projects through it). Only NEW work refuses them: accepting an inquiry for them, assigning them to a project, booking them, a session that assigns them to a project they aren't on, offering their profile in an invitation. Sessions for a project already assigned to them stay allowed (spec: existing projects continue to completion).
 - `PACKAGE_ENFORCEMENT`: `observe` (default, also when unset) logs `"Package rule would refuse"` with `{ tenantId, rule, ... }` at info and allows; `enforce` refuses with `PackageRuleError`. Rules in this phase: `artist_limit` (active artists would exceed `Entitlement.artistLimit`) and `paused` (adding an active artist while the state is `paused`). Both are checked when an artist is created and when one is restored.
 - The gate locks the tenant row (`select 1 from tenants where id = ? for update`) before counting, so concurrent activations in enforce mode serialize.
-- Out of this phase: refusing new client work while over the artist limit (ruling 11a) belongs to phase 3, with the other new-work gates; the downgrade's eligibility check (ruling 11) to phase 4, which will call `ArtistService.countActive`.
+- Out of this phase: the downgrade's eligibility check (ruling 11) belongs to phase 4, which will call `ArtistService.countActive`.
 - Refusal copy: artist limit — `Solo includes one active artist. Archive an artist, or upgrade to Studio.`; paused — `Pay for a package to add an active artist.`.
 - Commands run from `apps/platform`; every new tenant route gets a `TENANT_ROUTE_ROLES` entry (OWNERS), a case in `tests/isolation/cases.ts`, and `node ace codegen`.
 
