@@ -1,6 +1,6 @@
 # Production stack for one server, behind a Cloudflare Tunnel. No service
 # publishes a port: cloudflared reaches nginx over the network below, and
-# nginx reaches web and storefront. Run from the repo root:
+# nginx reaches web, storefront and discover. Run from the repo root:
 #
 #   docker compose -f deploy/compose.yml ...
 #
@@ -147,7 +147,7 @@ services:
   # release plan in docs/discover/domain-migration.md); by hand:
   # docker compose --profile discover up -d discover. nginx's split layout
   # (hosts.split.conf), live since the D11 cutover, sends tattoodrip.app to this
-  # address; the rollback layout (hosts.current.conf) doesn't use it.
+  # address; the old layout (hosts.current.conf, kept as a record) doesn't use it.
   discover:
     profiles: ["discover"]
     build:

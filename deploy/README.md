@@ -297,7 +297,7 @@ git -C /srv/tattoo-drip/app pull --ff-only
 ls /srv/tattoo-drip/app/deploy/env
 ```
 
-**You should see:** the six `*.env.example` templates. If `ls` says there is no such folder, the work is not merged to `main` yet: stop and merge it first.
+**You should see:** the seven `*.env.example` templates. If `ls` says there is no such folder, the work is not merged to `main` yet: stop and merge it first.
 
 Then make the files. The loop never overwrites a file that exists, so running it again is safe:
 
@@ -530,7 +530,7 @@ Run the `grep` of 3.9 again. **You should see:** nothing.
 /srv/tattoo-drip/app/deploy/deploy.sh
 ```
 
-This is the same command for every later update. It refuses to start while the checkout has local changes or a settings file is missing, unreadable or unfinished, and says which file and variable, before it changes anything. Then it fetches `origin/main`, builds the images, starts Postgres (which creates the database and the restricted app role on its first start), runs the migrations, starts the services, waits for web and storefront to be healthy and reloads nginx. Last, it writes the commit it deployed to `/srv/tattoo-drip/deployed` (one line, the full commit id) and deletes the images the build replaced. That file always names the last release that got through every step: a deploy that fails leaves it as it was, although the checkout already sits on the failed commit. Going back (section 5) and a restore (7.5) use it. Until the first deploy succeeds there is no such file.
+This is the same command for every later update. It refuses to start while the checkout has local changes or a settings file is missing, unreadable or unfinished, and says which file and variable, before it changes anything. Then it fetches `origin/main`, builds the images, starts Postgres (which creates the database and the restricted app role on its first start), runs the migrations, starts the services, waits for web, storefront and Discover to be healthy and reloads nginx. Last, it writes the commit it deployed to `/srv/tattoo-drip/deployed` (one line, the full commit id) and deletes the images the build replaced. That file always names the last release that got through every step: a deploy that fails leaves it as it was, although the checkout already sits on the failed commit. Going back (section 5) and a restore (7.5) use it. Until the first deploy succeeds there is no such file.
 
 The first build downloads every dependency and can take 5 to 15 minutes; later ones are faster. Lines that begin with `deploy:` say which step it is on.
 
@@ -539,10 +539,10 @@ The first build downloads every dependency and can take 5 to 15 minutes; later o
 ### 4.4 Look at what is running
 
 ```bash
-docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml --profile discover ps
 ```
 
-**You should see** seven lines. `postgres`, `web` and `storefront` say `Up ... (healthy)`; `worker`, `video-worker` (video angles' transcodes), `nginx` and `cloudflared` say `Up`. Anything saying `Restarting` is crashing: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 50 <name>` says why.
+`--profile discover` makes `ps` include Discover, which `deploy.sh` starts because `discover.env` exists. **You should see** eight lines. `postgres`, `web`, `storefront` and `discover` say `Up ... (healthy)`; `worker`, `video-worker` (video angles' transcodes), `nginx` and `cloudflared` say `Up`. Anything saying `Restarting` is crashing: `docker compose -f /srv/tattoo-drip/app/deploy/compose.yml logs --tail 50 <name>` says why.
 
 ### 4.5 The tunnel and the site
 
@@ -559,11 +559,13 @@ Then, from your computer:
 ```bash
 curl -sI http://app.tattoodrip.app/login | grep -i -E '^(HTTP|location)'
 curl -sI https://app.tattoodrip.app/login | head -1
+curl -s https://tattoodrip.app/healthz; echo
+curl -sI https://tattoodrip.app/login | grep -i -E '^(HTTP|location)'
 curl -s -o /dev/null -w '%{http_code}\n' https://tattoodrip.page/
 curl -s -o /dev/null -w '%{http_code}\n' https://nosuch.tattoodrip.page/
 ```
 
-**You should see:** the first, a redirect (`301`) with `location: https://app.tattoodrip.app/login`; the second, `HTTP/2 200`; the third, `200` (the landing page for a host with no studio); the fourth, `404` (a studio that does not exist).
+**You should see:** the first, a redirect (`301`) with `location: https://app.tattoodrip.app/login`; the second, `HTTP/2 200`; the third, `ok` (Discover on the apex); the fourth, `308` with `location: https://app.tattoodrip.app/login` (the old dashboard address); the fifth, `200` (the landing page for a host with no studio); the sixth, `404` (a studio that does not exist).
 
 ### 4.6 The pilot's account
 
@@ -652,11 +654,11 @@ sudo reboot
 Wait two minutes, log in again, and run:
 
 ```bash
-docker compose -f /srv/tattoo-drip/app/deploy/compose.yml ps
+docker compose -f /srv/tattoo-drip/app/deploy/compose.yml --profile discover ps
 systemctl list-timers tattoo-drip-backup.timer
 ```
 
-**You should see:** the same six containers up (the three with checks `healthy` after a minute), the timer listed with a next run, and the site answering again. Nothing was started by hand.
+**You should see:** the same eight containers up as in 4.4 (`postgres`, `web`, `storefront` and `discover` `healthy` after a minute), the timer listed with a next run, and the site answering again. Nothing was started by hand.
 
 Still at the quiet hour, check that Docker Compose gives a recreated `web` and `storefront` their fixed addresses back (nginx looks for them only there; section 5, "Changing a setting"). The dashboard is down for the half minute `web` takes to start:
 
@@ -708,7 +710,7 @@ If a step fails, `deploy.sh` says which one, what state that leaves (a failed bu
 /srv/tattoo-drip/app/deploy/deploy.sh "$(cat /srv/tattoo-drip/deployed)"
 ```
 
-After a deploy that worked but turned out bad, the file names that bad release; the deploy's own last lines named the one before it ("to go back to the release before"). Any earlier commit works the same way (`git -C /srv/tattoo-drip/app log --oneline origin/main` lists them):
+After a deploy that worked but turned out bad, the file names that bad release; the deploy's own last lines named the one before it ("to go back to the release before"). Any earlier commit works the same way (`git -C /srv/tattoo-drip/app log --oneline origin/main` lists them), but never a commit before the D11 cutover (28bb1cb9); the rollback window is closed ([domain migration](../docs/discover/domain-migration.md), H):
 
 ```bash
 /srv/tattoo-drip/app/deploy/deploy.sh <earlier commit>

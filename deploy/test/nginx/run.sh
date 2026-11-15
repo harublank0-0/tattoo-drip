@@ -6,8 +6,8 @@
 #
 # Three files, one after the other: nginx.conf (production; checked as the layout
 # its include loads, the split one since the D11 cutover), nginx.current.conf
-# (the layout before the cutover: dashboard and API on tattoodrip.app; the
-# rollback's) and nginx.split.conf (app., api., Discover on the apex, legacy
+# (the layout before the cutover: dashboard and API on tattoodrip.app; kept as
+# a record) and nginx.split.conf (app., api., Discover on the apex, legacy
 # redirects; docs/discover/domain-migration.md). LAYOUTS picks some:
 # LAYOUTS=nginx.split.conf bash deploy/test/nginx/run.sh
 #
@@ -101,7 +101,7 @@ check_layout() { # nginx.conf | nginx.current.conf | nginx.split.conf
 		expect_lines 'proxy_set_header X-Discover-Country $discover_country' 1 # D06.5, Discover's location only
 	else
 		upstreams=2
-		expect_lines 'server 172.30.42.13:3000' 0 # the rollback layout never names Discover
+		expect_lines 'server 172.30.42.13:3000' 0 # the old layout never names Discover
 		expect_lines 'proxy_set_header X-Discover-Country $discover_country' 0
 	fi
 	expect_lines 'keepalive_timeout 4s' "$upstreams" # one in each upstream
