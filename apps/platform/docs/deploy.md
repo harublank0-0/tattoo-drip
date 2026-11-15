@@ -10,7 +10,7 @@ Where this setup differs from the general advice below:
 
 - `TRUST_PROXY` is nginx's fixed address (`172.30.42.10`), not Cloudflare's ranges: the tunnel connects from inside the Docker network.
 - nginx replaces `X-Forwarded-For` with the visitor's address instead of appending to it ([Reverse proxy](#reverse-proxy)).
-- The storefront runs on the same server, not on a separate host.
+- The storefront and Discover run on the same server, behind the same nginx, not on separate hosts.
 - Settings live in one file per role in `/srv/tattoo-drip/env/` (templates: `deploy/env/*.env.example`), not in a host's dashboard.
 - Mail is off (`ALERT_EMAILS=false`) until the sending domain exists (TAT-20): accounts are confirmed by hand ([Account email](#account-email)).
 

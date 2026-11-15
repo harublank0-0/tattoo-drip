@@ -29,7 +29,7 @@ media.tattoodrip.app → R2 public bucket (Cloudflare, not through the server)
 - **The API:** cookieless; CORS never allows credentials.
 - **The installed dashboard app:** owners reinstall it from `app.tattoodrip.app`; the apex `/sw.js` unregisters the old worker (E).
 
-### Before the cutover (historical; the rollback layout)
+### Before the cutover (historical)
 
 ```text
 visitor ─TLS─► Cloudflare (Always Use HTTPS, edge certificate)
@@ -62,7 +62,7 @@ The rollback (H) returned to this layout while the rollback window was open; it 
 
 ## C. Configuration reference
 
-| Setting | Where | Before D11 (the rollback's) | Live (since D11) | Purpose |
+| Setting | Where | Before D11 | Live (since D11) | Purpose |
 |---|---|---|---|---|
 | `APP_URL` | platform | `https://tattoodrip.app` | `https://app.tattoodrip.app` | Studio OS origin. Email links (confirmation, reset, invitation, alerts) are built from it. There are no OAuth callbacks; auth redirects are relative paths |
 | `API_URL` (new, optional) | platform | unset | `https://api.tattoodrip.app` | The API's origin. When its host differs from `APP_URL`'s, that host serves `/api` only (`ApiHostMiddleware`) |
@@ -133,12 +133,12 @@ This rehearsal was run for D01; see "J. D01 verification" below.
   - There is no session handoff, and no cookie is widened to `Domain=tattoodrip.app`. That would expose sessions to Discover and every subdomain.
   - Announce the sign-in in advance.
 - **CSRF.** The `XSRF-TOKEN` cookie and the session are per host. A dashboard tab opened before the cutover:
-  - its next write is redirected by the 307 to `app.` without the session, and fails with "Invalid or expired CSRF token", then the sign-in page;
-  - its Inertia navigations become cross-origin redirects, which fail until the tab is reloaded.
+  - its next write was redirected by the apex redirect (307 at the cutover) to `app.` without the session, and failed with "Invalid or expired CSRF token", then showed the sign-in page;
+  - its Inertia navigations became cross-origin redirects, which failed until the tab was reloaded.
   - Expected; covered by the announcement.
 - **Email links already sent:**
   - Confirmation (24 h), reset (60 min) and invitation (7 days) links point at `tattoodrip.app/...`.
-  - The apex 307 sends them, token included, to the same path on `app.`, which stages the token in its own session as today.
+  - The apex redirect (307 during the rollback window, 308 since) sent them, token included, to the same path on `app.`, which stages the token in its own session as before.
   - The token is never logged: the `$loggable` map in `common.conf` covers every host.
 - **Installed app (PWA).**
   - Its `start_url` `/dashboard` on the apex is redirected to `app.`, which is outside the installed scope, so it opens with browser chrome.
@@ -152,7 +152,7 @@ This rehearsal was run for D01; see "J. D01 verification" below.
 
 | Old address (`tattoodrip.app`) | After D11 | Why |
 |---|---|---|
-| `/login`, `/logout`, `/signup[/…]`, `/forgot-password[/…]`, `/reset-password[/…]`, `/verify-email[/…]`, `/confirm-email`, `/invitations[/…]`, `/dashboard`, `/onboarding`, `/account[/…]`, `/t/*` | **307** (live) to `https://app.tattoodrip.app` + same path and query | Bookmarks, emailed links, the installed app. 307 keeps the method and body and is not cached for good, so a rollback is not stuck behind it. Switch to 308 when the rollback window closes (**pending**: the window is open) |
+| `/login`, `/logout`, `/signup[/…]`, `/forgot-password[/…]`, `/reset-password[/…]`, `/verify-email[/…]`, `/confirm-email`, `/invitations[/…]`, `/dashboard`, `/onboarding`, `/account[/…]`, `/t/*` | **308** to `https://app.tattoodrip.app` + same path and query | Bookmarks, emailed links, the installed app. 308 is permanent and keeps the method and body. It was 307 (not cached for good) during the rollback window, which closed with no rollback |
 | `/api`, `/api/*` | **Proxied** to web (Host `tattoodrip.app`, which the platform answers as an API-only host) | Pages cached with the old dehydrated `apiUrl`, and any SDK user. A redirected multipart POST or preflight is not reliably followed. **Retire** after ≥30 days without traffic in the nginx log |
 | `/sw.js` | Unregistering worker (nginx) | Removes the dashboard's worker from the apex |
 | `/assets/*`, `/uploads/*`, `/files/*`, `/manifest.webmanifest`, `/icons/*`, `/offline.html` | **Discover's** (not redirected) | Vite serves Discover's build at `/assets/`; R2 serves photos in production; the old shell files only matter to the retired worker |
@@ -348,13 +348,13 @@ Run in a cloud workspace: Docker 29 with Compose 5, the production images built 
 
 | Check | Result |
 |---|---|
-| Stage B: `deploy.sh` with the live values and `discover.env` | Pass: fresh database, every migration (`Migrated in` under 1 s), Discover healthy beside web and storefront, apex still the dashboard, `app.`/`api.` closed, Discover rendering inside the stack with the key |
+| Stage B: `deploy.sh` with the pre-cutover values and `discover.env` | Pass: fresh database, every migration (`Migrated in` under 1 s), Discover healthy beside web and storefront, apex still the dashboard, `app.`/`api.` closed, Discover rendering inside the stack with the key |
 | Guard: split-layout commit without `discover.env` | Refused before any change; release record unchanged |
 | Stage D: the split-layout commit with the D11 values | Pass: all healthy; `deploy/test/launch-smoke.mjs` 31/31 (indexing off) and 31/31 (indexing on) |
 | Browser journeys through the edge | 20/20: home → directory → studio → booking form with `ref`; gallery → artwork → artist → `/book?artist=`; Sign in → Studio OS; sign up, `account:verify`, sign in, host-only `__Host-td-session` (Secure, HttpOnly, Lax) on `app.` only, onboarding write (CSRF), the new studio's `*.tattoodrip.page`, sign out; an old apex `/forgot-password` → `app.`; no console errors, no request to an internal address |
 | Database boundary on the production image, as the app role | No superuser or BYPASSRLS on either role; the discovery role can't log in; with no tenant context the app role sees 0 tenants, artists, inquiries and users; a private column through a view is "does not exist"; writes to a view are refused; `SET ROLE tattoo_drip_discovery` is refused; only the listed studio and its photos come through the views (unlisted and taken-down studios never) |
 | Upgrade from the last release before Discover (`e3d3114`, its own image and migrations, 40 businesses, 120 artists, 480 photos) | Without `setup_roles.sql` the views migration refuses (old release keeps running); after it, the rest apply in 162 ms; rows preserved; no business listed, nothing on Discover until consent; the pre-Discover code serves sign-in and the studio API on the upgraded schema (rollback-safe) |
-| Rollback: `deploy.sh <previous>` with the live values | Pass: apex dashboard again, `app.`/`api.` closed, studio pages and the apex API working |
+| Rollback: `deploy.sh <previous>` with the pre-cutover values | Pass: apex dashboard again, `app.`/`api.` closed, studio pages and the apex API working |
 | Operations | Discover restarts after its process is killed (healthy in ~8 s); `SIGTERM` stops it gracefully (~1 s, exit 0); no service publishes a port but the rehearsal's own; containers run as `node`; failed API reads log one line each |
 | `deploy/test/nginx/run.sh` | Both layouts: 183 checks pass |
 | Platform suite (Postgres 18) | 3645 passed |

@@ -125,6 +125,7 @@ Which role may use each dashboard route is one table (`TENANT_ROUTE_ROLES`), rea
 | Part | Where |
 |---|---|
 | Storefront | A container on the one server, behind nginx and a Cloudflare Tunnel, for `tattoodrip.page` and `*.tattoodrip.page` ([server runbook](../deploy/README.md)) |
+| Discover | A container on the same server, behind nginx, for `tattoodrip.app` since the Discover cutover ([domain migration](discover/domain-migration.md)) |
 | Platform web + worker | Containers on the same server; the dashboard on `app.tattoodrip.app` and the API on `api.tattoodrip.app` since the Discover cutover ([domain migration](discover/domain-migration.md)) |
 | PostgreSQL | A container on the same server, with nightly backups to R2 |
 | Files | Cloudflare R2 (S3 API, no egress fees) + CDN (`media.tattoodrip.app`) |

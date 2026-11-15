@@ -470,7 +470,7 @@ Deployed on `tattoodrip.app` since the D11 cutover ([domain migration](domain-mi
 
 - `Dockerfile` target `discover`, with its own build stage, so the platform and storefront images build as before.
 - `deploy/compose.yml` service `discover` at `172.30.42.13` (the address `hosts.split.conf`'s upstream names), behind the `discover` profile: a plain `up` doesn't start it. Settings: `deploy/env/discover.env.example`.
-- Health: `/healthz` answers 200 (it reads no API data; see "Health and logs" above). Missing or malformed settings make every request a 500 with the variables named in the log, so the health check fails.
+- Health: `/healthz` answers 200 (it reads no API data; see "Health and logs" above). Missing or malformed settings stop the server at startup (`src/server/startup.ts`) with the variables named in the log (never a value), so the container shows as a restart loop, never as healthy.
 - Hostname routing is nginx's: Discover only on the apex, with the legacy paths redirected ([domain migration](domain-migration.md)). Discover never registers a service worker.
 
 ## Deferred
