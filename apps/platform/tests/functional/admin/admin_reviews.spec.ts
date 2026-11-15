@@ -103,12 +103,21 @@ test.group("Admin reviews", (group) => {
 			a.clientReview.id,
 		);
 
-		// Taking it down again is a no-op that keeps the first takedown's time.
+		// Taking it down again succeeds: the first takedown's time stays, the
+		// reason and note are replaced.
 		const again = await send(client, admin, "post", `${base}/takedown`, {
-			reason: "rude",
+			reason: "other",
+			note: "Second look",
 		});
 		again.assertStatus(302);
-		assert.isNull(again.flashMessage("error") ?? null);
+		again.assertFlashMessage(
+			"success",
+			"The review is off every public surface.",
+		);
+		const repeated = await reviewOf(a);
+		assert.equal(repeated.takenDownAt?.toMillis(), row.takenDownAt?.toMillis());
+		assert.equal(repeated.takedownReason, "other");
+		assert.equal(repeated.takedownNote, "Second look");
 
 		const up = await send(client, admin, "post", `${base}/restore`);
 		up.assertStatus(302);
