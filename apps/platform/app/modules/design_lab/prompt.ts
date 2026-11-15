@@ -14,9 +14,12 @@
  * leave out ("No human body, no skin…"); FLUX does not take negative
  * prompts, so both primed a limb-shaped outline (seen in the first live
  * FLUX.2 [pro] run). v2 says only what to draw: the placement becomes the
- * artwork's shape, and the sheet is described positively.
+ * artwork's shape, and the sheet is described positively. Its "tapers
+ * gently" and "the design's own linework forms its outer edge" still drew a
+ * closed, tapered border (the second live run), so v3 names a composition
+ * only and lets the elements fade into open paper.
  */
-export const PROMPT_VERSION = "tattoo-concept-v2";
+export const PROMPT_VERSION = "tattoo-concept-v3";
 export const PROMPT_VERSIONS = [
 	"tattoo-concept-v1",
 	"tattoo-concept-v2",
@@ -126,67 +129,79 @@ export const DETAIL_KEYS = Object.keys(DETAIL_LEVELS) as DetailKey[];
  * for a body, skin or a mockup.
  */
 export const BODY_AREAS = {
-	any: { label: "Not decided", phrase: "", shape: "" },
+	any: { label: "Not decided", phrase: "", shape: "", layout: "" },
 	forearm: {
 		label: "Forearm",
 		phrase: "a long, narrow forearm placement",
 		shape:
 			"a tall, narrow vertical design that tapers gently, with open, natural edges",
+		layout: "a tall, narrow vertical composition",
 	},
 	upper_arm: {
 		label: "Upper arm",
 		phrase: "an upper arm placement",
 		shape: "a medium vertical design with a balanced, oval silhouette",
+		layout: "a medium vertical composition",
 	},
 	shoulder: {
 		label: "Shoulder",
 		phrase: "a rounded shoulder placement",
 		shape: "a rounded, dome-shaped design",
+		layout: "a rounded, compact composition",
 	},
 	chest: {
 		label: "Chest",
 		phrase: "a wide chest placement",
 		shape: "a wide, symmetrical design balanced along a horizontal axis",
+		layout: "a wide, symmetrical horizontal composition",
 	},
 	back: {
 		label: "Back",
 		phrase: "a large back placement",
 		shape: "a large, detailed design built around a strong central axis",
+		layout: "a large, detailed composition built around a central axis",
 	},
 	ribs: {
 		label: "Ribs",
 		phrase: "a tall rib placement",
 		shape: "a tall, slender vertical design",
+		layout: "a tall, slender vertical composition",
 	},
 	thigh: {
 		label: "Thigh",
 		phrase: "a thigh placement",
 		shape: "a large vertical design with a broad, flowing outline",
+		layout: "a large vertical composition",
 	},
 	calf: {
 		label: "Calf",
 		phrase: "a calf placement",
 		shape: "a tall vertical design with a flowing outline",
+		layout: "a tall vertical composition",
 	},
 	hand: {
 		label: "Hand",
 		phrase: "a small hand placement",
 		shape: "a small, compact design with bold, simple shapes",
+		layout: "a small, compact composition with bold, simple shapes",
 	},
 	neck: {
 		label: "Neck",
 		phrase: "a small neck placement",
 		shape: "a small, compact design with bold, simple shapes",
+		layout: "a small, compact composition with bold, simple shapes",
 	},
 	ankle: {
 		label: "Ankle",
 		phrase: "a small ankle placement",
 		shape: "a small design that reads clearly at a small size",
+		layout: "a small composition that reads clearly at a small size",
 	},
 	wrist: {
 		label: "Wrist",
 		phrase: "a small wrist placement",
 		shape: "a small, compact design that reads clearly at a small size",
+		layout: "a small composition that reads clearly at a small size",
 	},
 } as const;
 export type BodyAreaKey = keyof typeof BODY_AREAS;
@@ -308,7 +323,9 @@ export function buildPrompt(
 	inputs: GenerationInputs,
 	version: string = PROMPT_VERSION,
 ): string {
-	return version === "tattoo-concept-v1" ? promptV1(inputs) : promptV2(inputs);
+	if (version === "tattoo-concept-v1") return promptV1(inputs);
+	if (version === "tattoo-concept-v2") return promptV2(inputs);
+	return promptV3(inputs);
 }
 
 const styleOf = (inputs: GenerationInputs) =>
@@ -324,7 +341,32 @@ const letteringOf = (inputs: GenerationInputs) =>
 const sentences = (parts: (string | null)[]) =>
 	`${parts.filter((part): part is string => Boolean(part)).join(". ")}.`;
 
-/** tattoo-concept-v2: only what to draw, the placement as the artwork's shape. */
+/**
+ * tattoo-concept-v3: only what to draw; the placement is a composition (never
+ * a shape with an edge), and the elements fade into open white paper.
+ */
+function promptV3(inputs: GenerationInputs): string {
+	return sentences([
+		`A single original tattoo design, ${styleOf(inputs)}`,
+		inputs.subject ? `Subject: ${fragment(inputs.subject)}` : null,
+		`Concept: ${fragment(inputs.concept)}`,
+		letteringOf(inputs),
+		PALETTES[inputs.palette].phrase,
+		ORIENTATIONS[inputs.orientation].phrase,
+		DETAIL_LEVELS[inputs.detail].phrase,
+		inputs.bodyArea !== "any"
+			? `Laid out as ${BODY_AREAS[inputs.bodyArea].layout}`
+			: null,
+		"Drawn as flat ink artwork on a plain white sheet of paper, with generous white space all around",
+		"A free-standing design whose elements fade into the open white paper, giving it an organic, irregular silhouette",
+		"Clear, legible linework and balanced negative space, presented as a design sheet for a tattoo artist to review",
+		inputs.style === "lettering"
+			? "The requested lettering is the only text"
+			: "Purely pictorial artwork",
+	]);
+}
+
+/** tattoo-concept-v2, kept so generations made with it still show their prompt. */
 function promptV2(inputs: GenerationInputs): string {
 	return sentences([
 		`A single original tattoo design, ${styleOf(inputs)}`,

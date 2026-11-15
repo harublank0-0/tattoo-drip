@@ -144,7 +144,7 @@ test.group("AI Design Lab", (group) => {
 				["queued", 1, "fake"],
 			],
 		);
-		assert.equal(rows[0].promptVersion, "tattoo-concept-v2");
+		assert.equal(rows[0].promptVersion, "tattoo-concept-v3");
 		assert.equal(
 			rows[0].inputs.concept,
 			"A koi fish swimming upward through peonies",
@@ -369,8 +369,8 @@ test.group("AI Design Lab", (group) => {
 			DesignGeneration.findOrFail(studio.designGeneration.id),
 		);
 		assert.equal(retried.attempt, 2);
-		// Seeded with v1, retried with the current template.
-		assert.equal(retried.promptVersion, "tattoo-concept-v2");
+		// Seeded with v1, retried with the current template (v3).
+		assert.equal(retried.promptVersion, "tattoo-concept-v3");
 		assert.equal(retried.status, "queued");
 		assert.isNull(retried.failureCode);
 		assert.deepEqual(

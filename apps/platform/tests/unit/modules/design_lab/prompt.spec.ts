@@ -31,25 +31,34 @@ const inputs = (
 });
 
 test.group("Design Lab prompt", () => {
-	test("v2 says only what to draw: the placement is the artwork's shape, never a body part", ({
+	test("v3 says only what to draw: a composition, never a body part, edge or frame", ({
 		assert,
 	}) => {
-		assert.equal(PROMPT_VERSION, "tattoo-concept-v2");
+		assert.equal(PROMPT_VERSION, "tattoo-concept-v3");
 		const prompt = buildPrompt(inputs());
 		assert.equal(
 			prompt,
-			"A single original tattoo design, Japanese irezumi-inspired tattoo style, flowing composition and bold outlines. Subject: Koi fish. Concept: A koi fish swimming upward through peonies. black and grey ink only. vertical composition. moderate detail. Shaped as a tall, narrow vertical design that tapers gently, with open, natural edges. Drawn as flat ink artwork on a plain white sheet of paper, centred with generous white margins on every side. The design's own linework forms its outer edge, with clear, legible lines and balanced negative space. Presented as a clean design sheet for a tattoo artist to review. Purely pictorial artwork.",
+			"A single original tattoo design, Japanese irezumi-inspired tattoo style, flowing composition and bold outlines. Subject: Koi fish. Concept: A koi fish swimming upward through peonies. black and grey ink only. vertical composition. moderate detail. Laid out as a tall, narrow vertical composition. Drawn as flat ink artwork on a plain white sheet of paper, with generous white space all around. A free-standing design whose elements fade into the open white paper, giving it an organic, irregular silhouette. Clear, legible linework and balanced negative space, presented as a design sheet for a tattoo artist to review. Purely pictorial artwork.",
 		);
-		// No placement, body word or negative list ever reaches the model: FLUX
-		// draws what a prompt names, even after "no".
+		// No placement, body word, enclosing shape or negative list reaches the
+		// model: FLUX draws what a prompt names, even after "no".
 		for (const bodyArea of BODY_AREA_KEYS) {
 			const text = buildPrompt(inputs({ bodyArea }));
 			assert.notMatch(
 				text,
-				/\b(?:body|skin|person|arm|forearm|shoulder|chest|back|ribs?|thigh|calf|hand|neck|ankle|wrist|limb|mockup|photo\w*|stencil|no)\b/i,
+				/\b(?:body|skin|person|arm|forearm|shoulder|chest|back|ribs?|thigh|calf|hand|neck|ankle|wrist|limb|mockup|photo\w*|stencil|no|edges?|frame\w*|borders?|taper\w*|shaped)\b/i,
 				bodyArea,
 			);
 		}
+	});
+
+	test("v2 stays reproducible for the generations made with it", ({
+		assert,
+	}) => {
+		assert.equal(
+			buildPrompt(inputs(), "tattoo-concept-v2"),
+			"A single original tattoo design, Japanese irezumi-inspired tattoo style, flowing composition and bold outlines. Subject: Koi fish. Concept: A koi fish swimming upward through peonies. black and grey ink only. vertical composition. moderate detail. Shaped as a tall, narrow vertical design that tapers gently, with open, natural edges. Drawn as flat ink artwork on a plain white sheet of paper, centred with generous white margins on every side. The design's own linework forms its outer edge, with clear, legible lines and balanced negative space. Presented as a clean design sheet for a tattoo artist to review. Purely pictorial artwork.",
+		);
 	});
 
 	test("v1 stays reproducible for the generations made with it", ({
@@ -70,7 +79,7 @@ test.group("Design Lab prompt", () => {
 			}),
 		);
 		assert.include(custom, "tattoo design, neo-traditional stipple. ");
-		assert.notInclude(custom, "Shaped as");
+		assert.notInclude(custom, "Laid out as");
 		const lettering = buildPrompt(
 			inputs({ style: "lettering", lettering: 'Stay "wild"' }),
 		);
