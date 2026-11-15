@@ -6,10 +6,13 @@ import {
 	INVOICE_STATUS_TEXT,
 	SUBSCRIPTION_STATUS_TEXT,
 } from "#modules/billing/billing_page";
+import BillingAccessPeriod from "#modules/billing/models/billing_access_period";
 import BillingInvoice from "#modules/billing/models/billing_invoice";
 import BillingPlan from "#modules/billing/models/billing_plan";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import BillingService from "#modules/billing/services/billing_service";
+import BillingService, {
+	STAFF_REVOCATION_REASONS,
+} from "#modules/billing/services/billing_service";
 import type GatewayAccount from "#modules/payments/models/gateway_account";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import GatewayAccountService from "#modules/payments/services/gateway_account_service";
@@ -22,6 +25,22 @@ const reviewValidator = vine.create({
 	accountId: vine.string().uuid(),
 	decision: vine.enum(["verify", "suspend"] as const),
 });
+
+const endAccessValidator = vine.create({
+	tenantId: vine.string().uuid(),
+	invoiceId: vine.string().uuid(),
+	reason: vine.enum(STAFF_REVOCATION_REASONS),
+});
+
+/** Why a paid period ended, in the admin page's words. */
+const REVOKED_TEXT: Record<string, string> = {
+	void: "invoice voided",
+	uncollectible: "invoice uncollectible",
+	write_off: "invoice written off",
+	refund: "refund",
+	chargeback: "chargeback",
+	other: "ended by staff",
+};
 
 const day = (at: DateTime | null) =>
 	at ? formatDay(at.toUTC().toISODate() as string) : null;
@@ -62,6 +81,7 @@ export default class AdminController {
 		}[] = [];
 		const invoices: {
 			id: string;
+			tenantId: string;
 			studio: string;
 			number: string | null;
 			statusText: string;
@@ -70,11 +90,17 @@ export default class AdminController {
 			paid: string | null;
 			issuedText: string | null;
 			paidText: string | null;
+			/** The paid period the invoice granted: still counting, ended early, or none. */
+			grant: "granted" | "ended" | null;
+			grantText: string | null;
 		}[] = [];
 		const monthStart = DateTime.utc().startOf("month");
 		let paidThisMonth = 0;
 		let paidAllTime = 0;
 		let outstanding = 0;
+		// Only the active mode's records: sandbox invoices are no income once
+		// billing runs live, and none count with no mode active.
+		const mode = this.billing.activeMode();
 		for (const tenantId of await tenantIds("billing_tenants")) {
 			await withDbContext({ tenantId }, async () => {
 				const tenant = await Tenant.find(tenantId);
@@ -96,11 +122,24 @@ export default class AdminController {
 							? "No paid period"
 							: `${access.state === "paid" ? "Paid" : "Trial"} until ${day(access.until)}`,
 				});
+				if (!mode) return;
 				const rows = await BillingInvoice.query()
 					.where("tenant_id", tenantId)
+					.where("livemode", mode === "live")
 					.orderBy("created_at", "desc")
 					.limit(50);
+				const periods = new Map(
+					(
+						await BillingAccessPeriod.query()
+							.where("tenant_id", tenantId)
+							.whereIn(
+								"invoice_id",
+								rows.map((row) => row.id),
+							)
+					).map((period) => [period.invoiceId, period]),
+				);
 				for (const invoice of rows) {
+					const period = periods.get(invoice.id);
 					if (invoice.status === "paid" && invoice.currency === "NPR") {
 						paidAllTime += invoice.amountPaid;
 						if (invoice.paidAt && invoice.paidAt >= monthStart) {
@@ -115,6 +154,7 @@ export default class AdminController {
 					}
 					invoices.push({
 						id: invoice.id,
+						tenantId,
 						studio: tenant.name,
 						number: invoice.number,
 						status: invoice.status,
@@ -123,6 +163,12 @@ export default class AdminController {
 						paid: invoice.amountPaid ? formatMoney(invoice.amountPaid) : null,
 						issuedText: day(invoice.issuedAt ?? invoice.createdAt),
 						paidText: day(invoice.paidAt),
+						grant: period ? (period.revokedAt ? "ended" : "granted") : null,
+						grantText: period
+							? period.revokedAt
+								? `Access ended ${day(period.revokedAt)} (${REVOKED_TEXT[period.revokedReason ?? ""] ?? period.revokedReason})`
+								: `Access ${day(period.startsAt)} to ${day(period.endsAt)}`
+							: null,
 					});
 				}
 			});
@@ -139,7 +185,37 @@ export default class AdminController {
 			},
 			studios: studios.sort((a, b) => a.name.localeCompare(b.name)),
 			invoices: invoices.slice(0, 200),
+			reasons: STAFF_REVOCATION_REASONS.map((value) => ({
+				value,
+				text: REVOKED_TEXT[value],
+			})),
 		});
+	}
+
+	/**
+	 * Ends a studio's paid period early for a refund, a chargeback or
+	 * another staff reason: PayBridgeNP shows none of them on an invoice
+	 * (docs/payments-paybridgenp.md). The studio is checked against the
+	 * billing listing and the write runs in its own context.
+	 */
+	async endAccess(ctx: HttpContext) {
+		const input = await ctx.request.validateUsing(endAccessValidator);
+		const admin = ctx.auth.getUserOrFail();
+		const allowed = await tenantIds("billing_tenants");
+		const ended =
+			allowed.includes(input.tenantId) &&
+			(await withDbContext({ tenantId: input.tenantId }, () =>
+				this.billing.endAccess(
+					{ id: input.tenantId },
+					input.invoiceId,
+					input.reason,
+					admin.id,
+				),
+			));
+		if (ended)
+			ctx.session.flash("success", "Paid access ended for that invoice.");
+		else ctx.session.flash("error", "That invoice has no paid access to end.");
+		return ctx.response.redirect().toRoute("admin.billing");
 	}
 
 	async gatewaysIndex(ctx: HttpContext) {

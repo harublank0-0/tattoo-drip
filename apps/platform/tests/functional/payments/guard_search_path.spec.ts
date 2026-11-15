@@ -10,15 +10,19 @@ import { sql } from "#tests/helpers/sql";
  * if a later migration replaces a guard without it.
  */
 test.group("guard functions", () => {
-	test("both pin search_path to the built-ins", async ({ assert }) => {
+	test("each pins search_path to the built-ins", async ({ assert }) => {
 		const { rows } = await sql(
 			{},
 			`select proname, proconfig from pg_proc
-			 where proname in ('inquiries_guard_update', 'payments_guard')
+			 where proname in ('billing_access_periods_guard', 'inquiries_guard_update', 'payments_guard')
 			 order by proname`,
 		);
 
 		assert.deepEqual(rows, [
+			{
+				proname: "billing_access_periods_guard",
+				proconfig: ["search_path=pg_catalog, pg_temp"],
+			},
 			{
 				proname: "inquiries_guard_update",
 				proconfig: ["search_path=pg_catalog, pg_temp"],

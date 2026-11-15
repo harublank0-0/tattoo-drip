@@ -348,6 +348,9 @@ export type ProviderInvoice = {
 	customerId: string | null;
 	customerExternalId: string | null;
 	subscriptionId: string | null;
+	/** The plan the invoice billed (its own `plan`), not the subscription's of today. */
+	planId: string | null;
+	/** The subscription's period as it is when read, not the invoice's (it has none). */
 	periodStart: string | null;
 	periodEnd: string | null;
 	livemode: boolean;
@@ -508,6 +511,7 @@ export function normalizeInvoice(raw: Invoice | Loose): ProviderInvoice {
 	const i = raw as Loose;
 	const customer = obj(i.customer);
 	const subscription = obj(i.subscription);
+	const plan = obj(i.plan);
 	return {
 		id: String(i.id),
 		number: str(i.number),
@@ -522,6 +526,7 @@ export function normalizeInvoice(raw: Invoice | Loose): ProviderInvoice {
 		customerId: str(customer.id) ?? str(i.customer_id),
 		customerExternalId: str(customer.external_customer_id),
 		subscriptionId: str(subscription.id) ?? str(i.subscription_id),
+		planId: str(plan.id) ?? str(i.plan_id),
 		periodStart: str(subscription.current_period_start),
 		periodEnd: str(subscription.current_period_end),
 		livemode: i.livemode === true,

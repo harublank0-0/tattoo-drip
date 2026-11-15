@@ -176,10 +176,22 @@ test.group("PayBridgeNP adapter", () => {
 				current_period_start: "2026-11-01T00:00:00Z",
 				current_period_end: "2026-12-01T00:00:00Z",
 			},
+			plan: { id: "bpl_monthly", name: "Studio, monthly" },
 		});
 		assert.equal(invoice.customerId, "bc_1");
 		assert.equal(invoice.subscriptionId, "sub_1");
 		assert.equal(invoice.periodEnd, "2026-12-01T00:00:00Z");
+		// The plan the invoice billed: its own, not the subscription's of today.
+		assert.equal(invoice.planId, "bpl_monthly");
+		assert.isNull(
+			normalizeInvoice({ id: "inv_2", status: "open", plan: null }).planId,
+		);
+		// A list answer may carry the id without the expanded plan.
+		assert.equal(
+			normalizeInvoice({ id: "inv_3", status: "paid", plan_id: "bpl_yearly" })
+				.planId,
+			"bpl_yearly",
+		);
 	});
 
 	test("webhooks: the raw body's signature and timestamp are checked with the SDK", async ({

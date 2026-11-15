@@ -1,0 +1,21 @@
+@if(kind === 'reversed')
+@email.layout({ title: 'Studio paid access ended', preheader: 'A paid invoice was reversed, so the period it paid for ended.' })
+  <p style="margin: 0 0 16px;">Hi,</p>
+  <p style="margin: 0 0 16px;">A paid {{ mode }} invoice of the studio “{{ studioSlug }}” was {{ reasonText }} at PayBridgeNP, so the paid period it granted has ended. The record stays on the admin Billing page.</p>
+  <p style="margin: 0 0 16px;">If the studio should still have access, check the invoice in PayBridgeNP.</p>
+  @!email.button({ href: url, text: 'Open billing' })
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    You get these emails as a Tattoo Drip platform admin.
+  </p>
+@end
+@else
+@email.layout({ title: 'Paid studio invoice not granted', preheader: 'A paid invoice granted no access and needs a check.' })
+  <p style="margin: 0 0 16px;">Hi,</p>
+  <p style="margin: 0 0 16px;">A paid {{ mode }} invoice of the studio “{{ studioSlug }}” granted no access: Tattoo Drip can't tell which period it paid for. The period read with it doesn't fit its dates, and the plan it billed isn't one Tattoo Drip knows in this mode (or it names none).</p>
+  <p style="margin: 0 0 16px;">Check the invoice and the studio's subscription in PayBridgeNP.</p>
+  @!email.button({ href: url, text: 'Open billing' })
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    You get these emails as a Tattoo Drip platform admin.
+  </p>
+@end
+@end
