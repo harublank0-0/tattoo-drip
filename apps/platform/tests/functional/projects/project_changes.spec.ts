@@ -323,7 +323,13 @@ test.group("Project notes, contact and artist", (group) => {
 			}
 		});
 
-		// Archived (studio packages, phase 2): no new work.
+		// Archived (studio packages, phase 2): no new work. The picker offers
+		// the project's own archived artist only, so it never leads to a 404.
+		const page = await client.get(url(project.id)).withInertia().loginAs(owner);
+		assert.deepEqual(
+			page.inertiaProps.assignment.choices.map(({ id }: { id: string }) => id),
+			[asha.id],
+		);
 		(await send(bina.id)).assertStatus(404);
 		assert.equal((await reload(tenant, project)).artistId, asha.id);
 		// Saving the project's own archived artist again changes nothing.

@@ -599,6 +599,34 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 		assert.lengthOf(await memberships(tenant), 2);
 	});
 
+	test("a profile archived meanwhile: the person still joins, without it", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("archived-33", "Arch 33");
+		const asha = await addArtist(tenant, owner, { name: "Asha", slug: "asha" });
+		const made = await invite(tenant, owner, {
+			email: "ink@archived-33.example",
+			artistId: asha.id,
+		});
+		// Archived (studio packages, phase 2): a new member is new work.
+		await inTenant(tenant, () =>
+			new ArtistService(new ImageService()).archive(tenant, asha.id),
+		);
+		const user = await confirmedUser("ink@archived-33.example");
+
+		const joined = await invitations.accept(
+			user,
+			made.token,
+			invitationFlow(made.token),
+		);
+
+		assert.isFalse(joined.claimed);
+		assert.lengthOf(await memberships(tenant), 2);
+		assert.isNull(
+			(await inTenant(tenant, () => Artist.findOrFail(asha.id))).userId,
+		);
+	});
+
 	test("a profile taken meanwhile: the person still joins, without it", async ({
 		assert,
 	}) => {

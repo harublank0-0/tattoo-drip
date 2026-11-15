@@ -28,13 +28,17 @@ export default class PackageGate {
 	 * Before an artist becomes active (added, or restored from the archive):
 	 * refused while paused, or when the active artists already fill the
 	 * package's limit. Runs in the caller's studio context and transaction,
-	 * and locks the studio's row first, so two activations at once
-	 * serialize and the count can't be read stale.
+	 * and takes the studio's activation lock first (a transaction-level
+	 * advisory lock), so two activations at once serialize and the count
+	 * can't be read stale. Not a row lock on `tenants`: that would hold every
+	 * foreign-key check of the studio's inserts (an inquiry, a payment) until
+	 * the request ends, a photo upload included.
 	 */
 	async checkArtistActivation(tenant: TenantRef): Promise<void> {
-		await dbClient().rawQuery("select 1 from tenants where id = ? for update", [
-			tenant.id,
-		]);
+		await dbClient().rawQuery(
+			"select pg_advisory_xact_lock(hashtextextended(?, 0))",
+			[`tattoo-drip:artist-activation:${tenant.id}`],
+		);
 		const entitlement = await this.entitlements.for(tenant);
 		const active = await this.artists.countActive(tenant);
 		const rule: PackageRule | null =

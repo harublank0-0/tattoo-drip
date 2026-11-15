@@ -56,13 +56,17 @@ const activation = async (tenant: Tenant) =>
 test.group("Packages: the package gate", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 	group.each.teardown(() => {
+		// env.set also writes process.env, which child processes of later
+		// specs inherit (role_guard.spec.ts boots real ones): leave it unset.
 		env.set("PACKAGE_ENFORCEMENT", undefined as never);
+		delete process.env.PACKAGE_ENFORCEMENT;
 	});
 
 	test("in observe mode nothing is refused: past the limit or paused, the rule is only logged", async ({
 		assert,
 	}) => {
 		env.set("PACKAGE_ENFORCEMENT", undefined as never);
+		delete process.env.PACKAGE_ENFORCEMENT;
 		const solo = await workspace("gate-observe", "independent");
 		await assert.doesNotReject(() => activation(solo.tenant));
 
@@ -120,6 +124,24 @@ test.group("Packages: the package gate", (group) => {
 			await addArtist(studio.tenant, studio.owner, { name: slug, slug });
 		}
 		await assert.doesNotReject(() => activation(studio.tenant));
+	});
+
+	test("activations serialize on a per-studio advisory lock, not the studio's row", async ({
+		assert,
+	}) => {
+		const { tenant } = await workspace("gate-lock", "studio");
+		const held = await inTenant(tenant, async () => {
+			await (await gate()).checkArtistActivation(tenant);
+			const { rows } = await dbClient().rawQuery(
+				`select
+				   (select count(*)::int from pg_locks
+				    where locktype = 'advisory' and pid = pg_backend_pid() and granted) as advisory`,
+			);
+			return rows[0].advisory;
+		});
+		// A row lock on tenants would hold every foreign-key check of the
+		// studio's inserts (inquiries, payments) until the request ends.
+		assert.equal(held, 1);
 	});
 
 	test("the usage counts active artists against the package's limit", async ({

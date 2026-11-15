@@ -671,7 +671,14 @@ export default class ProjectsController {
 				membership.role === "owner" && !closed
 					? {
 							artistId: project.artistId,
-							choices: artists.map(({ id, name }) => ({ id, name })),
+							// Archived artists (studio packages) take no new work: only
+							// the project's own stays offered.
+							choices: artists
+								.filter(
+									({ id, archivedAt }) =>
+										archivedAt === null || id === project.artistId,
+								)
+								.map(({ id, name }) => ({ id, name })),
 						}
 					: null,
 			request,

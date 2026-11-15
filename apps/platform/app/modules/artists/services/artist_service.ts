@@ -384,7 +384,10 @@ export default class ArtistService {
 				.where("id", artistId)
 				.forUpdate()
 				.first();
-			if (!live || live.userId !== null) return false;
+			// An archived profile (studio packages, phase 2) takes no new member.
+			if (!live || live.userId !== null || live.archivedAt !== null) {
+				return false;
+			}
 			live.userId = userId;
 			await live.save();
 			return true;

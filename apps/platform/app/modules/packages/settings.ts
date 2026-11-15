@@ -10,5 +10,5 @@ export type PackageEnforcement = "observe" | "enforce";
  * upgrade (phase 4) has shipped.
  */
 export function packageEnforcement(): PackageEnforcement {
-	return env.get("PACKAGE_ENFORCEMENT") ?? "observe";
+	return env.get("PACKAGE_ENFORCEMENT") === "enforce" ? "enforce" : "observe";
 }

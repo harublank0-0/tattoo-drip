@@ -54,7 +54,10 @@ async function soloWorkspace(slug: string) {
 test.group("Artists: archiving from the dashboard", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 	group.each.teardown(() => {
+		// env.set also writes process.env, which child processes of later
+		// specs inherit (role_guard.spec.ts boots real ones): leave it unset.
 		env.set("PACKAGE_ENFORCEMENT", undefined as never);
+		delete process.env.PACKAGE_ENFORCEMENT;
 	});
 
 	test("an owner archives and restores an artist; an artist can't", async ({
