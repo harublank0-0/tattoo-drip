@@ -29,7 +29,7 @@ import BillingSubscription, {
 } from "#modules/billing/models/billing_subscription";
 import { PLAN_CATALOGUE } from "#modules/billing/plans";
 import BillingReviewMail from "#modules/notifications/emails/billing_review_mail";
-import { bundleIdsByKey } from "#modules/packages/bundles";
+import { bundleIdsByKey, bundleKeysById } from "#modules/packages/bundles";
 import type { PackageKey } from "#modules/packages/packages";
 import type Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -93,6 +93,12 @@ export type SyncedPlan = {
 	code: string;
 	providerPlanId: string;
 	created: boolean;
+	/**
+	 * Why a stored plan differs from its catalogue entry (its package or
+	 * allowance bundle), or null. Never written over: periods already paid
+	 * keep their plan's allowances, so a change needs a new plan code.
+	 */
+	mismatch: string | null;
 };
 
 /**
@@ -606,7 +612,8 @@ export default class BillingService {
 	 * Creates every catalogue plan missing in the platform key's mode
 	 * (`node ace billing:sync-plans`). The idempotency key names the plan's
 	 * code, price and interval, so a rerun inside PayBridgeNP's 24-hour
-	 * window returns the same plan.
+	 * window returns the same plan. A stored plan keeps its package and
+	 * bundle; one that differs from the catalogue is reported (`mismatch`).
 	 */
 	async syncPlans(): Promise<SyncedPlan[]> {
 		const api = this.api();
@@ -621,10 +628,22 @@ export default class BillingService {
 				.where("livemode", livemode)
 				.first();
 			if (existing?.providerPlanId) {
+				const bundleId = bundles.get(entry.bundleKey);
+				let mismatch: string | null = null;
+				if (
+					existing.package !== entry.package ||
+					existing.allowanceBundleId !== bundleId
+				) {
+					const storedKey = (
+						await bundleKeysById([existing.allowanceBundleId])
+					).get(existing.allowanceBundleId);
+					mismatch = `stored as ${existing.package} (${storedKey}), the catalogue says ${entry.package} (${entry.bundleKey}): paid periods keep their plan's allowances, so give the change a new plan code`;
+				}
 				synced.push({
 					code: entry.code,
 					providerPlanId: existing.providerPlanId,
 					created: false,
+					mismatch,
 				});
 				continue;
 			}
@@ -661,6 +680,7 @@ export default class BillingService {
 				code: entry.code,
 				providerPlanId: created.id,
 				created: true,
+				mismatch: null,
 			});
 		}
 		return synced;
