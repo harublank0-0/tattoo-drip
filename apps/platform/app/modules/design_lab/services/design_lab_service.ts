@@ -397,6 +397,8 @@ export default class DesignLabService {
 			generation.providerMeta = null;
 			generation.provider = provider.name;
 			generation.model = provider.model;
+			// A retry is a new request: it uses the current template.
+			generation.promptVersion = PROMPT_VERSION;
 			generation.acceptedAt = DateTime.now();
 			await generation.save();
 			await this.usage.reserve(tenant, member.userId, [

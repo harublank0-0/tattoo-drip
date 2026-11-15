@@ -6,7 +6,6 @@ import DesignGeneration from "#modules/design_lab/models/design_generation";
 import DesignProject from "#modules/design_lab/models/design_project";
 import DesignUsageRecord from "#modules/design_lab/models/design_usage_record";
 import type { GenerationInputs } from "#modules/design_lab/prompt";
-import { PROMPT_VERSION } from "#modules/design_lab/prompt";
 import {
 	type DesignProvider,
 	DesignProviderError,
@@ -152,7 +151,7 @@ export async function seedDesignLab(tenant: Tenant, artist: { id: string }) {
 			createdBy: artist.id,
 			provider: designProvider.name,
 			model: designProvider.model,
-			promptVersion: PROMPT_VERSION,
+			promptVersion: "tattoo-concept-v1",
 			inputs: sampleInputs(),
 			acceptedAt: now,
 		};

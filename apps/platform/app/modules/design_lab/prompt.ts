@@ -8,7 +8,20 @@
  * stored rows still explain themselves) and bump PROMPT_VERSION.
  */
 
-export const PROMPT_VERSION = "tattoo-concept-v1";
+/**
+ * The template new generations use. v1 named the body part ("Proportioned
+ * for a long, narrow forearm placement") and ended with a list of what to
+ * leave out ("No human body, no skin…"); FLUX does not take negative
+ * prompts, so both primed a limb-shaped outline (seen in the first live
+ * FLUX.2 [pro] run). v2 says only what to draw: the placement becomes the
+ * artwork's shape, and the sheet is described positively.
+ */
+export const PROMPT_VERSION = "tattoo-concept-v2";
+export const PROMPT_VERSIONS = [
+	"tattoo-concept-v1",
+	"tattoo-concept-v2",
+] as const;
+export type PromptVersion = (typeof PROMPT_VERSIONS)[number];
 
 export const STYLE_PRESETS = {
 	fine_line: {
@@ -113,19 +126,68 @@ export const DETAIL_KEYS = Object.keys(DETAIL_LEVELS) as DetailKey[];
  * for a body, skin or a mockup.
  */
 export const BODY_AREAS = {
-	any: { label: "Not decided", phrase: "" },
-	forearm: { label: "Forearm", phrase: "a long, narrow forearm placement" },
-	upper_arm: { label: "Upper arm", phrase: "an upper arm placement" },
-	shoulder: { label: "Shoulder", phrase: "a rounded shoulder placement" },
-	chest: { label: "Chest", phrase: "a wide chest placement" },
-	back: { label: "Back", phrase: "a large back placement" },
-	ribs: { label: "Ribs", phrase: "a tall rib placement" },
-	thigh: { label: "Thigh", phrase: "a thigh placement" },
-	calf: { label: "Calf", phrase: "a calf placement" },
-	hand: { label: "Hand", phrase: "a small hand placement" },
-	neck: { label: "Neck", phrase: "a small neck placement" },
-	ankle: { label: "Ankle", phrase: "a small ankle placement" },
-	wrist: { label: "Wrist", phrase: "a small wrist placement" },
+	any: { label: "Not decided", phrase: "", shape: "" },
+	forearm: {
+		label: "Forearm",
+		phrase: "a long, narrow forearm placement",
+		shape:
+			"a tall, narrow vertical design that tapers gently, with open, natural edges",
+	},
+	upper_arm: {
+		label: "Upper arm",
+		phrase: "an upper arm placement",
+		shape: "a medium vertical design with a balanced, oval silhouette",
+	},
+	shoulder: {
+		label: "Shoulder",
+		phrase: "a rounded shoulder placement",
+		shape: "a rounded, dome-shaped design",
+	},
+	chest: {
+		label: "Chest",
+		phrase: "a wide chest placement",
+		shape: "a wide, symmetrical design balanced along a horizontal axis",
+	},
+	back: {
+		label: "Back",
+		phrase: "a large back placement",
+		shape: "a large, detailed design built around a strong central axis",
+	},
+	ribs: {
+		label: "Ribs",
+		phrase: "a tall rib placement",
+		shape: "a tall, slender vertical design",
+	},
+	thigh: {
+		label: "Thigh",
+		phrase: "a thigh placement",
+		shape: "a large vertical design with a broad, flowing outline",
+	},
+	calf: {
+		label: "Calf",
+		phrase: "a calf placement",
+		shape: "a tall vertical design with a flowing outline",
+	},
+	hand: {
+		label: "Hand",
+		phrase: "a small hand placement",
+		shape: "a small, compact design with bold, simple shapes",
+	},
+	neck: {
+		label: "Neck",
+		phrase: "a small neck placement",
+		shape: "a small, compact design with bold, simple shapes",
+	},
+	ankle: {
+		label: "Ankle",
+		phrase: "a small ankle placement",
+		shape: "a small design that reads clearly at a small size",
+	},
+	wrist: {
+		label: "Wrist",
+		phrase: "a small wrist placement",
+		shape: "a small, compact design that reads clearly at a small size",
+	},
 } as const;
 export type BodyAreaKey = keyof typeof BODY_AREAS;
 export const BODY_AREA_KEYS = Object.keys(BODY_AREAS) as BodyAreaKey[];
@@ -237,22 +299,60 @@ export const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 const fragment = (text: string) => oneLine(text).replace(/[.\s]+$/, "");
 
 /**
- * The provider prompt for `inputs` under PROMPT_VERSION. Only the inputs'
- * own fields go in: the caller has nothing else to add (no client, no
- * booking, no studio), and that is on purpose.
+ * The provider prompt for `inputs` under `version` (each stored generation
+ * keeps its version, so its page shows the prompt that made it). Only the
+ * inputs' own fields go in: the caller has nothing else to add (no client,
+ * no booking, no studio), and that is on purpose.
  */
-export function buildPrompt(inputs: GenerationInputs): string {
-	const style =
-		inputs.style === "custom"
-			? fragment(inputs.customStyle ?? "custom tattoo style")
-			: STYLE_PRESETS[inputs.style].phrase;
-	const parts = [
-		`Original tattoo design concept artwork, ${style}`,
+export function buildPrompt(
+	inputs: GenerationInputs,
+	version: string = PROMPT_VERSION,
+): string {
+	return version === "tattoo-concept-v1" ? promptV1(inputs) : promptV2(inputs);
+}
+
+const styleOf = (inputs: GenerationInputs) =>
+	inputs.style === "custom"
+		? fragment(inputs.customStyle ?? "custom tattoo style")
+		: STYLE_PRESETS[inputs.style].phrase;
+
+const letteringOf = (inputs: GenerationInputs) =>
+	inputs.style === "lettering" && inputs.lettering
+		? `The lettering reads exactly "${oneLine(inputs.lettering).replaceAll('"', "'")}"`
+		: null;
+
+const sentences = (parts: (string | null)[]) =>
+	`${parts.filter((part): part is string => Boolean(part)).join(". ")}.`;
+
+/** tattoo-concept-v2: only what to draw, the placement as the artwork's shape. */
+function promptV2(inputs: GenerationInputs): string {
+	return sentences([
+		`A single original tattoo design, ${styleOf(inputs)}`,
 		inputs.subject ? `Subject: ${fragment(inputs.subject)}` : null,
 		`Concept: ${fragment(inputs.concept)}`,
-		inputs.style === "lettering" && inputs.lettering
-			? `The lettering reads exactly "${oneLine(inputs.lettering).replaceAll('"', "'")}"`
+		letteringOf(inputs),
+		PALETTES[inputs.palette].phrase,
+		ORIENTATIONS[inputs.orientation].phrase,
+		DETAIL_LEVELS[inputs.detail].phrase,
+		inputs.bodyArea !== "any"
+			? `Shaped as ${BODY_AREAS[inputs.bodyArea].shape}`
 			: null,
+		"Drawn as flat ink artwork on a plain white sheet of paper, centred with generous white margins on every side",
+		"The design's own linework forms its outer edge, with clear, legible lines and balanced negative space",
+		"Presented as a clean design sheet for a tattoo artist to review",
+		inputs.style === "lettering"
+			? "The requested lettering is the only text"
+			: "Purely pictorial artwork",
+	]);
+}
+
+/** tattoo-concept-v1, kept so generations made with it still show their prompt. */
+function promptV1(inputs: GenerationInputs): string {
+	return sentences([
+		`Original tattoo design concept artwork, ${styleOf(inputs)}`,
+		inputs.subject ? `Subject: ${fragment(inputs.subject)}` : null,
+		`Concept: ${fragment(inputs.concept)}`,
+		letteringOf(inputs),
 		PALETTES[inputs.palette].phrase,
 		ORIENTATIONS[inputs.orientation].phrase,
 		DETAIL_LEVELS[inputs.detail].phrase,
@@ -266,8 +366,7 @@ export function buildPrompt(inputs: GenerationInputs): string {
 			? "No other text, no watermark, no signature"
 			: "No text, no watermark, no signature",
 		"No human body, no skin, no person, no tattoo mockup, no photograph",
-	];
-	return `${parts.filter((part): part is string => Boolean(part)).join(". ")}.`;
+	]);
 }
 
 /** The image size for `orientation`. */

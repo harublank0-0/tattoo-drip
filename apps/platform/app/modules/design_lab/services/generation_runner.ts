@@ -261,7 +261,7 @@ export default class GenerationRunner {
 			try {
 				const submitted = await provider.submit(
 					{
-						prompt: buildPrompt(generation.inputs),
+						prompt: buildPrompt(generation.inputs, generation.promptVersion),
 						endUser: endUserId(tenant, generation.createdBy),
 						orientation: generation.inputs.orientation,
 						...size,

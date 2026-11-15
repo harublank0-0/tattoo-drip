@@ -1,5 +1,6 @@
 import { test } from "@japa/runner";
 import {
+	BODY_AREA_KEYS,
 	buildPrompt,
 	type GenerationInputs,
 	inputsLabel,
@@ -30,16 +31,34 @@ const inputs = (
 });
 
 test.group("Design Lab prompt", () => {
-	test("the template asks for an isolated concept, never a body, mockup or stencil", ({
+	test("v2 says only what to draw: the placement is the artwork's shape, never a body part", ({
 		assert,
 	}) => {
-		assert.equal(PROMPT_VERSION, "tattoo-concept-v1");
+		assert.equal(PROMPT_VERSION, "tattoo-concept-v2");
 		const prompt = buildPrompt(inputs());
 		assert.equal(
 			prompt,
+			"A single original tattoo design, Japanese irezumi-inspired tattoo style, flowing composition and bold outlines. Subject: Koi fish. Concept: A koi fish swimming upward through peonies. black and grey ink only. vertical composition. moderate detail. Shaped as a tall, narrow vertical design that tapers gently, with open, natural edges. Drawn as flat ink artwork on a plain white sheet of paper, centred with generous white margins on every side. The design's own linework forms its outer edge, with clear, legible lines and balanced negative space. Presented as a clean design sheet for a tattoo artist to review. Purely pictorial artwork.",
+		);
+		// No placement, body word or negative list ever reaches the model: FLUX
+		// draws what a prompt names, even after "no".
+		for (const bodyArea of BODY_AREA_KEYS) {
+			const text = buildPrompt(inputs({ bodyArea }));
+			assert.notMatch(
+				text,
+				/\b(?:body|skin|person|arm|forearm|shoulder|chest|back|ribs?|thigh|calf|hand|neck|ankle|wrist|limb|mockup|photo\w*|stencil|no)\b/i,
+				bodyArea,
+			);
+		}
+	});
+
+	test("v1 stays reproducible for the generations made with it", ({
+		assert,
+	}) => {
+		assert.equal(
+			buildPrompt(inputs(), "tattoo-concept-v1"),
 			"Original tattoo design concept artwork, Japanese irezumi-inspired tattoo style, flowing composition and bold outlines. Subject: Koi fish. Concept: A koi fish swimming upward through peonies. black and grey ink only. vertical composition. moderate detail. Proportioned for a long, narrow forearm placement, shown flat as a drawing. Isolated artwork centred on a plain white background with generous margins. Clean composition with clear, legible linework and balanced negative space. Presented as a flat 2D design sheet for an artist to review. No text, no watermark, no signature. No human body, no skin, no person, no tattoo mockup, no photograph.",
 		);
-		assert.notMatch(prompt, /stencil/i);
 	});
 
 	test("custom styles, lettering and an undecided placement", ({ assert }) => {
@@ -50,13 +69,13 @@ test.group("Design Lab prompt", () => {
 				bodyArea: "any",
 			}),
 		);
-		assert.include(custom, "concept artwork, neo-traditional stipple. ");
-		assert.notInclude(custom, "Proportioned");
+		assert.include(custom, "tattoo design, neo-traditional stipple. ");
+		assert.notInclude(custom, "Shaped as");
 		const lettering = buildPrompt(
 			inputs({ style: "lettering", lettering: 'Stay "wild"' }),
 		);
 		assert.include(lettering, `The lettering reads exactly "Stay 'wild'"`);
-		assert.include(lettering, "No other text");
+		assert.include(lettering, "The requested lettering is the only text");
 		// Lettering text is only used with the lettering style.
 		assert.notInclude(buildPrompt(inputs({ lettering: "Ignored" })), "Ignored");
 	});

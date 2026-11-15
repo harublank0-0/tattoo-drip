@@ -144,7 +144,7 @@ test.group("AI Design Lab", (group) => {
 				["queued", 1, "fake"],
 			],
 		);
-		assert.equal(rows[0].promptVersion, "tattoo-concept-v1");
+		assert.equal(rows[0].promptVersion, "tattoo-concept-v2");
 		assert.equal(
 			rows[0].inputs.concept,
 			"A koi fish swimming upward through peonies",
@@ -172,7 +172,8 @@ test.group("AI Design Lab", (group) => {
 			assert.include(submit.prompt, "koi fish");
 			assert.notInclude(submit.prompt, clientRow.name);
 			assert.notInclude(submit.prompt, "Studio");
-			assert.include(submit.prompt, "No human body");
+			assert.include(submit.prompt, "plain white sheet of paper");
+			assert.notMatch(submit.prompt, /\b(?:forearm|body|skin)\b/i);
 			assert.deepEqual([submit.width, submit.height], [832, 1216]);
 		}
 
@@ -368,6 +369,8 @@ test.group("AI Design Lab", (group) => {
 			DesignGeneration.findOrFail(studio.designGeneration.id),
 		);
 		assert.equal(retried.attempt, 2);
+		// Seeded with v1, retried with the current template.
+		assert.equal(retried.promptVersion, "tattoo-concept-v2");
 		assert.equal(retried.status, "queued");
 		assert.isNull(retried.failureCode);
 		assert.deepEqual(

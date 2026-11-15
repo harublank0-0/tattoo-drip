@@ -372,7 +372,7 @@ export default class DesignLabController {
 			// the prompt the server built from them. Never the provider's URLs.
 			inputs: generation.inputs,
 			promptVersion: generation.promptVersion,
-			prompt: buildPrompt(generation.inputs),
+			prompt: buildPrompt(generation.inputs, generation.promptVersion),
 			model: generation.model,
 			asset: asset
 				? {
