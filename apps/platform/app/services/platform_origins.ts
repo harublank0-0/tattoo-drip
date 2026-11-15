@@ -10,7 +10,8 @@ import { pointsAtThisMachine } from "#services/storefront_url";
  *   host). Set to another host, that host serves /api only (production since
  *   the cutover: api.tattoodrip.app).
  * - DISCOVER_URL: the Discover site (tattoodrip.app in production since the
- *   cutover); unset where no Discover runs (development, tests). Its host is
+ *   cutover); unset by default in development, while .env.test sets both to
+ *   exercise the split hosts. Its host is
  *   never the dashboard's or the API's; the platform answers only /api there
  *   (the legacy /api proxy after the cutover), and it is a browser origin the
  *   API's CORS allows.

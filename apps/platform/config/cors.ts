@@ -21,7 +21,7 @@ const allowedOrigin = browserOriginPolicy({
  * CORS for the public API only (TAT-32): the allowed browser origins above,
  * never credentials, the methods and request headers the SDK sends. The
  * dashboard is same-origin and answers no cross-origin request. A
- * server-side caller (the storefront's server, later Discover's) sends no
+ * server-side caller (the storefront's and Discover's servers) sends no
  * Origin and needs no CORS.
  *
  * https://docs.adonisjs.com/guides/security/cors

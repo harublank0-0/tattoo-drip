@@ -55,12 +55,12 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	// The public API's origin (Discover D01), e.g. https://api.example.com.
 	// Unset, the API is served from APP_URL's host (the single-host layout).
 	// Set to another host, that host serves /api only (production since the D11
-	// cutover). The storefront's API_URL names the same
-	// origin. Checked with DISCOVER_URL below.
+	// cutover). The storefront's API_URL names the same origin. Checked with
+	// DISCOVER_URL below.
 	API_URL: (_key: string, value?: string) => value?.trim() || undefined,
 	// The Discover site's origin (Discover D01), e.g. https://example.com: a
 	// browser origin the API allows, never the dashboard's or the API's host.
-	// Set in production since the D11 cutover; unset where no Discover runs
+	// Set in production since the D11 cutover; unset by default in development
 	// (docs/discover/domain-migration.md).
 	DISCOVER_URL: (_key: string, value?: string) => value?.trim() || undefined,
 	// The studio pages' origin with {tenant} for the slug, e.g.

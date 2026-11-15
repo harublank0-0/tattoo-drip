@@ -435,8 +435,7 @@ export default class PublicationService {
 			),
 			storefrontUrl: studioPageUrl(template, live.slug),
 			bookingUrl: bookingPageUrl(template, live.slug),
-			// Where the profile will live once Discover is online (D05 onward);
-			// null while DISCOVER_URL is unset.
+			// The profile's address on Discover; null while DISCOVER_URL is unset.
 			discoverUrl: discoverBase
 				? new URL(
 						`/${live.type === "independent" ? "artists" : "studios"}/${live.slug}`,
