@@ -34,6 +34,8 @@ type Props = {
 		name: string;
 		line: string;
 		text: string;
+		/** Active artists against the package's limit: "1 of 1 active artist". */
+		artists: { active: number; limit: number | null; text: string };
 	};
 	access: { state: "paid" | "trial" | "none"; text: string };
 	plans: Plan[];
@@ -160,6 +162,9 @@ export default function Billing({
 							{studioPackage.text}
 						</p>
 						<p className="text-muted-foreground">{studioPackage.line}</p>
+						<p className="text-muted-foreground">
+							{studioPackage.artists.text}
+						</p>
 					</div>
 					<p className="flex flex-wrap items-center gap-2 text-sm">
 						<Badge variant={access.state === "none" ? "outline" : "secondary"}>

@@ -18,6 +18,7 @@ What the MVP (pilot with a design-partner studio) and V1 (paid launch) must do, 
 
 **Artists**
 - [ ] Artist profiles: name, slug, bio, photo, visible or hidden, and an "accepting inquiries" switch with an optional message (the intake form shows the message and hides that artist)
+- Archiving artists (studio packages): an owner archives an artist who keeps their history but is hidden, gets no new work and doesn't count toward the package, and restores them later (hidden until shown again).
 
 **Intake**
 - [x] A public intake form on the studio page, plus a per-artist link

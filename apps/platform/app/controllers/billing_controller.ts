@@ -9,6 +9,8 @@ import BillingService from "#modules/billing/services/billing_service";
 import { planChoiceValidator } from "#modules/billing/validators/billing";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import EntitlementService from "#modules/packages/services/entitlement_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PackageGate from "#modules/packages/services/package_gate";
 
 /**
  * The studio's TattooDrip subscription (Settings, Billing), owners only
@@ -20,6 +22,7 @@ export default class BillingController {
 	constructor(
 		private billing: BillingService,
 		private entitlements: EntitlementService,
+		private packages: PackageGate,
 	) {}
 
 	async show(ctx: HttpContext) {
@@ -40,6 +43,7 @@ export default class BillingController {
 				new Map(plans.map((plan) => [plan.id, plan])),
 				tenant.timezone,
 				await this.entitlements.for(tenant),
+				await this.packages.artistUsage(tenant),
 			),
 		);
 	}
