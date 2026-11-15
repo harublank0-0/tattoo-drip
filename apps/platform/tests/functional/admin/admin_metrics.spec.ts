@@ -8,6 +8,8 @@ import {
 	pilotTiles,
 } from "#modules/reports/pilot_metrics";
 import PilotMetricsService from "#modules/reports/services/pilot_metrics_service";
+import TenancyService from "#modules/tenancy/services/tenancy_service";
+import { withDbContext } from "#services/db_context";
 import { adminUser } from "#tests/helpers/admin";
 import { makeClient, makeInquiry } from "#tests/helpers/pipeline";
 import { inTenant, twoStudios } from "#tests/helpers/tenants";
@@ -38,34 +40,27 @@ test.group("Admin metrics", (group) => {
 		assert.equal(props.days, 42);
 
 		const service = await app.container.make(PilotMetricsService);
+		const tenancy = await app.container.make(TenancyService);
 		const window = lastDays(42);
-		const mine = [a.tenant, b.tenant];
-		const facts = [];
-		for (const tenant of mine) {
-			const shown = props.studios.find((row) => row.slug === tenant.slug);
-			assert.exists(shown);
-			assert.equal(shown?.name, tenant.name);
-			const own = await inTenant(tenant, () =>
-				service.forStudio(tenant, window),
-			);
-			facts.push(own);
-			assert.deepEqual(shown?.tiles, pilotTiles(own));
-		}
-		assert.isAtLeast(props.total.count, 2);
-		// The dev database may hold other studios: the total covers all listed.
+		// Every studio the page lists, the dev database's others included.
 		const all = [];
 		for (const row of props.studios) {
-			const tenant = mine.find((t) => t.slug === row.slug);
-			if (tenant) {
-				all.push(
-					await inTenant(tenant, () => service.forStudio(tenant, window)),
-				);
-			}
+			const tenantId = await tenancy.tenantIdForSlug(row.slug);
+			assert.exists(tenantId, row.slug);
+			const facts = await withDbContext({ tenantId: tenantId as string }, () =>
+				service.forStudio({ id: tenantId as string }, window),
+			);
+			all.push(facts);
+			assert.deepEqual(row.tiles, pilotTiles(facts), row.slug);
+		}
+		for (const { tenant } of [a, b]) {
+			assert.equal(
+				props.studios.find((row) => row.slug === tenant.slug)?.name,
+				tenant.name,
+			);
 		}
 		assert.equal(props.total.count, props.studios.length);
-		if (props.studios.length === 2) {
-			assert.deepEqual(props.total.tiles, pilotTiles(combineFacts(all)));
-		}
+		assert.deepEqual(props.total.tiles, pilotTiles(combineFacts(all)));
 	});
 
 	test("lists studios oldest first", async ({ client, assert }) => {
