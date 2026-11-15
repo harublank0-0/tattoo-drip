@@ -223,6 +223,29 @@ export async function seededStudio(slug: string, name: string) {
 			owner,
 		),
 	);
+	// An archived artist (studio packages, phase 2), the restore route's
+	// resource: hidden by the database's rule, so no public surface lists it.
+	const archivedArtist = await inTenant(tenant, async () => {
+		const profile = await artists.create(
+			tenant,
+			{
+				name: `${name} Rana`,
+				slug: `${slug}-rana`,
+				bio: null,
+				visible: false,
+				acceptingInquiries: true,
+				acceptingFlash: true,
+				closedMessage: null,
+				linkToMe: false,
+				styles: [],
+				instagramUrl: null,
+				facebookUrl: null,
+				tiktokUrl: null,
+			},
+			owner,
+		);
+		return artists.archive(tenant, profile.id);
+	});
 	// A cover photo and a logo for the studio (TAT-116, TAT-56, TAT-123) and two work
 	// photos for the artist, with made-up keys (the drive ignores a delete of a
 	// missing file). Two photos, so that a move changes something.
@@ -519,6 +542,7 @@ export async function seededStudio(slug: string, name: string) {
 		paymentMethod,
 		artistProfile,
 		closedArtist,
+		archivedArtist,
 		pipeline,
 		// The :id resources of the project routes' isolation cases.
 		project: pipeline.project,
