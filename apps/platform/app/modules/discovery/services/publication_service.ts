@@ -8,7 +8,10 @@ import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
-import { stillOf } from "#modules/artists/services/work_photo_service";
+import {
+	stillKey,
+	stillOf,
+} from "#modules/artists/services/work_photo_service";
 import { knownStyles } from "#modules/artists/styles";
 import {
 	type ArtistDiscoverState,
@@ -71,6 +74,16 @@ export type PublicationOverview = {
 };
 
 type TenantRef = Pick<Tenant, "id">;
+
+/** One work photo as the operator's studio page lists it. */
+export type OperatorPhoto = {
+	id: string;
+	artistId: string;
+	artistName: string;
+	/** The still's storage key, ready for ImageService.urlFor. */
+	imageKey: string;
+	takedown: { at: DateTime; note: string | null } | null;
+};
 
 /** How many of the newest photos the preview shows, as a Discover profile does. */
 const PREVIEW_PHOTOS = 12;
@@ -526,6 +539,46 @@ export default class PublicationService {
 					note: photo.discoverySuspensionNote,
 				})),
 			};
+		});
+	}
+
+	/**
+	 * Every work photo of the business's live artists, for the operator's
+	 * studio page: taken-down first (newest takedown first), then by artist
+	 * name, then newest photo first.
+	 */
+	async operatorPhotos(slug: string): Promise<OperatorPhoto[]> {
+		return this.asOperator(slug, async (trx, tenantId) => {
+			const artists = await Artist.query({ client: trx }).where(
+				"tenant_id",
+				tenantId,
+			);
+			const names = new Map(artists.map((artist) => [artist.id, artist.name]));
+			const photos = await ArtistWorkPhoto.query({ client: trx })
+				.where("tenant_id", tenantId)
+				.whereIn("artist_id", [...names.keys()])
+				.orderBy("created_at", "desc")
+				.orderBy("id", "desc");
+			return photos
+				.map((photo) => ({
+					id: photo.id,
+					artistId: photo.artistId,
+					artistName: names.get(photo.artistId) as string,
+					imageKey: stillKey(photo),
+					takedown: photo.discoverySuspendedAt
+						? {
+								at: photo.discoverySuspendedAt,
+								note: photo.discoverySuspensionNote,
+							}
+						: null,
+				}))
+				.sort((left, right) => {
+					if (left.takedown && right.takedown) {
+						return right.takedown.at.toMillis() - left.takedown.at.toMillis();
+					}
+					if (left.takedown || right.takedown) return left.takedown ? -1 : 1;
+					return left.artistName.localeCompare(right.artistName);
+				});
 		});
 	}
 

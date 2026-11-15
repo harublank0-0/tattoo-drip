@@ -7,7 +7,9 @@ import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService from "#modules/artists/services/artist_service";
 import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
-import PublicationService from "#modules/discovery/services/publication_service";
+import PublicationService, {
+	OperatorTargetError,
+} from "#modules/discovery/services/publication_service";
 import ImageService from "#modules/media/services/image_service";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -732,5 +734,40 @@ test.group("Discover settings: preview", (group) => {
 			photos.map((photo) => photo.id),
 		);
 		assert.notInclude(shown, angle.id);
+	});
+});
+
+test.group("Discover settings: operator photos", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("lists the studio's photos, taken-down first with its note; other studios' never appear", async ({
+		assert,
+	}) => {
+		const { tenant, sita, photos } = await studio("d04-op-photos");
+		const other = await studio("d04-op-other");
+		await publication().suspendPhoto(tenant.slug, photos[1].id, "DMCA");
+
+		const listed = await publication().operatorPhotos(tenant.slug);
+
+		assert.deepEqual(
+			listed.map((photo) => photo.id),
+			[photos[1].id, photos[0].id],
+		);
+		assert.equal(listed[0].takedown?.note, "DMCA");
+		assert.isNull(listed[1].takedown);
+		assert.equal(listed[0].artistId, sita.id);
+		assert.equal(listed[0].artistName, "Sita Rai");
+		assert.equal(listed[0].imageKey, photos[1].imageKey);
+		assert.notInclude(
+			listed.map((photo) => photo.id),
+			other.photos[0].id,
+		);
+	});
+
+	test("an unknown slug is an OperatorTargetError", async ({ assert }) => {
+		await assert.rejects(
+			() => publication().operatorPhotos("d04-no-such-studio"),
+			OperatorTargetError,
+		);
 	});
 });
