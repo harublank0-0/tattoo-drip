@@ -175,7 +175,12 @@ test.group("Packages: EntitlementService", (group) => {
 		const now = DateTime.utc().startOf("second");
 		await new PilotGrantService().grant(
 			"ent-pilot",
-			{ package: "studio", endsAt: now.plus({ months: 4 }), note: "Pilot" },
+			{
+				package: "studio",
+				endsAt: now.plus({ months: 4 }),
+				note: "Pilot",
+				grantedBy: "Ops",
+			},
 			now,
 		);
 
