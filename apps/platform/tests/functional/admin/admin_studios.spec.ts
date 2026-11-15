@@ -166,20 +166,24 @@ test.group("Admin studios", (group) => {
 			.get(`/admin/studios/${a.tenant.slug}`)
 			.loginAs(admin)
 			.withInertia();
-		const props = page.inertiaProps as any;
+		type Item = {
+			kind: string;
+			kindLabel: string;
+			takedown: { reasonLabel: string } | null;
+		};
+		const props = page.inertiaProps as {
+			discover: { statusLabel: string };
+			reports: { reasonLabel: string }[];
+			takenDown: Item[];
+			live: Item[];
+			takedownReasons: { value: string; label: string }[];
+		};
 		assert.equal(props.discover.statusLabel, "Removed by TattooDrip");
 		assert.equal(props.reports[0].reasonLabel, "Off-topic");
-		const reply = props.takenDown.find(
-			(item: { kind: string }) => item.kind === "reply",
-		);
-		assert.equal(reply.kindLabel, "Reply");
-		assert.equal(reply.takedown.reasonLabel, "Client's request");
-		const kinds = props.live.map(
-			(item: { kind: string; kindLabel: string }) => [
-				item.kind,
-				item.kindLabel,
-			],
-		);
+		const reply = props.takenDown.find((item) => item.kind === "reply");
+		assert.equal(reply?.kindLabel, "Reply");
+		assert.equal(reply?.takedown?.reasonLabel, "Client's request");
+		const kinds = props.live.map((item) => [item.kind, item.kindLabel]);
 		assert.deepInclude(kinds, ["review", "Review"]);
 		assert.deepInclude(kinds, ["post", "Fresh ink post"]);
 		assert.deepEqual(props.takedownReasons, [
