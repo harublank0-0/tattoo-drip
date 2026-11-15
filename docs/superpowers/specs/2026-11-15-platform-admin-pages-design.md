@@ -45,7 +45,7 @@ Success: the admin goes a normal week without SSHing in for any of the commands 
 ## Approaches considered
 
 - **A. One form per command.** Each command becomes a form (slug + reason → take down). Least work, but the admin still copies slugs and ids from elsewhere, which is half of what's tiresome about the shell.
-- **B. Browse, then act (chosen).** Studios list → studio page with every actionable item and its button; a report queue with actions per row; a metrics page; an account confirm form. Costs one new database function for the studio list, which metrics needs anyway.
+- **B. Browse, then act (chosen).** Studios list → studio page with every actionable item and its button; a report queue with actions per row; a metrics page; an account confirm form. Needs a safe listing of every studio, which metrics needs anyway (`package_tenants()` turned out to exist already).
 - **C. B with lookup-by-slug instead of a studio list.** Saves nothing: the metrics page needs the same listing function.
 
 The admin picked **B**.
@@ -58,9 +58,9 @@ The admin picked **B**.
 - The shared Inertia data gains `platformAdmin: true` for an admin (from `isPlatformAdmin`), and the account menu shows an "Admin" link only then. The flag only hides a link; the middleware stays the gate.
 - All admin pages share a small sub-nav: Studios, Reports, Metrics, Accounts, Billing, Payments. Breadcrumb labels go in `inertia/components/shell/breadcrumbs.ts`.
 
-### Database: `live_tenants()`
+### Database: reuse `package_tenants()`
 
-A SECURITY DEFINER function returning `table (tenant_id uuid)` of tenants where `deleted_at is null`, ids only, hardened and granted like `billing_tenants()`. Used by the Studios list and Metrics. Each studio is then read in its own context.
+*(Amended during implementation.)* The design first called for a new `live_tenants()` function. `main` already has `package_tenants()` (migration `1792000000002`), which is exactly that: a SECURITY DEFINER function returning the id of every tenant with `deleted_at is null`, hardened and granted to the app role. The Studios list and Metrics use it; no migration is needed. Its reason in `DEFINER_FUNCTIONS` (`tests/functional/rls/catalog_guard.spec.ts`) and its entry in `database/README.md` are broadened to name the admin Studios and Metrics pages.
 
 ### Studios list (`GET /admin/studios`)
 
@@ -113,7 +113,6 @@ One email field and the warning from the command: confirm only after checking wh
 - Every new route: a non-admin and an unconfirmed admin email get 404; signed-out gets the sign-in redirect (like `billing.spec.ts` covers the existing admin pages).
 - Each action through the page route, checked at the effect the command tests already check (e.g. the public Discover API no longer returns the studio; the review shows as taken down; the report is closed).
 - Validation: missing/too-long reason, unknown reason, bad uuid, unknown slug or id, a photo id from another studio (must 404 or refuse, not act).
-- `live_tenants()`: returns live studios only, and the app role can call it (in the `rls` / function tests where the other lookup functions are tested).
 - Metrics page: numbers match `metrics:pilot` for the same studios and window.
 
 ### Docs

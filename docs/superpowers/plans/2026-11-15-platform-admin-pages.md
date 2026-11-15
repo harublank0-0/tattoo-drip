@@ -4,7 +4,7 @@
 
 **Goal:** `/admin` pages (Studios, studio page, Reports, Metrics, Accounts) that do what the Discover, reviews, `account:verify` and `metrics:pilot` shell commands do.
 
-**Architecture:** Thin controllers under the existing `/admin` route group (auth → dbContext → platformAdmin) call the same services the commands call. Cross-tenant listing uses a new SECURITY DEFINER function `live_tenants()` (ids only), then each studio is read in its own `withDbContext({ tenantId })`. No request uses the `owner` connection.
+**Architecture:** Thin controllers under the existing `/admin` route group (auth → dbContext → platformAdmin) call the same services the commands call. Cross-tenant listing uses the existing SECURITY DEFINER function `package_tenants()` (ids only, every live studio), then each studio is read in its own `withDbContext({ tenantId })`. No request uses the `owner` connection.
 
 **Tech Stack:** AdonisJS 7, Lucid/PostgreSQL, VineJS, Inertia + React, shadcn, Japa.
 
@@ -35,55 +35,9 @@
 
 ---
 
-### Task 1: `live_tenants()` database function
+### Task 1: (dropped) `live_tenants()` database function
 
-**Files:**
-- Create: `database/migrations/1792010000000_create_live_tenants_function.ts`
-- Test: `tests/functional/admin/live_tenants.spec.ts`
-
-**Interfaces:**
-- Produces: SQL `public.live_tenants() returns table (tenant_id uuid)` — every tenant with `deleted_at is null`, granted to the app role. Order isn't guaranteed; callers sort.
-
-- [ ] **Step 1: Write the failing test** (pattern: `tests/functional/reviews/open_review_reports.spec.ts`, using `sql({}, …)` and `twoStudios()`, inside `wrapInGlobalTransaction`)
-
-```ts
-test("lists every live studio's id to the app role, which sees no tenant row itself", async ({ assert }) => {
-	const { a, b } = await twoStudios();
-	const { rows: seen } = await sql({}, "select count(*)::int as n from tenants");
-	assert.equal(seen[0].n, 0);
-	const { rows } = await sql({}, "select tenant_id from public.live_tenants()");
-	const ids = rows.map((r: { tenant_id: string }) => r.tenant_id);
-	assert.includeMembers(ids, [a.tenant.id, b.tenant.id]);
-});
-
-test("leaves out a deleted studio", async ({ assert }) => {
-	const { a, b } = await twoStudios();
-	await inTenant(b.tenant, () => Tenant.query().where("id", b.tenant.id).update({ deleted_at: new Date() }));
-	const ids = (await sql({}, "select tenant_id from public.live_tenants()")).rows.map((r: { tenant_id: string }) => r.tenant_id);
-	assert.include(ids, a.tenant.id);
-	assert.notInclude(ids, b.tenant.id);
-});
-```
-
-(If soft-deleting a tenant needs another path in the helpers, use whatever `open_review_reports.spec.ts`'s "deleted studio" case uses.)
-
-- [ ] **Step 2: Run it to verify it fails**
-
-Run: `pnpm test functional --files=live_tenants.spec.ts`
-Expected: FAIL, `function public.live_tenants() does not exist`.
-
-- [ ] **Step 3: Write the migration**
-
-Copy the shape of `billing_tenants()` in `database/migrations/1791950000002_create_payment_lookup_functions.ts`: `language sql stable security definer`, `set search_path = pg_catalog, pg_temp`, `begin atomic … end`, `revoke all … from public`, `grant execute … to ${appRole}`; `down()` drops it. Body: `select t.id from public.tenants t where t.deleted_at is null;`. Doc comment: ids only, for the admin's Studios and Metrics pages, each studio then read in its own context.
-
-- [ ] **Step 4: Migrate and run the test**
-
-Run: `pnpm migrate && pnpm test functional --files=live_tenants.spec.ts`
-Expected: PASS. `database/schema.ts` unchanged (functions don't regenerate it); if it changed, keep the regenerated file.
-
-- [ ] **Step 5: Commit**
-
-`git commit -m "feat(platform): add the live_tenants() listing for the admin pages"`
+Dropped during execution: `package_tenants()` (migration `1792000000002`) already returns every live studio's id to the app role, byte for byte what this task would have added. Tasks 4 and 7 use `package_tenants()`. Task 4 also broadens its reason in `DEFINER_FUNCTIONS` (`tests/functional/rls/catalog_guard.spec.ts`) and its entry in `database/README.md` to name the admin Studios and Metrics pages.
 
 ---
 
@@ -214,10 +168,11 @@ Expected: PASS, including the existing cases in both files.
 - Create: `app/controllers/admin_studios_controller.ts`
 - Create: `inertia/pages/admin/studios/index.tsx`, `inertia/pages/admin/studios/show.tsx`
 - Modify: `start/routes.ts`, `tests/functional/identity/account_routes.spec.ts`
+- Modify: `tests/functional/rls/catalog_guard.spec.ts` (`package_tenants` reason), `apps/platform/database/README.md` (its definer-function entry): name the admin Studios and Metrics pages too
 - Test: `tests/functional/admin/admin_studios.spec.ts`
 
 **Interfaces:**
-- Consumes: `live_tenants()` (Task 1), `operatorPhotos`, `studioItems` (Task 3), existing `PublicationService.operatorStatus`, `PublicationService.overview`, `ReviewOperatorService.openReports`, `TenancyService.tenantIdForSlug`, `ImageService.urlFor("artist_work_photo", key, tenant, THUMBNAIL_WIDTH)`.
+- Consumes: `package_tenants()` (existing, every live studio's id), `operatorPhotos`, `studioItems` (Task 3), existing `PublicationService.operatorStatus`, `PublicationService.overview`, `ReviewOperatorService.openReports`, `TenancyService.tenantIdForSlug`, `ImageService.urlFor("artist_work_photo", key, tenant, THUMBNAIL_WIDTH)`.
 - Produces: routes `GET /admin/studios` (`admin.studios`), `GET /admin/studios/:slug` (`admin.studios.show`). Props:
 
 ```ts
@@ -252,7 +207,7 @@ Expected: FAIL (404 for the admin: no route).
 
 - [ ] **Step 3: Implement the controller and pages**
 
-`index`: ids from `live_tenants()`, each studio's row read in `withDbContext({ tenantId })` (Tenant + `overview`), open-report counts by grouping `openReports()` by `tenantId`; sort by `createdAt`, then id. Browser-side text filter on name/slug. `show`: `tenantIdForSlug(slug)` → null ⇒ 404 (`E_ROUTE_NOT_FOUND`); read the tenant in context; if `tenant.slug !== slug` redirect to the current slug; then gather the props. Page sections in the spec's order (Discover listing, Photos, Reviews and Fresh ink, Open reports), buttons rendered but posting to the routes Tasks 5–6 add (forms may 404 until then; that's fine within the branch). Add both routes to `SIGNED_IN`.
+`index`: ids from `package_tenants()`, each studio's row read in `withDbContext({ tenantId })` (Tenant + `overview`), open-report counts by grouping `openReports()` by `tenantId`; sort by `createdAt`, then id. Browser-side text filter on name/slug. `show`: `tenantIdForSlug(slug)` → null ⇒ 404 (`E_ROUTE_NOT_FOUND`); read the tenant in context; if `tenant.slug !== slug` redirect to the current slug; then gather the props. Page sections in the spec's order (Discover listing, Photos, Reviews and Fresh ink, Open reports), buttons rendered but posting to the routes Tasks 5–6 add (forms may 404 until then; that's fine within the branch). Add both routes to `SIGNED_IN`.
 
 - [ ] **Step 4: Run tests, codegen, typecheck**
 
@@ -345,7 +300,7 @@ Flashes: takedown "The {kind} is off every public surface." (post: "The post is 
 - Test: `tests/functional/admin/admin_metrics.spec.ts`
 
 **Interfaces:**
-- Consumes: `live_tenants()`, `PilotMetricsService.forStudio(studio, window)`, `lastDays`, `combineFacts`, `pilotTiles`, `GATE_DAYS` (`#modules/reports/pilot_metrics`), `inertia/components/pilot_metrics_card.tsx` (reuse its tile rendering; extract a presentational piece if it's coupled to the studio card).
+- Consumes: `package_tenants()`, `PilotMetricsService.forStudio(studio, window)`, `lastDays`, `combineFacts`, `pilotTiles`, `GATE_DAYS` (`#modules/reports/pilot_metrics`), `inertia/components/pilot_metrics_card.tsx` (reuse its tile rendering; extract a presentational piece if it's coupled to the studio card).
 - Produces: `GET /admin/metrics?days=` (`admin.metrics`). Props: `{ days: number; fromText: string; toText: string; studios: { slug: string; name: string; tiles: PilotTile[] }[]; total: { count: number; tiles: PilotTile[] } }`.
 
 - [ ] **Step 1: Write the failing tests**
