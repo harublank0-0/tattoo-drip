@@ -97,6 +97,31 @@ test.group("boot guard", () => {
 		assert.notMatch(output, /Pilot numbers/);
 	}).timeout(40_000);
 
+	// It writes a grant in the studio's own context and relies on RLS to keep
+	// it there, so it is guarded like metrics:pilot.
+	test("packages:pilot refuses to run as the owner role", async ({
+		assert,
+	}) => {
+		const { exitCode, killed, output } = await bootAsOwner([
+			"ace.js",
+			"packages:pilot",
+			"no-such-studio",
+			"--package",
+			"studio",
+			"--until",
+			"2099-01-01",
+			"--note",
+			"Guard test",
+			"--by",
+			"Ops",
+		]);
+
+		assert.isFalse(killed);
+		assert.equal(exitCode, 1);
+		assert.match(output, /is a superuser/);
+		assert.notMatch(output, /No studio uses/);
+	}).timeout(40_000);
+
 	// The guard checks the default (app role) connection only: the list of
 	// studios still comes through the command's own owner connection.
 	test("metrics:pilot runs as the app role and still lists studios as the owner", async ({

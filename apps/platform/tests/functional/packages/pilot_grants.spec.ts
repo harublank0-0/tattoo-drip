@@ -30,6 +30,7 @@ test.group("Packages: pilot grants", (group) => {
 				package: "studio",
 				endsAt: now.plus({ months: 4 }),
 				note: "Design partner",
+				grantedBy: "Operator A",
 			},
 			now,
 		);
@@ -40,6 +41,7 @@ test.group("Packages: pilot grants", (group) => {
 		assert.equal(grant.startsAt.toMillis(), now.toMillis());
 		assert.equal(grant.endsAt.toMillis(), now.plus({ months: 4 }).toMillis());
 		assert.equal(grant.note, "Design partner");
+		assert.equal(grant.grantedBy, "Operator A");
 	});
 
 	test("a new grant ends the running one, and a grant is visible only to its studio", async ({
@@ -52,12 +54,22 @@ test.group("Packages: pilot grants", (group) => {
 
 		await pilots.grant(
 			"pilot-b",
-			{ package: "solo", endsAt: now.plus({ months: 2 }), note: "First" },
+			{
+				package: "solo",
+				endsAt: now.plus({ months: 2 }),
+				note: "First",
+				grantedBy: "Ops",
+			},
 			now,
 		);
 		await pilots.grant(
 			"pilot-b",
-			{ package: "studio", endsAt: now.plus({ months: 6 }), note: "Second" },
+			{
+				package: "studio",
+				endsAt: now.plus({ months: 6 }),
+				note: "Second",
+				grantedBy: "Ops",
+			},
 			later,
 		);
 
@@ -79,7 +91,7 @@ test.group("Packages: pilot grants", (group) => {
 		assert.deepEqual(await inTenant(other, () => pilots.forTenant(tenant)), []);
 	});
 
-	test("an unknown studio, a past date or an empty note is refused", async ({
+	test("an unknown studio, a past date, an empty note or no operator is refused", async ({
 		assert,
 	}) => {
 		await studioWithOwner("pilot-d", "Pilot D");
@@ -88,6 +100,7 @@ test.group("Packages: pilot grants", (group) => {
 			package: "studio" as const,
 			endsAt: now.plus({ months: 1 }),
 			note: "Pilot",
+			grantedBy: "Ops",
 		};
 
 		await assert.rejects(
@@ -110,6 +123,12 @@ test.group("Packages: pilot grants", (group) => {
 		for (const note of ["", "   ", "x".repeat(501)]) {
 			await assert.rejects(
 				() => pilots.grant("pilot-d", { ...valid, note }, now),
+				PilotGrantError,
+			);
+		}
+		for (const grantedBy of ["", "   ", "x".repeat(101)]) {
+			await assert.rejects(
+				() => pilots.grant("pilot-d", { ...valid, grantedBy }, now),
 				PilotGrantError,
 			);
 		}

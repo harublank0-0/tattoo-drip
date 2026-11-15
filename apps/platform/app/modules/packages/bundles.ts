@@ -18,3 +18,13 @@ export async function bundleIdsByKey(
 	}
 	return ids;
 }
+
+/** The keys of the allowance bundles with these ids, for reports. */
+export async function bundleKeysById(
+	ids: readonly string[],
+): Promise<Map<string, string>> {
+	const bundles = await AllowanceBundle.query().whereIn("id", [
+		...new Set(ids),
+	]);
+	return new Map(bundles.map((bundle) => [bundle.id, bundle.key]));
+}

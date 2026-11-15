@@ -1713,6 +1713,7 @@ export class PilotGrantSchema extends BaseModel {
 		"allowanceBundleId",
 		"createdAt",
 		"endsAt",
+		"grantedBy",
 		"id",
 		"note",
 		"package",
@@ -1726,6 +1727,8 @@ export class PilotGrantSchema extends BaseModel {
 	declare createdAt: DateTime;
 	@column.dateTime()
 	declare endsAt: DateTime;
+	@column()
+	declare grantedBy: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()

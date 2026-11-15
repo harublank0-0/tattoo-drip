@@ -35,6 +35,23 @@ export default class EntitlementService {
 		private pilots: PilotGrantService,
 	) {}
 
+	/**
+	 * Bundle ids by key, read once per service instance: bundles never change
+	 * (`allowance_bundles_guard`), so a loop over studios reads them once.
+	 */
+	private knownBundles = new Map<string, string>();
+
+	private async bundleIds(keys: string[]): Promise<Map<string, string>> {
+		const missing = keys.filter((key) => !this.knownBundles.has(key));
+		if (missing.length > 0) {
+			for (const [key, id] of await bundleIdsByKey(missing)) {
+				this.knownBundles.set(key, id);
+			}
+		}
+		return this.knownBundles;
+	}
+
+	/** The studio's entitlement, reading the studio first. */
 	async for(
 		tenant: Pick<Tenant, "id">,
 		at: DateTime = DateTime.utc(),
@@ -45,14 +62,25 @@ export default class EntitlementService {
 				"EntitlementService.for: the studio isn't visible in this context",
 			);
 		}
-		const coverage = await this.billing.paidCoverage(tenant);
-		const grants = await this.pilots.forTenant(tenant);
+		return this.forLoaded(studio, at);
+	}
+
+	/**
+	 * The same for a studio the caller has just loaded in this context (the
+	 * admin page's loop), without reading it again.
+	 */
+	async forLoaded(
+		studio: Pick<Tenant, "id" | "createdAt" | "type" | "selectedPackage">,
+		at: DateTime = DateTime.utc(),
+	): Promise<Entitlement> {
+		const coverage = await this.billing.paidCoverage(studio);
+		const grants = await this.pilots.forTenant(studio);
 		// No choice on record (a workspace from before, a fixture): the type's
 		// suggestion, as at signup.
 		const trialPackage =
 			studio.selectedPackage ?? packageForTenantType(studio.type);
 		const trialBundleKey = PACKAGES[trialPackage].defaultBundleKey;
-		const bundles = await bundleIdsByKey([trialBundleKey, LEGACY_BUNDLE_KEY]);
+		const bundles = await this.bundleIds([trialBundleKey, LEGACY_BUNDLE_KEY]);
 		const legacyBundle = bundles.get(LEGACY_BUNDLE_KEY) as string;
 
 		return resolveEntitlement({
