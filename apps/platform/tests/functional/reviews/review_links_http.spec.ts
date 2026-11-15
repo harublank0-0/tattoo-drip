@@ -6,7 +6,6 @@ import MessageTemplate from "#modules/notifications/models/message_template";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ReviewLink from "#modules/reviews/models/review_link";
 import { REVIEW_TOKEN } from "#modules/reviews/review_links";
-import env from "#start/env";
 import { makeArtist } from "#tests/helpers/pipeline";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
@@ -265,7 +264,7 @@ test.group("Ask for a review", (group) => {
 test.group("The review request message in Settings, Messages", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 
-	test("listed and saved while reviews are on; off, it is hidden and its text kept", async ({
+	test("listed and saved like the other messages", async ({
 		client,
 		assert,
 	}) => {
@@ -290,7 +289,7 @@ test.group("The review request message in Settings, Messages", (group) => {
 			.withCsrfToken()
 			.redirects(0);
 		assertValidationError(missing, "review_request");
-		// Emptied or left out while reviews are on: the same field error as the other kinds.
+		// Emptied or left out: the same field error as the other kinds.
 		for (const body of [
 			{ ...texts, review_request: "" },
 			Object.fromEntries(
@@ -324,33 +323,6 @@ test.group("The review request message in Settings, Messages", (group) => {
 				MessageTemplate.query().where("kind", "review_request").first(),
 			);
 		assert.equal((await row())?.body, "Tell us how it healed: {review_link}");
-
-		env.set("REVIEWS_ENABLED", false);
-		try {
-			const off = await client.get(settings).loginAs(a.owner).withInertia();
-			assert.notInclude(
-				(off.inertiaProps as { messages: { kind: string }[] }).messages.map(
-					({ kind }) => kind,
-				),
-				"review_request",
-			);
-			const { review_request: _, ...six } = texts;
-			(
-				await client
-					.put(settings)
-					.form(six)
-					.loginAs(a.owner)
-					.withCsrfToken()
-					.redirects(0)
-			).assertFlashMessage("success", "Messages saved.");
-		} finally {
-			env.set("REVIEWS_ENABLED", true);
-		}
-		assert.equal(
-			(await row())?.body,
-			"Tell us how it healed: {review_link}",
-			"kept while reviews are off",
-		);
 	});
 });
 

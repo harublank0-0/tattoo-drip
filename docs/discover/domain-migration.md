@@ -206,7 +206,8 @@ Any one of these stops the launch (stage D) or triggers the rollback (H):
    - No challenge (Bot Fight Mode, Under Attack, a challenge rule) on `app.` or `api.`: Discover's and the studio pages' servers read `https://api.tattoodrip.app` from the server's own address and cannot solve one.
    - Add `app.tattoodrip.app` to the optional sign-in rate-limiting rule (3.8) beside the apex; never aim a rule at `/api/`.
    - No cache rule on any host (I, "Edge caching of `/api`"): Cloudflare's defaults cache only the hashed `/assets/*` and the brand files, never Discover's HTML, the API's JSON, robots or sitemaps.
-5. The functional switch itself happens in one step (D). There is no useful half state: Studio OS on `app.` with the API still on the apex would split sessions and CORS. The full split layout was rehearsed in production mode instead (J2).
+5. R2, `tattoo-drip-private`, CORS policy (runbook 3.2): the dashboard uploads videos straight to the bucket from `APP_URL`'s origin, so add `https://app.tattoodrip.app` to `AllowedOrigins` beside `https://tattoodrip.app` and `https://*.tattoodrip.page`. Keep the apex until the rollback window closes (E.6), so a rollback still uploads. Run the runbook's CORS check (3.2) with `Origin: https://app.tattoodrip.app`. **You should see:** `200` and `access-control-allow-origin` naming it. Without it every video angle upload fails after the cutover, before any byte is sent.
+6. The functional switch itself happens in one step (D). There is no useful half state: Studio OS on `app.` with the API still on the apex would split sessions and CORS. The full split layout was rehearsed in production mode instead (J2).
 
 ### D. Cutover (approval required)
 
@@ -238,7 +239,7 @@ Any one of these stops the launch (stage D) or triggers the rollback (H):
 3. **The visitor's address** on the new hosts is real (runbook 4.8, with `app.tattoodrip.app`).
 4. **Discover is launched** when 1–3 hold. Indexing stays off until the product owner decides (blueprint J). Then set `DISCOVER_INDEXING=on` in `discover.env`, recreate it (`dc --profile discover up -d --force-recreate discover`), rerun the smoke test with `SMOKE_INDEXING=on`, and submit `https://tattoodrip.app/sitemap.xml` in Search Console. Each of those is its own decision.
 5. **Geolocation** stays off until a request with a made-up `CF-IPCountry: IN` from outside Nepal reaches Discover with Cloudflare's own value (`curl -H 'CF-IPCountry: IN' https://tattoodrip.app/` and the country it shows). Then set `DISCOVER_GEO_HEADER=X-Discover-Country` and recreate Discover.
-6. **Later:** legacy 307 → 308 when the rollback window closes (14 days); remove the apex `/api` proxy and `hosts.current.conf` after 30 days with no apex `/api` traffic.
+6. **Later:** legacy 307 → 308 when the rollback window closes (14 days), and then remove `https://tattoodrip.app` from the private bucket's CORS `AllowedOrigins` (C.5); remove the apex `/api` proxy and `hosts.current.conf` after 30 days with no apex `/api` traffic.
 
 ## H. Rollback
 

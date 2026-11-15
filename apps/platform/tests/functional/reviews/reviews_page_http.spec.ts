@@ -5,7 +5,6 @@ import Artist from "#modules/artists/models/artist";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import ClientPost from "#modules/reviews/models/client_post";
 import ClientReview from "#modules/reviews/models/client_review";
-import env from "#start/env";
 import { makeArtist, makeProject } from "#tests/helpers/pipeline";
 import { seedPost } from "#tests/helpers/reviews";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
@@ -562,63 +561,5 @@ test.group("Reviews page: the studio's decisions", (group) => {
 			"POST /t/:tenant/reviews/posts/:id/unpublish",
 			"PUT /t/:tenant/reviews/:id/reply",
 		]);
-	});
-});
-
-test.group("Reviews page: the feature flag", (group) => {
-	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
-
-	test("off, every review route is a 404 and the shell has no Reviews count", async ({
-		client,
-		assert,
-	}) => {
-		const { a } = await twoStudios();
-		env.set("REVIEWS_ENABLED", false);
-		try {
-			const sends = [
-				client.get(page(a)),
-				client.post(page(a, `/posts/${a.waitingPost.id}/approve`)),
-				client.post(page(a, `/posts/${a.waitingPost.id}/decline`)),
-				client.post(page(a, `/posts/${a.approvedPost.id}/unpublish`)),
-				client
-					.put(page(a, `/${a.clientReview.id}/reply`))
-					.form({ reply: "Hi" }),
-				client.delete(page(a, `/${a.clientReview.id}/reply`)),
-				client
-					.post(page(a, `/${a.clientReview.id}/report`))
-					.form({ reason: "hate" }),
-				client.post(
-					`/t/${a.tenant.slug}/projects/${a.finishProject.id}/review-link`,
-				),
-				client.delete(
-					`/t/${a.tenant.slug}/projects/${a.reviewProject.id}/review-link`,
-				),
-			];
-			for (const send of sends) {
-				(await send.loginAs(a.owner).withCsrfToken().redirects(0)).assertStatus(
-					404,
-				);
-			}
-			const today = await client
-				.get(`/t/${a.tenant.slug}/today`)
-				.loginAs(a.owner)
-				.withInertia();
-			assert.isNull(
-				(today.inertiaProps as { reviewsCount: null }).reviewsCount,
-			);
-			const project = await client
-				.get(`/t/${a.tenant.slug}/projects/${a.reviewProject.id}`)
-				.loginAs(a.owner)
-				.withInertia();
-			assert.isNull((project.inertiaProps as { review: null }).review);
-		} finally {
-			env.set("REVIEWS_ENABLED", true);
-		}
-		assert.equal(
-			(await inTenant(a.tenant, () => ClientPost.findOrFail(a.waitingPost.id)))
-				.status,
-			"waiting",
-		);
-		assert.equal((await review(a)).reply, "Thank you for coming in!");
 	});
 });

@@ -57,11 +57,9 @@ tags:
     description: |
       The client's review page (Reviews and Fresh ink, slice 1): a review and
       a Fresh ink post through the private link a studio sends after a
-      project. Behind a feature flag until the client content terms are
-      reviewed: while it is off every review page operation is a 404. The
-      link's token travels in the `X-Review-Token` header, never in a URL.
-      And what the studio's own page shows of them (slice 3): `listReviews`
-      and `listFreshInk`, which answer an empty page while the flag is off.
+      project. The link's token travels in the `X-Review-Token` header,
+      never in a URL. And what the studio's own page shows of them (slice 3):
+      `listReviews` and `listFreshInk`.
 
 paths:
   /styles:
@@ -233,9 +231,8 @@ paths:
         never "best first", a page at a time. `rating` is the average and
         count of all of them, only from 3 (ruling 10); below that it is null:
         list the reviews without an average. A studio that unlists takes
-        every review off at once. While reviews are switched off on the
-        platform the answer is an empty page with a null `rating`. 404 like
-        `getDiscoverStudio`. Cacheable like every Discover read.
+        every review off at once. 404 like `getDiscoverStudio`. Cacheable
+        like every Discover read.
       parameters:
         - $ref: "#/components/parameters/DiscoverCursor"
         - $ref: "#/components/parameters/DiscoverLimit"
@@ -257,8 +254,7 @@ paths:
       description: |
         Reviews and Fresh ink (slice 4): the studio's Fresh ink posts on
         Discover (see `listDiscoverFreshInk`), newest published first, a page
-        at a time. 404 like `getDiscoverStudio`; an empty page while reviews
-        are switched off.
+        at a time. 404 like `getDiscoverStudio`.
       parameters:
         - $ref: "#/components/parameters/DiscoverCursor"
         - $ref: "#/components/parameters/DiscoverLimit"
@@ -546,8 +542,7 @@ paths:
         that matches nothing is an empty page. Each post names its studio's
         slug (its Discover profile) and carries the studio's booking link
         and page, as an artwork does. A studio that unlists takes every post
-        off at once. While reviews are switched off on the platform the
-        answer is an empty page. Cacheable like every Discover read.
+        off at once. Cacheable like every Discover read.
       parameters:
         - $ref: "#/components/parameters/DiscoverCountry"
         - $ref: "#/components/parameters/DiscoverCity"
@@ -1063,10 +1058,8 @@ paths:
         at least 3 of them; below that it is null: list the reviews without
         an average. Never mark these reviews up as `AggregateRating` or
         `Review` structured data on the studio's own site (self-serving
-        reviews are not eligible for review rich results). While reviews
-        are switched off on the platform the answer is an empty page with a
-        null `rating`, never an error. Cacheable. Under an old studio slug
-        it answers like under the current one.
+        reviews are not eligible for review rich results). Cacheable. Under
+        an old studio slug it answers like under the current one.
       parameters:
         - name: cursor
           in: query
@@ -1120,10 +1113,8 @@ paths:
         taken down, newest published first. One entry per post, shaped like
         a gallery tattoo: its main photo, with its other photos and ready
         videos in `angles`. Only the public copies are served; a video still
-        processing or one that failed is never listed. While reviews are
-        switched off on the platform the answer is an empty page, never an
-        error. Cacheable. Under an old studio slug it answers like under the
-        current one.
+        processing or one that failed is never listed. Cacheable. Under an
+        old studio slug it answers like under the current one.
       parameters:
         - name: cursor
           in: query
@@ -1443,8 +1434,7 @@ paths:
         (the shown name, the project's style and placement), and what the
         client has written and posted. Never cached. Every link that doesn't
         work (unknown, revoked, expired, another studio's, or its project
-        gone) is the same 404, and so is every operation while reviews are
-        off. Rate-limited per address and per link.
+        gone) is the same 404. Rate-limited per address and per link.
       responses:
         "200":
           description: The review page

@@ -9,8 +9,7 @@
 
 /**
  * The messages, in the order a project meets them: TAT-52's six, then the
- * review request (Reviews and Fresh ink, slice 2), which the dashboard
- * offers only while REVIEWS_ENABLED is on.
+ * review request (Reviews and Fresh ink, slice 2).
  */
 export const MESSAGE_KINDS = [
 	"inquiry_received",

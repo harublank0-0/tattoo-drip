@@ -29,20 +29,17 @@ export default class MessageTemplateService {
 	}
 
 	/**
-	 * Saves the texts given (messageTemplatesValidator checked them), each
+	 * Saves every text (messageTemplatesValidator checked them), each
 	 * normalized: one equal to the default removes the studio's row, any
-	 * other is stored in place; a kind left out keeps its row (the review
-	 * request while reviews are off). One transaction.
+	 * other is stored in place. One transaction.
 	 */
 	async save(
 		tenant: TenantRef,
-		texts: Partial<Record<MessageKind, string>>,
+		texts: Record<MessageKind, string>,
 	): Promise<void> {
 		await withTransaction(async (trx) => {
 			for (const kind of MESSAGE_KINDS) {
-				const text = texts[kind];
-				if (text === undefined) continue;
-				const body = normalizeTemplate(text);
+				const body = normalizeTemplate(texts[kind]);
 				if (body === DEFAULT_TEMPLATES[kind]) {
 					await MessageTemplate.query({ client: trx })
 						.where("tenant_id", tenant.id)

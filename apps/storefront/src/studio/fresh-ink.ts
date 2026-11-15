@@ -66,7 +66,7 @@ export interface FreshInkView {
 	readonly nextCursor: string | null;
 }
 
-/** What an older API, a failed read, the flag off or a garbled answer comes to. */
+/** What an older API, a failed read or a garbled answer comes to. */
 export const EMPTY_FRESH_INK: FreshInkView = Object.freeze({
 	posts: [],
 	nextCursor: null,

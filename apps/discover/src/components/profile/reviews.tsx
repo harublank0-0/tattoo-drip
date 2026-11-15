@@ -37,8 +37,7 @@ import { cn } from "#/lib/utils";
  * studio's clients' reviews (newest first, never "best first") with the
  * average only from 3 (ruling 10), and their Fresh ink. Both come from
  * optional reads: a failed or empty one renders nothing (no heading, no
- * "no reviews yet"), and while reviews are switched off on the platform the
- * API answers empty pages, so the profile shows nothing of either. "Show
+ * "no reviews yet"). "Show
  * more" reads the next page in the browser (it appears after hydration);
  * the sections are keyed by the profile, so moving to another profile on
  * the same route (an artist to a colleague) starts them again.

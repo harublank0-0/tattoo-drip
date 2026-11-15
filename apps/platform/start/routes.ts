@@ -610,16 +610,14 @@ router
 					.as("tenant.projects.deposit_outcome.store");
 				// "Ask for a review" (Reviews and Fresh ink, slice 2): owners and
 				// the project's artist (ReviewLinkService through findFor), once
-				// the tattoo work is done; 404 while REVIEWS_ENABLED is off.
+				// the tattoo work is done.
 				router
 					.post(":id/review-link", [controllers.ReviewLinks, "store"])
 					.where("id", router.matchers.uuid())
-					.use(middleware.reviewsOn())
 					.as("tenant.projects.review_link.store");
 				router
 					.delete(":id/review-link", [controllers.ReviewLinks, "destroy"])
 					.where("id", router.matchers.uuid())
-					.use(middleware.reviewsOn())
 					.as("tenant.projects.review_link.destroy");
 			})
 			.prefix("/projects");
@@ -627,9 +625,9 @@ router
 		/**
 		 * The Reviews page (Reviews and Fresh ink, slice 2): owners every
 		 * review and post, an artist those of projects assigned to their own
-		 * profile (StudioReviewService). 404 while REVIEWS_ENABLED is off. The
-		 * studio decides on a post and replies to or reports a review; no
-		 * route edits or hides a review or edits a post (rulings 6 and 7).
+		 * profile (StudioReviewService). The studio decides on a post and
+		 * replies to or reports a review; no route edits or hides a review or
+		 * edits a post (rulings 6 and 7).
 		 * Every reviews route goes in this group (a test checks).
 		 */
 		router
@@ -662,8 +660,7 @@ router
 					.where("id", router.matchers.uuid())
 					.as("tenant.reviews.report.store");
 			})
-			.prefix("/reviews")
-			.use(middleware.reviewsOn());
+			.prefix("/reviews");
 
 		/**
 		 * Decisions on one payment (TAT-66): owners only (TENANT_ROUTE_ROLES),
@@ -1070,9 +1067,7 @@ router
 				// What the studio's page shows of its clients' reviews and Fresh ink
 				// (Reviews and Fresh ink, slice 3): what the client allowed there and
 				// TattooDrip has not taken down, newest first, a page at a time. Only
-				// the query string is read. While REVIEWS_ENABLED is off both are
-				// empty pages, never an error, so the page's sections render nothing.
-				// A shorter stale window than the other reads (60 s, as Discover's):
+				// the query string is read. A shorter stale window than the other reads (60 s, as Discover's):
 				// a takedown's text leaves shared caches within 2 minutes.
 				router
 					.get("/reviews", [controllers.PublicStudioReviews, "index"])
@@ -1115,8 +1110,7 @@ router
 					.as("api.v1.deposits.checkout");
 				// The client's review page (Reviews and Fresh ink, slice 1). The
 				// link's token rides in the X-Review-Token header, never the URL.
-				// reviewGuard answers every route with the 404 while the feature
-				// flag is off, then counts per address and per token. Never cached.
+				// reviewGuard counts per address and per token. Never cached.
 				router
 					.group(() => {
 						router

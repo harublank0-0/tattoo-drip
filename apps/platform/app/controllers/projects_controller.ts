@@ -98,7 +98,6 @@ import ProjectService, {
 import QuoteService from "#modules/projects/services/quote_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import WaitingService from "#modules/projects/services/waiting_service";
-import { reviewsEnabled } from "#modules/reviews/review_links";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ReviewLinkService from "#modules/reviews/services/review_link_service";
 import { dayText, lastDayText } from "#modules/reviews/studio_copy";
@@ -531,12 +530,10 @@ export default class ProjectsController {
 				: null;
 		// "Ask for a review" (Reviews and Fresh ink, slice 2): owners and the
 		// project's artist (the page is theirs: findFor above), once the tattoo
-		// work is done (ruling 3, the link service's own rule); nothing while
-		// REVIEWS_ENABLED is off.
-		const reviewProps =
-			reviewsEnabled() && (await this.reviewLinks.tattooDone(tenant, project))
-				? await this.reviewPanel(tenant, project, client, texts.review_request)
-				: null;
+		// work is done (ruling 3, the link service's own rule).
+		const reviewProps = (await this.reviewLinks.tattooDone(tenant, project))
+			? await this.reviewPanel(tenant, project, client, texts.review_request)
+			: null;
 		// Owners only, while the project waits for its deposit (TAT-65).
 		const depositProps =
 			membership.role === "owner" && project.status === "deposit_pending"

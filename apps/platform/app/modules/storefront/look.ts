@@ -26,7 +26,7 @@ export const DEFAULT_FONT: FontKey = "eczar";
  * photos, the artists, Flash (`flash`, TAT-129: the newest flash designs),
  * Fresh ink (`fresh_ink`) and Reviews (`reviews`) (Reviews and Fresh ink,
  * slice 3: clients' healed tattoos and reviews; each renders nothing until
- * something is shown there, and nothing while REVIEWS_ENABLED is off), Good
+ * something is shown there), Good
  * to know (`info`, TAT-128: hours and what clients ask) and the "Got an
  * idea?" invitation to the request page (`inquiry`).
  * The storefront's SECTION_KEYS is the same list in the same order
@@ -62,56 +62,6 @@ export const DEFAULT_SECTIONS: readonly SectionKey[] = [
 	"info",
 	"inquiry",
 ];
-
-/**
- * The sections of Reviews and Fresh ink: while REVIEWS_ENABLED is off,
- * Settings, Page look neither lists nor sends them, and a save keeps them
- * where they were (`keepSections`), so switching the flag on later finds
- * each studio's list as it was.
- */
-export const REVIEW_SECTIONS: readonly SectionKey[] = ["fresh_ink", "reviews"];
-
-/**
- * The sections that exist for this request: all of them, but Reviews and
- * Fresh ink's only while REVIEWS_ENABLED is on (`reviewsOn`, read by the
- * caller: this file is pure). Settings, Page look lists these, and the
- * public `Studio.storefront.sections` carries these, so a studio page makes
- * no reviews or Fresh ink read while the feature is off.
- */
-export function sectionsShown(
-	keys: readonly SectionKey[],
-	reviewsOn: boolean,
-): SectionKey[] {
-	return reviewsOn
-		? [...keys]
-		: keys.filter((key) => !REVIEW_SECTIONS.includes(key));
-}
-
-/**
- * The list a save stores when the form could not show `kept` (sections it
- * neither listed nor sent): `sent` without them, then each of them the
- * stored list holds, put back right after the nearest section before it in
- * the stored list that the new list has (at the start when none is). Pure.
- */
-export function keepSections(
-	sent: readonly SectionKey[],
-	stored: readonly SectionKey[],
-	kept: readonly SectionKey[],
-): SectionKey[] {
-	const sections = sent.filter((key) => !kept.includes(key));
-	stored.forEach((key, index) => {
-		if (!kept.includes(key) || sections.includes(key)) return;
-		for (let before = index - 1; before >= 0; before--) {
-			const at = sections.indexOf(stored[before]);
-			if (at !== -1) {
-				sections.splice(at + 1, 0, key);
-				return;
-			}
-		}
-		sections.unshift(key);
-	});
-	return sections;
-}
 
 /**
  * What the studio page does with one-of-a-kind flash designs somebody has

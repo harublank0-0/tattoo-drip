@@ -145,7 +145,7 @@ shortcuts:   flash or walk-in → booked     in_progress → booked (next sessio
 
 ## Reviews and Fresh ink
 
-Agreed with the product owner on 2026-11-12; the rulings are in the [spec](superpowers/specs/2026-11-12-reviews-and-fresh-ink-design.md). Slice 1 (data, links and the client's page) exists behind the `REVIEWS_ENABLED` setting, off until the [client content terms](legal/client-content-terms.md) are legally reviewed; while it is off, every review link is a not-found page.
+Agreed with the product owner on 2026-11-12; the rulings are in the [spec](superpowers/specs/2026-11-12-reviews-and-fresh-ink-design.md). All four slices are built and live; the [client content terms](legal/client-content-terms.md) are still a draft pending legal review.
 
 - Only a real client posts, through the studio's private link for one project (no open form, no client account). The link works for 12 months from when it is made and can be revoked; an expired or revoked link says "This link no longer works" with the studio's contact links and never shows what was posted. What was posted stays after the link ends.
 - A studio can make a project's link only once its tattoo work is done: a completed tattoo session, and the project in progress, in its healing check or completed. One live link per project; asking again shows the same link, or a new one after a revoke or expiry.

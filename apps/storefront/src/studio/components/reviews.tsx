@@ -193,8 +193,7 @@ export function AllReviewsLink({
 /**
  * Stencil & Ink's Reviews section (the `reviews` key): the average from 3
  * reviews, the newest six, and "All reviews" when more follow. Nothing when
- * there are none (reviews off, none allowed on the studio's page, a failed
- * read): no empty heading.
+ * there are none (none allowed on the studio's page, a failed read): no empty heading.
  */
 export function ReviewsSection({
 	view,
