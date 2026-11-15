@@ -8,10 +8,7 @@ import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService, {
 	type ProfileEditor,
 } from "#modules/artists/services/artist_service";
-import {
-	stillKey,
-	stillOf,
-} from "#modules/artists/services/work_photo_service";
+import { stillOf } from "#modules/artists/services/work_photo_service";
 import { knownStyles } from "#modules/artists/styles";
 import {
 	type ArtistDiscoverState,
@@ -80,8 +77,14 @@ export type OperatorPhoto = {
 	id: string;
 	artistId: string;
 	artistName: string;
-	/** The still's storage key, ready for ImageService.urlFor. */
-	imageKey: string;
+	kind: "photo" | "video";
+	/** A video's state; null for a photo. */
+	videoState: "processing" | "ready" | "failed" | null;
+	/**
+	 * The still's storage key (a video's poster, under the video's purpose),
+	 * ready for ImageService.urlFor; null while a video has no poster.
+	 */
+	imageKey: string | null;
 	takedown: { at: DateTime; note: string | null } | null;
 };
 
@@ -543,7 +546,8 @@ export default class PublicationService {
 	}
 
 	/**
-	 * Every work photo of the business's live artists, for the operator's
+	 * Every work photo and video of the business's live artists (leads and
+	 * angles: each is a Discover takedown target), for the operator's
 	 * studio page: taken-down first (newest takedown first), then by artist
 	 * name, then newest photo first.
 	 */
@@ -564,7 +568,16 @@ export default class PublicationService {
 					id: photo.id,
 					artistId: photo.artistId,
 					artistName: names.get(photo.artistId) as string,
-					imageKey: stillKey(photo),
+					kind:
+						photo.kind === "video" ? ("video" as const) : ("photo" as const),
+					videoState:
+						photo.kind === "video"
+							? ((photo.videoState ?? "processing") as
+									| "processing"
+									| "ready"
+									| "failed")
+							: null,
+					imageKey: photo.imageKey,
 					takedown: photo.discoverySuspendedAt
 						? {
 								at: photo.discoverySuspendedAt,

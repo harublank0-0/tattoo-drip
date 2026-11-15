@@ -14,7 +14,7 @@ import ImageService from "#modules/media/services/image_service";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient } from "#services/db_context";
-import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
+import { addArtist, addWorkPhoto, addWorkVideo } from "#tests/helpers/artists";
 import {
 	listThroughDashboard,
 	placeId,
@@ -700,6 +700,52 @@ test.group("Discover settings: operator photos", (group) => {
 			listed.map((photo) => photo.id),
 			other.photos[0].id,
 		);
+	});
+
+	test("lists angles and video angles in every state: no key while a video has no poster", async ({
+		assert,
+	}) => {
+		const { tenant, sita, photos } = await studio("d04-op-videos");
+		const [lead] = photos;
+		const { angle, processing, failed, ready } = await inTenant(
+			tenant,
+			async () => ({
+				angle: await addWorkPhoto(tenant, sita, {
+					angleOf: { lead, position: 1 },
+				}),
+				processing: await addWorkVideo(tenant, sita, lead, 2, {
+					state: "processing",
+				}),
+				failed: await addWorkVideo(tenant, sita, lead, 3, {
+					state: "failed",
+				}),
+				ready: await addWorkVideo(tenant, sita, lead, 4),
+			}),
+		);
+
+		const listed = await publication().operatorPhotos(tenant.slug);
+		const byId = new Map(listed.map((photo) => [photo.id, photo]));
+
+		assert.deepInclude(byId.get(angle.id), {
+			kind: "photo",
+			videoState: null,
+			imageKey: angle.imageKey,
+		});
+		assert.deepInclude(byId.get(processing.id), {
+			kind: "video",
+			videoState: "processing",
+			imageKey: null,
+		});
+		assert.deepInclude(byId.get(failed.id), {
+			kind: "video",
+			videoState: "failed",
+			imageKey: null,
+		});
+		assert.deepInclude(byId.get(ready.id), {
+			kind: "video",
+			videoState: "ready",
+			imageKey: ready.imageKey,
+		});
 	});
 
 	test("an unknown slug is an OperatorTargetError", async ({ assert }) => {

@@ -8,6 +8,7 @@ import ClientReview from "#modules/reviews/models/client_review";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { adminUser } from "#tests/helpers/admin";
+import { addWorkVideo } from "#tests/helpers/artists";
 import { makeProject } from "#tests/helpers/pipeline";
 import { seedReview } from "#tests/helpers/reviews";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
@@ -88,6 +89,51 @@ test.group("Admin studios", (group) => {
 			assert.notInclude(text, id);
 		}
 	});
+
+	for (const state of ["processing", "failed", "ready"] as const) {
+		test(`a studio with a ${state} video angle gets its page, with the video and the angle listed`, async ({
+			client,
+			assert,
+		}) => {
+			const { a } = await twoStudios();
+			const video = await inTenant(a.tenant, () =>
+				addWorkVideo(
+					a.tenant,
+					a.artistProfile,
+					// The seeded lead's columns as the database defaults them.
+					{ id: a.tattooLead.id, hidden: false, styles: [], healed: false },
+					2,
+					{ state },
+				),
+			);
+			const page = await client
+				.get(`/admin/studios/${a.tenant.slug}`)
+				.loginAs(await adminUser())
+				.withInertia();
+			page.assertStatus(200);
+			const photos = page.inertiaProps.photos as {
+				id: string;
+				kind: string;
+				thumbnailUrl: string | null;
+				placeholder: string | null;
+			}[];
+			const angle = photos.find((photo) => photo.id === a.tattooAngle.id);
+			assert.equal(angle?.kind, "photo");
+			assert.isString(angle?.thumbnailUrl);
+			const tile = photos.find((photo) => photo.id === video.id);
+			assert.equal(tile?.kind, "video");
+			if (state === "ready") {
+				assert.include(tile?.thumbnailUrl ?? "", "work_video");
+				assert.isNull(tile?.placeholder);
+			} else {
+				assert.isNull(tile?.thumbnailUrl);
+				assert.equal(
+					tile?.placeholder,
+					state === "processing" ? "Video processing" : "Video failed",
+				);
+			}
+		});
+	}
 
 	test("an old slug redirects to the current one", async ({ client }) => {
 		const { a } = await twoStudios();

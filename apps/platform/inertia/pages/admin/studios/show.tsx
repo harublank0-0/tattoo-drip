@@ -37,7 +37,10 @@ type Props = {
 	photos: {
 		id: string;
 		artistName: string;
-		thumbnailUrl: string;
+		kind: "photo" | "video";
+		/** Null while a video has no poster; `placeholder` says why. */
+		thumbnailUrl: string | null;
+		placeholder: string | null;
 		takedown: Takedown | null;
 	}[];
 	takenDown: Item[];
@@ -108,11 +111,18 @@ export default function AdminStudio({
 					<ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 						{photos.map((photo) => (
 							<li key={photo.id} className="flex flex-col gap-1 text-sm">
-								<img
-									src={photo.thumbnailUrl}
-									alt={`Work by ${photo.artistName}`}
-									className="aspect-square w-full rounded-md object-cover"
-								/>
+								{photo.thumbnailUrl ? (
+									<img
+										src={photo.thumbnailUrl}
+										alt={`${photo.kind === "video" ? "Video" : "Work"} by ${photo.artistName}`}
+										loading="lazy"
+										className="aspect-square w-full rounded-md object-cover"
+									/>
+								) : (
+									<div className="flex aspect-square w-full items-center justify-center rounded-md bg-muted text-muted-foreground">
+										{photo.placeholder}
+									</div>
+								)}
 								<span>{photo.artistName}</span>
 								{photo.takedown && (
 									<span className="text-muted-foreground">

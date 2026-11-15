@@ -10,6 +10,7 @@ import PublicationService, {
 import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
+import { VIDEO_PURPOSE } from "#modules/media/services/video_service";
 import { TAKEDOWN_REASONS } from "#modules/reviews/rules";
 import type { OperatorItem } from "#modules/reviews/services/review_operator_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -142,12 +143,21 @@ export default class AdminStudiosController {
 				photos.map(async (photo) => ({
 					id: photo.id,
 					artistName: photo.artistName,
-					thumbnailUrl: await this.images.urlFor(
-						"artist_work_photo",
-						photo.imageKey,
-						tenant,
-						THUMBNAIL_WIDTH,
-					),
+					kind: photo.kind,
+					// A video's poster is under the video's purpose, as the portfolio reads it.
+					thumbnailUrl: photo.imageKey
+						? await this.images.urlFor(
+								photo.kind === "video" ? VIDEO_PURPOSE : "artist_work_photo",
+								photo.imageKey,
+								tenant,
+								THUMBNAIL_WIDTH,
+							)
+						: null,
+					placeholder: photo.imageKey
+						? null
+						: photo.videoState === "failed"
+							? "Video failed"
+							: "Video processing",
 					takedown: photo.takedown ? takedownProps(photo.takedown) : null,
 				})),
 			),
