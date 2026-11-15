@@ -32,7 +32,7 @@ pg=$prefix-pg
 hb=$prefix-hb
 vol=$prefix-vol
 img=$prefix-img
-NODE_IMAGE=docker.io/library/node:24.3.0-bookworm-slim
+NODE_IMAGE=docker.io/library/node:24.22.3-bookworm-slim
 
 # One pin for Postgres: the production file's. The backup image must use the
 # same one, or pg_dump and the server drift apart.
