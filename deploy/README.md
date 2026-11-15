@@ -32,7 +32,7 @@ backup      --> R2 bucket  tattoo-drip-backups
 | Where | What |
 |---|---|
 | `/srv/tattoo-drip/app` | The git clone of the repo (read-only deploy key). Never edit files in it. |
-| `/srv/tattoo-drip/env` | The six settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env`, and a seventh, `discover.env`, required since the D11 cutover: its presence makes `deploy.sh` deploy Discover, and `deploy.sh` refuses the live nginx layout without it. Folder mode 700, files mode 600. Keep `discover.env` in the password manager with the others. |
+| `/srv/tattoo-drip/env` | The seven settings files, `postgres.env` `platform.env` `migrate.env` `storefront.env` `backup.env` `tunnel.env` `discover.env` (`discover.env` required since the D11 cutover: its presence makes `deploy.sh` deploy Discover, and `deploy.sh` refuses the live nginx layout without it. Folder mode 700, files mode 600. Keep `discover.env` in the password manager with the others. |
 | `/srv/tattoo-drip/deployed` | One line: the commit of the last successful deploy, written by `deploy.sh`. Going back (5) and a restore (7.5) read it. |
 | `/srv/tattoo-drip/restore` | Downloaded backups, only while you restore. They hold clients' data: delete them afterwards. |
 | Docker volume `tattoo-drip-prod_postgres_data` | The database. |
@@ -288,7 +288,7 @@ git -C /srv/tattoo-drip/app log -1 --oneline
 
 Each part of the stack reads its own file from `/srv/tattoo-drip/env`. The templates are in `deploy/env/*.env.example`; they carry a comment for every setting. A value that still says `CHANGE_ME` is yours to fill in, and `deploy.sh` refuses to start while any is left.
 
-### 2.1 Update the clone and make the six files
+### 2.1 Update the clone and make the seven files
 
 The clone on the server was made before the `deploy/` folder was merged, so bring it up to date first (only before the first deploy; after that `deploy.sh` does it):
 
@@ -302,7 +302,7 @@ ls /srv/tattoo-drip/app/deploy/env
 Then make the files. The loop never overwrites a file that exists, so running it again is safe:
 
 ```bash
-for name in postgres platform migrate storefront backup tunnel; do
+for name in postgres platform migrate storefront backup tunnel discover; do
   if [ -e /srv/tattoo-drip/env/$name.env ]; then
     echo "$name.env exists, skipped"
   else
@@ -315,25 +315,27 @@ ls -l /srv/tattoo-drip/env
 
 `install -m 600` makes each file readable by you alone from the start.
 
-**You should see:** `... created` six times (on a second run, `... exists, skipped`), then six files, each `-rw-------` and owned by `haru`.
+**You should see:** `... created` seven times (on a second run, `... exists, skipped`), then seven files, each `-rw-------` and owned by `haru`. `discover.env` is required since the D11 cutover: `deploy.sh` refuses the live nginx layout without it.
 
-**A seventh file, `discover.env`, is required since the D11 cutover:** `deploy.sh` refuses the live nginx layout without it. Make it the same way from `discover.env.example`, and give it and `platform.env` Discover's key as in the [domain migration](../docs/discover/domain-migration.md), G.A steps 4 and 5, but with `API_URL=https://api.tattoodrip.app`.
+**On a server that already runs without `discover.env`** (set up before this step listed it): the loop creates only `discover.env` and skips the rest. Don't run 2.2's block then; it would leave the other files alone but is meant for a fresh set. Give the new file and `platform.env` Discover's key by hand instead, as in the [domain migration](../docs/discover/domain-migration.md), G.A steps 4 and 5.
 
 ### 2.2 Make the secrets you generate yourself
 
-Some values must be the same in two or three files: the database owner's password (`postgres.env`, `migrate.env`, `backup.env`), the app role's password (`postgres.env`, `platform.env`) and the storefront's key (`platform.env`, `storefront.env`). This block makes each one once and writes it to every file, so you never type a secret and the copies cannot differ. Run it once, right after 2.1 made the files. It only replaces a `CHANGE_ME`, so a second run changes nothing in a file that is filled in; but never use it to repair one file (for example after deleting it): that file would get a password the other files and the existing database do not have.
+Some values must be the same in two or three files: the database owner's password (`postgres.env`, `migrate.env`, `backup.env`), the app role's password (`postgres.env`, `platform.env`) the storefront's key (`platform.env`, `storefront.env`) and Discover's key (`platform.env`, `discover.env`). This block makes each one once and writes it to every file, so you never type a secret and the copies cannot differ. Run it once, right after 2.1 made the files. It only replaces a `CHANGE_ME`, so a second run changes nothing in a file that is filled in; but never use it to repair one file (for example after deleting it): that file would get a password the other files and the existing database do not have.
 
 ```bash
 cd /srv/tattoo-drip/env
 owner_pw=$(openssl rand -hex 32)
 app_pw=$(openssl rand -hex 32)
 store_key=$(openssl rand -hex 32)
+discover_key=$(openssl rand -hex 32)
 sed -i "s|^POSTGRES_PASSWORD=CHANGE_ME$|POSTGRES_PASSWORD=$owner_pw|; s|^APP_DB_PASSWORD=CHANGE_ME$|APP_DB_PASSWORD=$app_pw|" postgres.env
 sed -i "s|^DB_MIGRATION_PASSWORD=CHANGE_ME$|DB_MIGRATION_PASSWORD=$owner_pw|" migrate.env
 sed -i "s|^PGPASSWORD=CHANGE_ME$|PGPASSWORD=$owner_pw|" backup.env
-sed -i "s|^APP_KEY=CHANGE_ME$|APP_KEY=$(openssl rand -hex 32)|; s|^DB_PASSWORD=CHANGE_ME$|DB_PASSWORD=$app_pw|; s|^STOREFRONT_SERVER_KEYS=CHANGE_ME$|STOREFRONT_SERVER_KEYS=$store_key|" platform.env
+sed -i "s|^APP_KEY=CHANGE_ME$|APP_KEY=$(openssl rand -hex 32)|; s|^DB_PASSWORD=CHANGE_ME$|DB_PASSWORD=$app_pw|; s|^STOREFRONT_SERVER_KEYS=CHANGE_ME$|STOREFRONT_SERVER_KEYS=$store_key|; s|^DISCOVER_SERVER_KEYS=CHANGE_ME$|DISCOVER_SERVER_KEYS=$discover_key|" platform.env
 sed -i "s|^STOREFRONT_SERVER_KEY=CHANGE_ME$|STOREFRONT_SERVER_KEY=$store_key|" storefront.env
-unset owner_pw app_pw store_key
+sed -i "s|^DISCOVER_SERVER_KEY=CHANGE_ME$|DISCOVER_SERVER_KEY=$discover_key|" discover.env
+unset owner_pw app_pw store_key discover_key
 ```
 
 Nothing is printed. Check that the generated lines are no longer placeholders. This lists the names of what is left, which at this point is only what Cloudflare gives you (the `cut` keeps values out of the output):
@@ -342,11 +344,11 @@ Nothing is printed. Check that the generated lines are no longer placeholders. T
 grep -n 'CHANGE_ME' /srv/tattoo-drip/env/*.env | grep -v ':[0-9]*:[[:space:]]*#' | cut -d= -f1
 ```
 
-**You should see:** exactly these nine names, each as `<file>:<line number>:<name>` (the numbers can differ): `TURNSTILE_SECRET_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in `platform.env`; `TUNNEL_TOKEN` in `tunnel.env`; `TURNSTILE_SITE_KEY` in `storefront.env`; and `RCLONE_CONFIG_R2_ACCESS_KEY_ID`, `RCLONE_CONFIG_R2_SECRET_ACCESS_KEY` and `RCLONE_CONFIG_R2_ENDPOINT` in `backup.env`. No `APP_KEY`, no password, no `STOREFRONT_SERVER_KEY` line.
+**You should see:** exactly these nine names, each as `<file>:<line number>:<name>` (the numbers can differ): `TURNSTILE_SECRET_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in `platform.env`; `TUNNEL_TOKEN` in `tunnel.env`; `TURNSTILE_SITE_KEY` in `storefront.env`; and `RCLONE_CONFIG_R2_ACCESS_KEY_ID`, `RCLONE_CONFIG_R2_SECRET_ACCESS_KEY` and `RCLONE_CONFIG_R2_ENDPOINT` in `backup.env`. No `APP_KEY`, no password, no `STOREFRONT_SERVER_KEY` or `DISCOVER_SERVER_KEY` line.
 
 About the keys this made:
 
-- Passwords and the storefront's key are `openssl rand -hex 32`: 64 hex characters, so no quoting problems in a settings file.
+- Passwords, the storefront's key and Discover's key (two different keys, never shared) are `openssl rand -hex 32`: 64 hex characters, so no quoting problems in a settings file.
 - `APP_KEY` signs the dashboard's cookies and the deposit links. It is the same `openssl rand -hex 32` form. The platform accepts any string of 16 or more characters (the encryption library checks the length when the key is first used), and `node ace generate:key --show` itself prints a random 32-character string of letters, digits, `-` and `_`. The `ace` command needs the platform image, and that image is built only by the first deploy, which refuses to run before the settings exist. So this page uses `openssl`.
 - Changing `APP_KEY` later signs everyone out and breaks every deposit link already handed out. Keep it (see 2.4).
 
