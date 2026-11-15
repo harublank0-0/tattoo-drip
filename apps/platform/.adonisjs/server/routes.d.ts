@@ -177,6 +177,7 @@ export type ScannedRoutes = {
     'account.show': { paramsTuple?: []; params?: {} }
     'account.password.update': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
+    'admin.index': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
@@ -287,6 +288,7 @@ export type ScannedRoutes = {
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
+    'admin.index': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
@@ -381,6 +383,7 @@ export type ScannedRoutes = {
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
+    'admin.index': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }

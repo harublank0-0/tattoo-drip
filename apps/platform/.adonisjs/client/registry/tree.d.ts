@@ -313,6 +313,7 @@ export interface ApiDefinition {
     signOutOthers: typeof routes['account.sign_out_others']
   }
   admin: {
+    index: typeof routes['admin.index']
     billing: typeof routes['admin.billing'] & {
       endAccess: typeof routes['admin.billing.end_access']
     }

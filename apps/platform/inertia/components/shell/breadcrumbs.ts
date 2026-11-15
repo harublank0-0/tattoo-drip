@@ -47,6 +47,10 @@ const OUTSIDE_LABELS: Record<string, string> = {
 	"account/show": "Your account",
 	"admin/billing": "TattooDrip billing",
 	"admin/payments": "Studio payment connections",
+	"admin/studios": "Studios",
+	"admin/reports": "Review reports",
+	"admin/metrics": "Pilot metrics",
+	"admin/accounts": "Accounts",
 };
 
 /**

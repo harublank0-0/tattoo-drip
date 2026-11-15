@@ -86,6 +86,7 @@ const SIGNED_IN = [
 	"POST /admin/billing/end-access",
 	"GET /admin/payments",
 	"POST /admin/payments/review",
+	"GET /admin",
 ];
 
 /** What drive serves (config/drive.ts): uploads and files, not pages. */

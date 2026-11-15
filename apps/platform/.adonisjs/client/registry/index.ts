@@ -1044,6 +1044,12 @@ const routes = {
     tokens: [{"old":"/account/sign-out-others","type":0,"val":"account","end":""},{"old":"/account/sign-out-others","type":0,"val":"sign-out-others","end":""}],
     types: placeholder as Registry['account.sign_out_others']['types'],
   },
+  'admin.index': {
+    methods: ["GET","HEAD"],
+    pattern: '/admin',
+    tokens: [{"old":"/admin","type":0,"val":"admin","end":""}],
+    types: placeholder as Registry['admin.index']['types'],
+  },
   'admin.billing': {
     methods: ["GET","HEAD"],
     pattern: '/admin/billing',

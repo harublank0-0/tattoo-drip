@@ -2083,6 +2083,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/account_controller').default['signOutOthers']>>>
     }
   }
+  'admin.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: unknown
+      errorResponse: unknown
+    }
+  }
   'admin.billing': {
     methods: ["GET","HEAD"]
     pattern: '/admin/billing'
