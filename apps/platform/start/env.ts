@@ -143,6 +143,14 @@ const env = await Env.create(new URL("../", import.meta.url), {
 	// image provider (off, preview or bfl), BFL's hosted FLUX API settings
 	// (server only: never in props, logs or responses) and each studio's
 	// monthly allowance.
+	// Studio packages (docs/superpowers/specs/2026-11-15-studio-packages-design.md,
+	// Enforcement switch): observe (the default) logs what package rules
+	// would refuse; enforce refuses.
+	PACKAGE_ENFORCEMENT: Env.schema.enum.optional([
+		"observe",
+		"enforce",
+	] as const),
+
 	DESIGN_LAB_PROVIDER: checkDesignLabProvider,
 	BFL_API_KEY: checkBflKey,
 	BFL_API_URL: checkBflApiUrl,
