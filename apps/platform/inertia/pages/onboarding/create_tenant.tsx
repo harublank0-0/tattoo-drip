@@ -41,13 +41,22 @@ const TYPE_COPY: Record<string, { title: string; description: string }> = {
 	},
 };
 
+/**
+ * The package a type suggests, as the server's `packageForTenantType`
+ * (#modules/packages/packages): an independent artist Solo, a studio Studio.
+ */
+const suggestedPackage = (type: string) =>
+	type === "independent" ? "solo" : "studio";
+
 export default function CreateTenant({
 	tenantTypes,
+	packages,
 	timezones,
 	defaultTimezone,
 	addressHost,
 }: {
 	tenantTypes: string[];
+	packages: { value: string; name: string; line: string }[];
 	timezones: string[];
 	defaultTimezone: string;
 	addressHost: AddressHost;
@@ -56,6 +65,10 @@ export default function CreateTenant({
 	const [slug, setSlug] = useState("");
 	// The slug follows the name until the user edits it themselves.
 	const [slugTouched, setSlugTouched] = useState(false);
+	const [type, setType] = useState(tenantTypes[0]);
+	// The package follows the type until the user picks one themselves.
+	const [pkg, setPkg] = useState(suggestedPackage(tenantTypes[0]));
+	const [pkgTouched, setPkgTouched] = useState(false);
 
 	return (
 		<>
@@ -98,7 +111,14 @@ export default function CreateTenant({
 							<FieldLegend variant="label">
 								What are you setting up?
 							</FieldLegend>
-							<RadioGroup name="type" defaultValue={tenantTypes[0]}>
+							<RadioGroup
+								name="type"
+								value={type}
+								onValueChange={(value) => {
+									setType(value);
+									if (!pkgTouched) setPkg(suggestedPackage(value));
+								}}
+							>
 								{tenantTypes.map((value) => {
 									const type = {
 										value,
@@ -130,6 +150,49 @@ export default function CreateTenant({
 								})}
 							</RadioGroup>
 							{errors.type && <FieldError>{errors.type}</FieldError>}
+						</FieldSet>
+
+						<FieldSet data-invalid={!!errors.package}>
+							<FieldLegend variant="label">Package</FieldLegend>
+							<RadioGroup
+								name="package"
+								value={pkg}
+								onValueChange={(value) => {
+									setPkgTouched(true);
+									setPkg(value);
+								}}
+							>
+								{packages.map((option) => (
+									<FieldLabel
+										key={option.value}
+										htmlFor={`package-${option.value}`}
+									>
+										<Field orientation="horizontal">
+											<FieldContent>
+												<FieldTitle id={`package-${option.value}-title`}>
+													{option.name}
+												</FieldTitle>
+												<FieldDescription
+													id={`package-${option.value}-description`}
+												>
+													{option.line}
+												</FieldDescription>
+											</FieldContent>
+											<RadioGroupItem
+												aria-labelledby={`package-${option.value}-title`}
+												aria-describedby={`package-${option.value}-description`}
+												value={option.value}
+												id={`package-${option.value}`}
+												aria-invalid={!!errors.package}
+											/>
+										</Field>
+									</FieldLabel>
+								))}
+							</RadioGroup>
+							<FieldDescription>
+								14 days free, no payment to start.
+							</FieldDescription>
+							{errors.package && <FieldError>{errors.package}</FieldError>}
 						</FieldSet>
 
 						<Field data-invalid={!!errors.slug}>

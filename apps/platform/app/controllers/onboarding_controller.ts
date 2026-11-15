@@ -1,6 +1,7 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
+import { PACKAGE_KEYS, PACKAGES } from "#modules/packages/packages";
 import { SlugTakenError } from "#modules/tenancy/errors";
 import { DEFAULT_TIMEZONE, TENANT_TYPES } from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -27,6 +28,13 @@ export default class OnboardingController {
 
 		return inertia.render("onboarding/create_tenant", {
 			tenantTypes: [...TENANT_TYPES],
+			// The package the trial runs on (studio packages); the page
+			// preselects the one the chosen type suggests.
+			packages: PACKAGE_KEYS.map((value) => ({
+				value,
+				name: PACKAGES[value].name,
+				line: PACKAGES[value].line,
+			})),
 			timezones: TIMEZONES,
 			defaultTimezone: DEFAULT_TIMEZONE,
 			// The real host the page link will have (TAT-101), not a made-up one.
