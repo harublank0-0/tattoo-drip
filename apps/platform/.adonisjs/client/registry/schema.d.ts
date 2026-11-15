@@ -2119,6 +2119,54 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['show']>>>
     }
   }
+  'admin.studios.discover.suspend': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/discover/suspend'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/admin').discoverReasonValidator)>>
+      paramsTuple: [ParamValue]
+      params: { slug: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#validators/admin').discoverReasonValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['suspendDiscover']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['suspendDiscover']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'admin.studios.discover.restore': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/discover/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { slug: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restoreDiscover']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restoreDiscover']>>>
+    }
+  }
+  'admin.studios.photos.suspend': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/photos/:photo/suspend'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/admin').discoverReasonValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { slug: ParamValue; photo: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#validators/admin').discoverReasonValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['suspendPhoto']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['suspendPhoto']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'admin.studios.photos.restore': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/photos/:photo/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { slug: ParamValue; photo: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restorePhoto']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restorePhoto']>>>
+    }
+  }
   'admin.billing': {
     methods: ["GET","HEAD"]
     pattern: '/admin/billing'

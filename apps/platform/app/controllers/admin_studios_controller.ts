@@ -3,7 +3,9 @@ import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@adonisjs/core/http";
 import type { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
-import PublicationService from "#modules/discovery/services/publication_service";
+import PublicationService, {
+	OperatorTargetError,
+} from "#modules/discovery/services/publication_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	THUMBNAIL_WIDTH,
@@ -16,6 +18,7 @@ import Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient, withDbContext } from "#services/db_context";
+import { discoverReasonValidator } from "#validators/admin";
 
 /** Live items the studio page lists; `?more=1` raises it. */
 export const LIVE_ITEMS = 20;
@@ -40,6 +43,8 @@ export function liveWindow<T>(
 		truncated: over && more,
 	};
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Dates on admin pages are UTC. */
 const at = (value: DateTime) =>
@@ -191,5 +196,62 @@ export default class AdminStudiosController {
 			})),
 			takedownReasons: [...TAKEDOWN_REASONS],
 		});
+	}
+
+	async suspendDiscover(ctx: HttpContext) {
+		const { reason } = await ctx.request.validateUsing(discoverReasonValidator);
+		return this.operate(ctx, async (slug) => {
+			await this.publication.suspendStudio(slug, reason);
+			return "The listing is off Discover. The studio page and bookings are unchanged. Public caches can keep it for up to two minutes.";
+		});
+	}
+
+	async restoreDiscover(ctx: HttpContext) {
+		return this.operate(ctx, async (slug) => {
+			await this.publication.restoreStudio(slug);
+			return this.liftedMessage(slug);
+		});
+	}
+
+	async suspendPhoto(ctx: HttpContext) {
+		const { reason } = await ctx.request.validateUsing(discoverReasonValidator);
+		return this.operate(ctx, async (slug, photoId) => {
+			await this.publication.suspendPhoto(slug, photoId, reason);
+			return "The photo is off Discover. It stays on the studio page. Public caches can keep it for up to two minutes.";
+		});
+	}
+
+	async restorePhoto(ctx: HttpContext) {
+		return this.operate(ctx, async (slug, photoId) => {
+			await this.publication.restorePhoto(slug, photoId);
+			return this.liftedMessage(slug);
+		});
+	}
+
+	private async liftedMessage(slug: string) {
+		const status = await this.publication.operatorStatus(slug);
+		return `Takedown lifted. The listing is now: ${status.status}${status.optedIn ? "" : " (the owner's listing is off)"}.`;
+	}
+
+	/** Runs a takedown action; the service's refusals become an error flash. */
+	private async operate(
+		ctx: HttpContext,
+		run: (slug: string, photoId: string) => Promise<string>,
+	) {
+		try {
+			const photoId = ctx.params.photo as string | undefined;
+			// A malformed id can't name a photo; Postgres would reject it as a 500.
+			if (photoId !== undefined && !UUID.test(photoId)) {
+				throw new OperatorTargetError("That studio has no photo with this id.");
+			}
+			ctx.session.flash(
+				"success",
+				await run(ctx.params.slug as string, photoId as string),
+			);
+		} catch (error) {
+			if (!(error instanceof OperatorTargetError)) throw error;
+			ctx.session.flash("error", error.message);
+		}
+		return ctx.response.redirect().back();
 	}
 }

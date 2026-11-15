@@ -902,6 +902,30 @@ router
 			.get("studios/:slug", [controllers.AdminStudios, "show"])
 			.as("admin.studios.show");
 		router
+			.post("studios/:slug/discover/suspend", [
+				controllers.AdminStudios,
+				"suspendDiscover",
+			])
+			.as("admin.studios.discover.suspend");
+		router
+			.post("studios/:slug/discover/restore", [
+				controllers.AdminStudios,
+				"restoreDiscover",
+			])
+			.as("admin.studios.discover.restore");
+		router
+			.post("studios/:slug/photos/:photo/suspend", [
+				controllers.AdminStudios,
+				"suspendPhoto",
+			])
+			.as("admin.studios.photos.suspend");
+		router
+			.post("studios/:slug/photos/:photo/restore", [
+				controllers.AdminStudios,
+				"restorePhoto",
+			])
+			.as("admin.studios.photos.restore");
+		router
 			.get("billing", [controllers.Admin, "billingIndex"])
 			.as("admin.billing");
 		router

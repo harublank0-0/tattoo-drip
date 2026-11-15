@@ -316,6 +316,14 @@ export interface ApiDefinition {
     index: typeof routes['admin.index']
     studios: typeof routes['admin.studios'] & {
       show: typeof routes['admin.studios.show']
+      discover: {
+        suspend: typeof routes['admin.studios.discover.suspend']
+        restore: typeof routes['admin.studios.discover.restore']
+      }
+      photos: {
+        suspend: typeof routes['admin.studios.photos.suspend']
+        restore: typeof routes['admin.studios.photos.restore']
+      }
     }
     billing: typeof routes['admin.billing'] & {
       endAccess: typeof routes['admin.billing.end_access']

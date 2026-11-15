@@ -1062,6 +1062,30 @@ const routes = {
     tokens: [{"old":"/admin/studios/:slug","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug","type":1,"val":"slug","end":""}],
     types: placeholder as Registry['admin.studios.show']['types'],
   },
+  'admin.studios.discover.suspend': {
+    methods: ["POST"],
+    pattern: '/admin/studios/:slug/discover/suspend',
+    tokens: [{"old":"/admin/studios/:slug/discover/suspend","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug/discover/suspend","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug/discover/suspend","type":1,"val":"slug","end":""},{"old":"/admin/studios/:slug/discover/suspend","type":0,"val":"discover","end":""},{"old":"/admin/studios/:slug/discover/suspend","type":0,"val":"suspend","end":""}],
+    types: placeholder as Registry['admin.studios.discover.suspend']['types'],
+  },
+  'admin.studios.discover.restore': {
+    methods: ["POST"],
+    pattern: '/admin/studios/:slug/discover/restore',
+    tokens: [{"old":"/admin/studios/:slug/discover/restore","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug/discover/restore","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug/discover/restore","type":1,"val":"slug","end":""},{"old":"/admin/studios/:slug/discover/restore","type":0,"val":"discover","end":""},{"old":"/admin/studios/:slug/discover/restore","type":0,"val":"restore","end":""}],
+    types: placeholder as Registry['admin.studios.discover.restore']['types'],
+  },
+  'admin.studios.photos.suspend': {
+    methods: ["POST"],
+    pattern: '/admin/studios/:slug/photos/:photo/suspend',
+    tokens: [{"old":"/admin/studios/:slug/photos/:photo/suspend","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug/photos/:photo/suspend","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug/photos/:photo/suspend","type":1,"val":"slug","end":""},{"old":"/admin/studios/:slug/photos/:photo/suspend","type":0,"val":"photos","end":""},{"old":"/admin/studios/:slug/photos/:photo/suspend","type":1,"val":"photo","end":""},{"old":"/admin/studios/:slug/photos/:photo/suspend","type":0,"val":"suspend","end":""}],
+    types: placeholder as Registry['admin.studios.photos.suspend']['types'],
+  },
+  'admin.studios.photos.restore': {
+    methods: ["POST"],
+    pattern: '/admin/studios/:slug/photos/:photo/restore',
+    tokens: [{"old":"/admin/studios/:slug/photos/:photo/restore","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":1,"val":"slug","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":0,"val":"photos","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":1,"val":"photo","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":0,"val":"restore","end":""}],
+    types: placeholder as Registry['admin.studios.photos.restore']['types'],
+  },
   'admin.billing': {
     methods: ["GET","HEAD"],
     pattern: '/admin/billing',

@@ -1,9 +1,12 @@
+import { Form } from "@adonisjs/inertia/react";
 import { Link } from "@inertiajs/react";
 import { urlFor } from "~/client";
 import AdminNav from "~/components/admin_nav";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
 import AppLayout from "~/layouts/app";
 
 type Takedown = { atText: string; note: string | null };
@@ -51,7 +54,8 @@ type Props = {
 };
 
 /**
- * One studio's moderation state for TattooDrip staff, read-only for now.
+ * One studio's moderation state for TattooDrip staff, with the Discover
+ * takedown actions.
  * Everything studio- or client-typed is plain text.
  */
 export default function AdminStudio({
@@ -84,6 +88,11 @@ export default function AdminStudio({
 						{discover.takedown.note ? `: ${discover.takedown.note}` : ""}
 					</p>
 				)}
+				{discover.takedown ? (
+					<LiftTakedown target={{ slug: studio.slug }} />
+				) : (
+					<TakedownForm target={{ slug: studio.slug }} />
+				)}
 			</Section>
 
 			<Section title="Photos">
@@ -104,6 +113,15 @@ export default function AdminStudio({
 										Taken down {photo.takedown.atText}
 										{photo.takedown.note ? `: ${photo.takedown.note}` : ""}
 									</span>
+								)}
+								{photo.takedown ? (
+									<LiftTakedown
+										target={{ slug: studio.slug, photo: photo.id }}
+									/>
+								) : (
+									<TakedownForm
+										target={{ slug: studio.slug, photo: photo.id }}
+									/>
 								)}
 							</li>
 						))}
@@ -154,6 +172,88 @@ export default function AdminStudio({
 				)}
 			</Section>
 		</Page>
+	);
+}
+
+/** The listing (no photo) or one photo of a studio. */
+type Target = { slug: string; photo?: string };
+
+/** Takes the listing or one photo off Discover; the reason is for operators only. */
+function TakedownForm({ target }: { target: Target }) {
+	const idPrefix = target.photo ? `photo-${target.photo}` : "listing";
+	const fields = ({
+		errors,
+		processing,
+	}: {
+		errors: Record<string, string>;
+		processing: boolean;
+	}) => (
+		<>
+			<label htmlFor={`${idPrefix}-reason`} className="sr-only">
+				Reason for taking it off Discover
+			</label>
+			<Input
+				id={`${idPrefix}-reason`}
+				name="reason"
+				required
+				maxLength={500}
+				placeholder="Reason (kept for operators)"
+				className="h-11"
+				aria-invalid={!!errors.reason}
+			/>
+			{errors.reason && (
+				<p className="text-sm text-destructive">{errors.reason}</p>
+			)}
+			<Button
+				type="submit"
+				variant="outline"
+				className="h-11"
+				disabled={processing}
+			>
+				{processing ? "Saving…" : "Take off Discover"}
+			</Button>
+		</>
+	);
+	const className = "flex flex-col gap-2";
+	return target.photo ? (
+		<Form
+			route="admin.studios.photos.suspend"
+			routeParams={{ slug: target.slug, photo: target.photo }}
+			className={className}
+		>
+			{fields}
+		</Form>
+	) : (
+		<Form
+			route="admin.studios.discover.suspend"
+			routeParams={{ slug: target.slug }}
+			className={className}
+		>
+			{fields}
+		</Form>
+	);
+}
+
+function LiftTakedown({ target }: { target: Target }) {
+	const button = ({ processing }: { processing: boolean }) => (
+		<Button type="submit" className="h-11" disabled={processing}>
+			{processing ? "Saving…" : "Lift takedown"}
+		</Button>
+	);
+	return target.photo ? (
+		<Form
+			route="admin.studios.photos.restore"
+			routeParams={{ slug: target.slug, photo: target.photo }}
+		>
+			{button}
+		</Form>
+	) : (
+		<Form
+			route="admin.studios.discover.restore"
+			routeParams={{ slug: target.slug }}
+		>
+			{button}
+		</Form>
 	);
 }
 

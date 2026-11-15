@@ -180,6 +180,10 @@ export type ScannedRoutes = {
     'admin.index': { paramsTuple?: []; params?: {} }
     'admin.studios': { paramsTuple?: []; params?: {} }
     'admin.studios.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.discover.suspend': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.discover.restore': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.photos.suspend': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
+    'admin.studios.photos.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
@@ -490,6 +494,10 @@ export type ScannedRoutes = {
     'onboarding.store': { paramsTuple?: []; params?: {} }
     'invitations.accept': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
+    'admin.studios.discover.suspend': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.discover.restore': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.photos.suspend': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
+    'admin.studios.photos.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
     'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments.review': { paramsTuple?: []; params?: {} }
     'api.v1.webhooks.platform': { paramsTuple?: []; params?: {} }

@@ -89,6 +89,10 @@ const SIGNED_IN = [
 	"GET /admin",
 	"GET /admin/studios",
 	"GET /admin/studios/:slug",
+	"POST /admin/studios/:slug/discover/suspend",
+	"POST /admin/studios/:slug/discover/restore",
+	"POST /admin/studios/:slug/photos/:photo/suspend",
+	"POST /admin/studios/:slug/photos/:photo/restore",
 ];
 
 /** What drive serves (config/drive.ts): uploads and files, not pages. */
