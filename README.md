@@ -18,7 +18,7 @@ Packages are consumed from source inside the workspace, so there's no build step
 
 ## Setup
 
-Use the repo's Node 24.3.0 (`.nvmrc`) and pnpm 12.8.1 (`package.json`) pins, plus Podman with podman-compose.
+Use the repo's Node 24.22.3 (`.nvmrc`) and pnpm 12.8.1 (`package.json`) pins, plus Podman with podman-compose.
 
 ```bash
 pnpm install

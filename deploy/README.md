@@ -511,7 +511,7 @@ grep -n 'CHANGE_ME' /srv/tattoo-drip/env/*.env | grep -v ':[0-9]*:[[:space:]]*#'
 
 ### 4.1 On your computer: the storefront page check
 
-From your copy of the repo, with Node 24.3.0 (`.nvmrc`) and pnpm, on an up-to-date `main` (the merged commit that you are about to deploy):
+From your copy of the repo, with Node 24.22.3 (`.nvmrc`) and pnpm, on an up-to-date `main` (the merged commit that you are about to deploy):
 
 ```bash
 git switch main && git pull --ff-only

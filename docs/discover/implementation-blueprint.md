@@ -77,7 +77,7 @@ Status legend: **Done** = in code, with tests where noted. **Partial** = exists,
 
 | Area | What it is | Status | Evidence |
 |---|---|---|---|
-| Tooling | pnpm 12.8.1 workspaces, Node 24.3.0, TypeScript 6, Biome 2.4, husky + commitlint | Done | `package.json`, `pnpm-workspace.yaml`, `.nvmrc` |
+| Tooling | pnpm 12.8.1 workspaces, Node 24.22.3, TypeScript 6, Biome 2.4, husky + commitlint | Done | `package.json`, `pnpm-workspace.yaml`, `.nvmrc` |
 | `apps/platform` | AdonisJS 7, Lucid/Postgres 18, VineJS, session auth (email + password; no OAuth), Japa | Done | `adonisrc.ts`, `config/inertia.ts` (`ssr.enabled: false`) |
 | `apps/storefront` | TanStack Start/Router/Query/Form, React 19, Tailwind v4, shadcn | Done | `apps/storefront/src/**` |
 | `packages/types` / `sdk` / `react` | Contract + generated types; one-tenant client; TanStack Query hooks | Done | `packages/*/src` |

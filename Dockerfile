@@ -20,7 +20,7 @@
 # Settings are runtime-only: no .env file enters the context (.dockerignore) and
 # the build needs none.
 
-ARG NODE_VERSION=24.3.0
+ARG NODE_VERSION=24.22.3
 
 # ---------------------------------------------------------------------------
 # base: Node and pnpm, as pinned by .nvmrc and the root package.json
@@ -29,8 +29,9 @@ FROM node:${NODE_VERSION}-bookworm-slim AS base
 # Keep PNPM_VERSION equal to "packageManager" in the root package.json
 ARG PNPM_VERSION=12.8.1
 ENV CI=true
-# From npm, not Corepack: Corepack 0.33 (bundled with Node 24.3.0) cannot run
-# pnpm 12 ("Cannot find module .../pnpm/12.8.1/bin/pnpm.cjs")
+# From npm, not Corepack: the Corepack bundled with Node 24.3.0 (0.33) could not
+# run pnpm 12 ("Cannot find module .../pnpm/12.8.1/bin/pnpm.cjs"), and npm keeps
+# the pnpm install independent of whichever Corepack the Node image bundles
 RUN npm install --global pnpm@${PNPM_VERSION} && pnpm --version
 WORKDIR /repo
 
