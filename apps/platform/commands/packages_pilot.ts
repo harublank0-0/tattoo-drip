@@ -6,9 +6,10 @@ import { DateTime } from "luxon";
  * Gives a pilot studio an explicit, temporary package until its agreed
  * transition date (docs/superpowers/specs/2026-11-15-studio-packages-design.md,
  * ruling 7), so it is never paused by accident when enforcement ships. A
- * grant still running ends now. The note is stored for operators only.
+ * grant still running ends now. The note and the operator's name (`--by`)
+ * are stored for operators only.
  *
- *   node ace packages:pilot black-needle --package studio --until 2027-03-31 --note "Design partner"
+ *   node ace packages:pilot black-needle --package studio --until 2027-03-31 --note "Design partner" --by "Ops name"
  *   node build/ace.js packages:pilot ...                                     (production)
  */
 export default class PackagesPilot extends BaseCommand {
@@ -31,6 +32,9 @@ export default class PackagesPilot extends BaseCommand {
 
 	@flags.string({ description: "Why (stored for operators; required)" })
 	declare note?: string;
+
+	@flags.string({ description: "Who grants it, by name (stored; required)" })
+	declare by?: string;
 
 	async run() {
 		const { PACKAGE_KEYS } = await import("#modules/packages/packages");
@@ -55,6 +59,7 @@ export default class PackagesPilot extends BaseCommand {
 				package: pkg,
 				endsAt,
 				note: this.note ?? "",
+				grantedBy: this.by ?? "",
 			});
 			this.logger.success(
 				`"${this.slug}" is a ${pkg} pilot until ${this.until} (00:00 UTC).`,

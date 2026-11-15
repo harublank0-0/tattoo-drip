@@ -8,9 +8,11 @@ import BillingAccessPeriod from "#modules/billing/models/billing_access_period";
 import BillingCustomer from "#modules/billing/models/billing_customer";
 import BillingEvent from "#modules/billing/models/billing_event";
 import BillingInvoice from "#modules/billing/models/billing_invoice";
+import BillingPlan from "#modules/billing/models/billing_plan";
 import BillingSubscription from "#modules/billing/models/billing_subscription";
 import BillingService from "#modules/billing/services/billing_service";
 import { entitlementText } from "#modules/packages/entitlement";
+import AllowanceBundle from "#modules/packages/models/allowance_bundle";
 import EntitlementService from "#modules/packages/services/entitlement_service";
 import { formatDay } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
@@ -936,5 +938,36 @@ test.group("Billing: the package state (studio packages)", (group) => {
 		);
 		assert.equal(row?.packageText, expected);
 		assert.match(row?.packageText ?? "", /^(Studio, |Paused)/);
+	});
+});
+
+test.group("Billing: syncing plans", (group) => {
+	group.each.setup(() => paybridge.reset());
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	// A paid period's package and allowances are its plan's, fixed at purchase
+	// (studio packages design), so a catalogue change to a plan that exists
+	// is reported, never written over it.
+	test("a stored plan whose package or bundle differs from the catalogue is reported and left as it is", async ({
+		assert,
+	}) => {
+		const [monthly] = await sandboxPlans();
+		const soloBundle = await AllowanceBundle.findByOrFail("key", "solo-v1");
+		await BillingPlan.query()
+			.where("id", monthly.id)
+			.update({ package: "solo", allowanceBundleId: soloBundle.id });
+
+		const synced = await (await billingService()).syncPlans();
+
+		const byCode = new Map(synced.map((plan) => [plan.code, plan]));
+		assert.isFalse(byCode.get("studio-monthly")?.created);
+		assert.match(
+			byCode.get("studio-monthly")?.mismatch ?? "",
+			/solo-v1.*studio-v1.*new plan code/,
+		);
+		assert.isNull(byCode.get("studio-yearly")?.mismatch);
+		const stored = await BillingPlan.findOrFail(monthly.id);
+		assert.equal(stored.package, "solo");
+		assert.equal(stored.allowanceBundleId, soloBundle.id);
 	});
 });

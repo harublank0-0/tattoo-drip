@@ -91,6 +91,13 @@ test.group("Onboarding", (group) => {
 				line: "Multiple artists working together.",
 			},
 		]);
+		// The page takes the type-to-package rule and the trial length from
+		// the server instead of repeating them.
+		assert.deepEqual(page.inertiaProps.suggestedPackages, {
+			studio: "studio",
+			independent: "solo",
+		});
+		assert.equal(page.inertiaProps.trialDays, 14);
 	});
 
 	test("the chosen package is stored", async ({ client, assert }) => {

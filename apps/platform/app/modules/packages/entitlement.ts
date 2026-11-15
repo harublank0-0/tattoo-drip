@@ -46,7 +46,11 @@ export type Entitlement = {
 	state: EntitlementState;
 	package: PackageKey;
 	bundleId: string;
-	/** When this state ends; null when paused. */
+	/**
+	 * When this state ends; null when paused. The state's end, not the
+	 * package's: a pilot lifted by a higher paid package ends with the
+	 * grant, though the higher package ends with its coverage.
+	 */
 	until: DateTime | null;
 	artistLimit: number | null;
 };
@@ -115,16 +119,19 @@ export function resolveEntitlement(input: EntitlementInput): Entitlement {
 	);
 	const pilot = running.length > 0 ? highest(running) : null;
 
-	if (
-		pilot &&
-		(!paid || higherPackage(pilot.package, paid.package) === pilot.package)
-	) {
-		return entitlement("pilot", pilot, pilot.endsAt);
+	// A running grant is always Pilot; paid coverage only lifts its package.
+	if (pilot) {
+		const top =
+			paid && higherPackage(pilot.package, paid.package) !== pilot.package
+				? paid
+				: pilot;
+		return entitlement("pilot", top, pilot.endsAt);
 	}
 	if (paid) return entitlement("paid", paid, paid.end);
 
 	// Grace: only after coverage that ran out, never after a revocation.
 	const ended = periods.filter((period) => period.end <= at);
+	let lapsedIntoGrace: { periods: Source[]; graceEnd: DateTime } | null = null;
 	if (ended.length > 0) {
 		const lastEnd = ended.reduce(
 			(latest, period) => (period.end > latest ? period.end : latest),
@@ -141,20 +148,34 @@ export function resolveEntitlement(input: EntitlementInput): Entitlement {
 		if (lapsed.length > 0 && at < graceEnd) {
 			return entitlement("grace", highest(lapsed), graceEnd);
 		}
+		if (lapsed.length > 0) lapsedIntoGrace = { periods: lapsed, graceEnd };
 	}
 
+	// "Never paid" means no coverage that began by `at`: a period that counts
+	// for nothing or hasn't started yet doesn't end the trial.
+	const begun = periods.filter((period) => period.startsAt <= at);
 	const trialEnd = input.workspaceCreatedAt.plus({ days: TRIAL_DAYS });
-	if (input.periods.length === 0 && at < trialEnd) {
+	if (begun.length === 0 && at < trialEnd) {
 		return entitlement("trial", input.trial, trialEnd);
 	}
 
-	// Paused, with the package and bundle of whatever ended last.
+	// Paused, with the package and bundle of whatever ended last. The trial
+	// ended at the first payment, if that came first; a lapse ended with its
+	// grace.
+	const firstPaid = begun[0]?.startsAt;
 	const past: Source[] = [
-		...periods.filter((period) => period.startsAt <= at),
+		...begun.map((period) =>
+			lapsedIntoGrace?.periods.includes(period)
+				? { ...period, end: lapsedIntoGrace.graceEnd }
+				: period,
+		),
 		...input.pilots
 			.filter((grant) => grant.endsAt <= at)
 			.map((grant) => ({ ...grant, end: grant.endsAt })),
-		{ ...input.trial, end: trialEnd },
+		{
+			...input.trial,
+			end: firstPaid && firstPaid < trialEnd ? firstPaid : trialEnd,
+		},
 	];
 	const latestEnd = past.reduce(
 		(latest, source) => (source.end > latest ? source.end : latest),
