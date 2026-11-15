@@ -388,7 +388,7 @@ export default class ProjectsController {
 
 		// Scheduling a session here (TAT-85 part 2): whom this member may
 		// schedule, the default, and what a tattoo session would do.
-		const bookable = this.bookings.bookableFrom(artists, membership);
+		const bookable = this.bookings.bookableOn(artists, membership, project);
 		const depositDue =
 			project.status === "deposit_pending" && current
 				? await this.deposits.remaining(tenant, project, current)
