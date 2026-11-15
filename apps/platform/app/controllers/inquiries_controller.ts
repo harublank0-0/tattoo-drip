@@ -217,7 +217,10 @@ export default class InquiriesController {
 				inquiry.status === "new"
 					? {
 							artistId: preferred?.id ?? null,
-							choices: artists.map(({ id, name }) => ({ id, name })),
+							// Archived artists (studio packages) take no new work.
+							choices: artists
+								.filter(({ archivedAt }) => archivedAt === null)
+								.map(({ id, name }) => ({ id, name })),
 						}
 					: null,
 			projectId,

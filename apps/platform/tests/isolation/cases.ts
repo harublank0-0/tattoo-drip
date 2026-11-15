@@ -71,6 +71,7 @@ export type IsolationCase = {
 		| "archivedInventoryItem"
 		| "paymentMethod"
 		| "artistProfile"
+		| "archivedArtist"
 		| "workPhoto"
 		| "tattooLead"
 		| "tattooAngle"
@@ -966,6 +967,25 @@ export const isolationCases: IsolationCase[] = [
 		method: "DELETE",
 		pattern: "/t/:tenant/artists/:id",
 		resource: "artistProfile",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: artistRows,
+	},
+	// Archiving (studio packages, phase 2): the seeded profile is active, so
+	// archiving changes it; restoring an active profile changes nothing but
+	// still answers its own studio and refuses another's.
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/:id/archive",
+		resource: "artistProfile",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: artistRows,
+	},
+	{
+		method: "POST",
+		pattern: "/t/:tenant/artists/:id/restore",
+		resource: "archivedArtist",
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: artistRows,

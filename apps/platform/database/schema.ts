@@ -140,6 +140,7 @@ export class ArtistSchema extends BaseModel {
 	static $columns = [
 		"acceptingFlash",
 		"acceptingInquiries",
+		"archivedAt",
 		"bio",
 		"closedMessage",
 		"createdAt",
@@ -165,6 +166,8 @@ export class ArtistSchema extends BaseModel {
 	declare acceptingFlash: boolean;
 	@column()
 	declare acceptingInquiries: boolean;
+	@column.dateTime()
+	declare archivedAt: DateTime | null;
 	@column()
 	declare bio: string | null;
 	@column()

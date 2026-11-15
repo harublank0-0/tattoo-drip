@@ -4,7 +4,9 @@ import { test } from "@japa/runner";
 import { Settings } from "luxon";
 import User from "#models/user";
 import Artist from "#modules/artists/models/artist";
+import ArtistService from "#modules/artists/services/artist_service";
 import { hashAccountToken } from "#modules/identity/account_tokens";
+import ImageService from "#modules/media/services/image_service";
 import { InvitationRuleError } from "#modules/tenancy/errors";
 import TenantInvitation from "#modules/tenancy/models/tenant_invitation";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
@@ -142,7 +144,7 @@ test.group("InvitationService: making invitations (TAT-33)", (group) => {
 		assert.isFalse(unknown.replaced);
 	});
 
-	test("only a live profile nobody is linked to can be offered", async ({
+	test("only a live, unarchived profile nobody is linked to can be offered", async ({
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner("offer-33", "Offer 33");
@@ -156,9 +158,16 @@ test.group("InvitationService: making invitations (TAT-33)", (group) => {
 		});
 		const gone = await addArtist(tenant, owner, { name: "Gone", slug: "gone" });
 		await inTenant(tenant, () => gone.softDelete());
+		const archived = await addArtist(tenant, owner, {
+			name: "Asha",
+			slug: "asha",
+		});
+		await inTenant(tenant, () =>
+			new ArtistService(new ImageService()).archive(tenant, archived.id),
+		);
 		const foreign = await addArtist(other, otherOwner);
 
-		for (const artistId of [taken.id, gone.id, foreign.id]) {
+		for (const artistId of [taken.id, gone.id, archived.id, foreign.id]) {
 			assert.equal(
 				await refusal(() => invite(tenant, owner, { artistId })),
 				"profile_unavailable",
@@ -588,6 +597,34 @@ test.group("InvitationService: opening and accepting (TAT-33)", (group) => {
 			"invalid",
 		);
 		assert.lengthOf(await memberships(tenant), 2);
+	});
+
+	test("a profile archived meanwhile: the person still joins, without it", async ({
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("archived-33", "Arch 33");
+		const asha = await addArtist(tenant, owner, { name: "Asha", slug: "asha" });
+		const made = await invite(tenant, owner, {
+			email: "ink@archived-33.example",
+			artistId: asha.id,
+		});
+		// Archived (studio packages, phase 2): a new member is new work.
+		await inTenant(tenant, () =>
+			new ArtistService(new ImageService()).archive(tenant, asha.id),
+		);
+		const user = await confirmedUser("ink@archived-33.example");
+
+		const joined = await invitations.accept(
+			user,
+			made.token,
+			invitationFlow(made.token),
+		);
+
+		assert.isFalse(joined.claimed);
+		assert.lengthOf(await memberships(tenant), 2);
+		assert.isNull(
+			(await inTenant(tenant, () => Artist.findOrFail(asha.id))).userId,
+		);
 	});
 
 	test("a profile taken meanwhile: the person still joins, without it", async ({

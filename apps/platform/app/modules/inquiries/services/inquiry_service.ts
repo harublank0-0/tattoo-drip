@@ -1,5 +1,4 @@
 import { inject } from "@adonisjs/core";
-import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -310,15 +309,13 @@ export default class InquiryService {
 		});
 	}
 
-	/** A live artist of the tenant, else "artist_unavailable". */
+	/**
+	 * A live artist of the tenant who may take new work (not archived,
+	 * studio packages phase 2), else "artist_unavailable".
+	 */
 	private async checkArtist(tenant: TenantRef, artistId: string) {
-		try {
-			await this.artists.findFor(tenant, artistId);
-		} catch (error) {
-			if (error instanceof lucidErrors.E_ROW_NOT_FOUND) {
-				throw new InquiryRuleError("artist_unavailable");
-			}
-			throw error;
+		if (!(await this.artists.findAssignable(tenant, artistId))) {
+			throw new InquiryRuleError("artist_unavailable");
 		}
 	}
 }

@@ -43,11 +43,15 @@ export default function Artists({
 	const tenant = useTenant();
 	const heading = useRef<HTMLHeadingElement>(null);
 	const params = { tenant: tenant.slug };
-	const onPage = artists.filter(({ visible }) => visible).length;
-	const taking = artists.filter(
+	// Archived artists (studio packages) keep their history but come last,
+	// apart: they don't count and take no new work.
+	const active = artists.filter(({ archived }) => !archived);
+	const archived = artists.filter(({ archived }) => archived);
+	const onPage = active.filter(({ visible }) => visible).length;
+	const taking = active.filter(
 		({ visible, acceptingInquiries }) => visible && acceptingInquiries,
 	).length;
-	const logins = artists.filter(({ hasLogin }) => hasLogin).length;
+	const logins = active.filter(({ hasLogin }) => hasLogin).length;
 
 	return (
 		<Page
@@ -95,11 +99,12 @@ export default function Artists({
 			) : (
 				<>
 					<p className="border-y py-2.5 text-sm text-muted-foreground">
-						{artists.length} artist{artists.length === 1 ? "" : "s"}, {onPage}{" "}
-						on your page, {taking} taking requests, {logins} with a login.
+						{active.length} active artist{active.length === 1 ? "" : "s"},{" "}
+						{onPage} on your page, {taking} taking requests, {logins} with a
+						login{archived.length > 0 ? `, ${archived.length} archived` : ""}.
 					</p>
 					<ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-						{artists.map((artist) => (
+						{active.map((artist) => (
 							<ArtistCard
 								key={artist.id}
 								artist={artist}
@@ -109,6 +114,29 @@ export default function Artists({
 							/>
 						))}
 					</ul>
+					{archived.length > 0 && (
+						<section aria-labelledby="archived-artists" className="mt-8">
+							<h2 id="archived-artists" className="text-base font-semibold">
+								Archived
+							</h2>
+							<p className="mt-1 mb-4 max-w-prose text-sm text-muted-foreground">
+								Archived artists keep their projects, sessions and work. They
+								aren't on your page, don't count toward your package and get no
+								new work.
+							</p>
+							<ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+								{archived.map((artist) => (
+									<ArtistCard
+										key={artist.id}
+										artist={artist}
+										tenantSlug={tenant.slug}
+										upcomingDays={upcomingDays}
+										fallback={heading}
+									/>
+								))}
+							</ul>
+						</section>
+					)}
 				</>
 			)}
 		</Page>
@@ -148,6 +176,11 @@ function ArtistCard({
 				)}
 				{artist.isMine && (
 					<Badge className="absolute top-2.5 left-2.5">You</Badge>
+				)}
+				{artist.archived && (
+					<Badge variant="secondary" className="absolute top-2.5 right-2.5">
+						Archived
+					</Badge>
 				)}
 			</div>
 			<div className="flex flex-1 flex-col gap-3 p-4">
@@ -251,7 +284,48 @@ function ArtistCard({
 				</div>
 				{/* Asked in the card, not in the browser's box (Studio OS): its own row,
 				    so the question has the card's width. */}
-				<div className="border-t pt-3">
+				<div className="flex flex-col items-start gap-1 border-t pt-3">
+					{artist.archived ? (
+						<InlineConfirm
+							label="Restore artist"
+							ariaLabel={`Restore ${artist.name}`}
+							variant="ghost"
+							size="sm"
+							triggerClassName="-ml-2"
+							question={`Restore "${artist.name}"? They count toward your package again and can take new work. They stay hidden until you show them on your page.`}
+							confirmLabel="Restore artist"
+							keepLabel="Keep archived"
+							busyLabel="Restoring…"
+							fallback={fallback}
+							onConfirm={(finished) =>
+								router.post(
+									urlFor("tenant.artists.restore", params),
+									{},
+									{ preserveScroll: true, onFinish: finished },
+								)
+							}
+						/>
+					) : (
+						<InlineConfirm
+							label="Archive artist"
+							ariaLabel={`Archive ${artist.name}`}
+							variant="ghost"
+							size="sm"
+							triggerClassName="-ml-2 text-muted-foreground"
+							question={`Archive "${artist.name}"? They keep their projects, sessions and work, leave your page and get no new work. You can restore them later.`}
+							confirmLabel="Archive artist"
+							keepLabel="Keep the artist"
+							busyLabel="Archiving…"
+							fallback={fallback}
+							onConfirm={(finished) =>
+								router.post(
+									urlFor("tenant.artists.archive", params),
+									{},
+									{ preserveScroll: true, onFinish: finished },
+								)
+							}
+						/>
+					)}
 					<InlineConfirm
 						label="Delete artist"
 						ariaLabel={`Delete ${artist.name}`}

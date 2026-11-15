@@ -47,6 +47,8 @@ export type BillingPageProps = {
 		name: string;
 		line: string;
 		text: string;
+		/** Active artists against the package's limit (null: any number). */
+		artists: { active: number; limit: number | null; text: string };
 	};
 	access: { state: Access["state"]; text: string };
 	plans: {
@@ -82,6 +84,20 @@ export type BillingPageProps = {
 	}[];
 };
 
+/** Active artists and the package's limit (PackageGate.artistUsage). */
+export type ArtistUsage = { active: number; limit: number | null };
+
+/**
+ * "1 of 1 active artist" against a limit, else "3 active artists" (studio
+ * packages, phase 2). Archived artists don't count; hidden ones do.
+ */
+export function artistUsageText({ active, limit }: ArtistUsage): string {
+	if (limit !== null) {
+		return `${active} of ${limit} active artist${limit === 1 ? "" : "s"}`;
+	}
+	return `${active} active artist${active === 1 ? "" : "s"}`;
+}
+
 /**
  * The studio's Billing page, from BillingService.overview, with every date
  * in the studio's time zone and every amount as NPR text.
@@ -91,6 +107,7 @@ export function billingPage(
 	planById: Map<string, BillingPlan>,
 	timezone: string,
 	entitlement: Entitlement,
+	artists: ArtistUsage,
 ): BillingPageProps {
 	const day = (at: DateTime | null) =>
 		at ? formatDay(at.setZone(timezone).toFormat("yyyy-MM-dd")) : null;
@@ -102,6 +119,7 @@ export function billingPage(
 			name: PACKAGES[entitlement.package].name,
 			line: PACKAGES[entitlement.package].line,
 			text: entitlementText(entitlement, (at) => day(at) as string),
+			artists: { ...artists, text: artistUsageText(artists) },
 		},
 		access: {
 			state: overview.access.state,

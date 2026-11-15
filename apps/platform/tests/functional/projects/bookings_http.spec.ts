@@ -75,6 +75,14 @@ test.group("Booking page", (group) => {
 		await inTenant(tenant, async () => {
 			await Artist.create({ tenantId: tenant.id, name: "Ram", slug: "ram" });
 			await makeArtist(tenant);
+			// Archived (studio packages, phase 2): not bookable, so not offered.
+			await Artist.create({
+				tenantId: tenant.id,
+				name: "Asha",
+				slug: "asha",
+				visible: false,
+				archivedAt: DateTime.now(),
+			});
 		});
 
 		const response = await client.get(newUrl()).withInertia().loginAs(owner);
@@ -635,14 +643,14 @@ test.group("Refused bookings", (group) => {
 		assert.deepEqual(await countsIn(tenant), before);
 	});
 
-	test("an artist can't book someone else; an owner can't book a deleted or another studio's artist", async ({
+	test("an artist can't book someone else; an owner can't book a deleted, archived or another studio's artist", async ({
 		client,
 		assert,
 	}) => {
 		const { owner, tenant } = await studioWithOwner();
 		const { tenant: other } = await studioWithOwner("studio-b", "Studio B");
 		const { user } = await linkedArtist(tenant);
-		const { sita, gone } = await inTenant(tenant, async () => {
+		const { sita, gone, archived } = await inTenant(tenant, async () => {
 			const sita = await makeArtist(tenant);
 			const gone = await Artist.create({
 				tenantId: tenant.id,
@@ -650,7 +658,14 @@ test.group("Refused bookings", (group) => {
 				slug: "gone",
 			});
 			await gone.softDelete();
-			return { sita, gone };
+			const archived = await Artist.create({
+				tenantId: tenant.id,
+				name: "Arya",
+				slug: "arya",
+				visible: false,
+				archivedAt: DateTime.now(),
+			});
+			return { sita, gone, archived };
 		});
 		const elsewhere = await inTenant(other, () => makeArtist(other));
 		const before = await countsIn(tenant);
@@ -659,6 +674,7 @@ test.group("Refused bookings", (group) => {
 		for (const [actor, artistId] of [
 			[user, sita.id],
 			[owner, gone.id],
+			[owner, archived.id],
 			[owner, elsewhere.id],
 		] as const) {
 			const response = await client

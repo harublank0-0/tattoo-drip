@@ -61,14 +61,33 @@ export default class BookingService {
 	) {}
 
 	/**
-	 * The live artists `member` may book: every one for an owner (by name),
-	 * only the profile linked to them for an artist (none without one).
+	 * The live artists `member` may book for new work: every unarchived one
+	 * for an owner (by name), only the profile linked to them for an artist,
+	 * if it isn't archived (none without one).
 	 */
 	async bookableArtists(
 		tenant: Pick<Tenant, "id">,
 		member: Member,
 	): Promise<Artist[]> {
-		return this.bookableFrom(await this.artists.list(tenant), member);
+		return this.bookableFrom(await this.artists.listAssignable(tenant), member);
+	}
+
+	/**
+	 * The artists `member` may schedule on `project`: bookableArtists, plus
+	 * the project's own artist when archived (studio packages, phase 2: an
+	 * archived artist finishes their own projects).
+	 */
+	bookableOn(
+		artists: Artist[],
+		member: Member,
+		project: { artistId: string | null },
+	): Artist[] {
+		return this.bookableFrom(
+			artists.filter(
+				({ id, archivedAt }) => archivedAt === null || id === project.artistId,
+			),
+			member,
+		);
 	}
 
 	/**

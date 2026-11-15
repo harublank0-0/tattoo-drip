@@ -343,30 +343,45 @@ test.group("IntakeService.submit", (group) => {
 		const { tenant } = await studioWithOwner("intake-artist-51");
 		const other = await studioWithOwner("intake-artist-b-51");
 		const { intake, images } = makeIntake();
-		const { hidden, gone, closed } = await inTenant(tenant, async () => {
-			await Artist.create({ tenantId: tenant.id, name: "Bina", slug: "bina" });
-			const gone = await Artist.create({
-				tenantId: tenant.id,
-				name: "Gone",
-				slug: "gone",
-			});
-			await gone.softDelete();
-			return {
-				hidden: await Artist.create({
+		const { hidden, gone, closed, archived } = await inTenant(
+			tenant,
+			async () => {
+				await Artist.create({
 					tenantId: tenant.id,
-					name: "Hidden",
-					slug: "hidden",
-					visible: false,
-				}),
-				gone,
-				closed: await Artist.create({
+					name: "Bina",
+					slug: "bina",
+				});
+				const gone = await Artist.create({
 					tenantId: tenant.id,
-					name: "Sita",
-					slug: "sita",
-					acceptingInquiries: false,
-				}),
-			};
-		});
+					name: "Gone",
+					slug: "gone",
+				});
+				await gone.softDelete();
+				return {
+					hidden: await Artist.create({
+						tenantId: tenant.id,
+						name: "Hidden",
+						slug: "hidden",
+						visible: false,
+					}),
+					gone,
+					closed: await Artist.create({
+						tenantId: tenant.id,
+						name: "Sita",
+						slug: "sita",
+						acceptingInquiries: false,
+					}),
+					// Archived (studio packages, phase 2): hidden by the database's rule.
+					archived: await Artist.create({
+						tenantId: tenant.id,
+						name: "Asha",
+						slug: "asha",
+						visible: false,
+						archivedAt: DateTime.now(),
+					}),
+				};
+			},
+		);
 		const foreign = await inTenant(other.tenant, () =>
 			Artist.create({ tenantId: other.tenant.id, name: "Ram", slug: "ram" }),
 		);
@@ -375,6 +390,7 @@ test.group("IntakeService.submit", (group) => {
 			["unknown", randomUUID(), "artist_unavailable"],
 			["hidden", hidden.id, "artist_unavailable"],
 			["deleted", gone.id, "artist_unavailable"],
+			["archived", archived.id, "artist_unavailable"],
 			["another studio's", foreign.id, "artist_unavailable"],
 			["not accepting", closed.id, "artist_not_accepting"],
 		] as const) {
