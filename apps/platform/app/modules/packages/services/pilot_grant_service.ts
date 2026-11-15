@@ -27,12 +27,24 @@ export default class PilotGrantService {
 	 */
 	async grant(
 		slug: string,
-		input: { package: PackageKey; endsAt: DateTime; note: string },
+		input: {
+			package: PackageKey;
+			endsAt: DateTime;
+			note: string;
+			/** The operator, by name. */
+			grantedBy: string;
+		},
 		now: DateTime = DateTime.utc(),
 	): Promise<PilotGrant> {
 		const note = input.note.trim();
 		if (note.length < 1 || note.length > 500) {
 			throw new PilotGrantError("Give a note of 1 to 500 characters.");
+		}
+		const grantedBy = input.grantedBy.trim();
+		if (grantedBy.length < 1 || grantedBy.length > 100) {
+			throw new PilotGrantError(
+				"Say who grants it (--by), in 1 to 100 characters.",
+			);
 		}
 		if (input.endsAt <= now) {
 			throw new PilotGrantError("The grant must end after now.");
@@ -63,11 +75,17 @@ export default class PilotGrantService {
 					startsAt: now,
 					endsAt: input.endsAt,
 					note,
+					grantedBy,
 				},
 				{ client: trx },
 			);
 			logger.info(
-				{ tenantId, package: input.package, endsAt: at },
+				{
+					tenantId,
+					package: input.package,
+					endsAt: input.endsAt.toUTC().toISO(),
+					grantedBy,
+				},
 				"Pilot grant recorded",
 			);
 			return grant;

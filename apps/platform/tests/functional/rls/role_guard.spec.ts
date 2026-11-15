@@ -112,6 +112,8 @@ test.group("boot guard", () => {
 			"2099-01-01",
 			"--note",
 			"Guard test",
+			"--by",
+			"Ops",
 		]);
 
 		assert.isFalse(killed);
