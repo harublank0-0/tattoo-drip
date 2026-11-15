@@ -314,6 +314,9 @@ export interface ApiDefinition {
   }
   admin: {
     index: typeof routes['admin.index']
+    studios: typeof routes['admin.studios'] & {
+      show: typeof routes['admin.studios.show']
+    }
     billing: typeof routes['admin.billing'] & {
       endAccess: typeof routes['admin.billing.end_access']
     }

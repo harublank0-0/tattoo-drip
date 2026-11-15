@@ -2095,6 +2095,30 @@ export interface Registry {
       errorResponse: unknown
     }
   }
+  'admin.studios': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/studios'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['index']>>>
+    }
+  }
+  'admin.studios.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/studios/:slug'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { slug: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['show']>>>
+    }
+  }
   'admin.billing': {
     methods: ["GET","HEAD"]
     pattern: '/admin/billing'

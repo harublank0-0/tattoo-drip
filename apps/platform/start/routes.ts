@@ -892,10 +892,15 @@ router
  */
 router
 	.group(() => {
-		// Until the Studios page exists (a later task), by path.
 		router
 			.get("/", ({ response }) => response.redirect("/admin/studios"))
 			.as("admin.index");
+		router
+			.get("studios", [controllers.AdminStudios, "index"])
+			.as("admin.studios");
+		router
+			.get("studios/:slug", [controllers.AdminStudios, "show"])
+			.as("admin.studios.show");
 		router
 			.get("billing", [controllers.Admin, "billingIndex"])
 			.as("admin.billing");

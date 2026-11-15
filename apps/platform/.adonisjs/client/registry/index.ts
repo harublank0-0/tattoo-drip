@@ -1050,6 +1050,18 @@ const routes = {
     tokens: [{"old":"/admin","type":0,"val":"admin","end":""}],
     types: placeholder as Registry['admin.index']['types'],
   },
+  'admin.studios': {
+    methods: ["GET","HEAD"],
+    pattern: '/admin/studios',
+    tokens: [{"old":"/admin/studios","type":0,"val":"admin","end":""},{"old":"/admin/studios","type":0,"val":"studios","end":""}],
+    types: placeholder as Registry['admin.studios']['types'],
+  },
+  'admin.studios.show': {
+    methods: ["GET","HEAD"],
+    pattern: '/admin/studios/:slug',
+    tokens: [{"old":"/admin/studios/:slug","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug","type":1,"val":"slug","end":""}],
+    types: placeholder as Registry['admin.studios.show']['types'],
+  },
   'admin.billing': {
     methods: ["GET","HEAD"],
     pattern: '/admin/billing',
