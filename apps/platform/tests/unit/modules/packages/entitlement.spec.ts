@@ -265,6 +265,22 @@ test.group("Entitlement: resolving a studio's package state", () => {
 		assert.equal(paused.bundleId, "studio-pilot-bundle");
 	});
 
+	test("a studio paused after grace keeps grace's package, even if a pilot ended inside it", ({
+		assert,
+	}) => {
+		const paused = resolve("2026-12-20T00:00:00Z", {
+			workspaceCreatedAt: longAgo,
+			periods: [
+				period("studio", "2026-11-01T00:00:00Z", "2026-12-01T00:00:00Z"),
+			],
+			// Ends inside grace (1 to 8 Dec), so grace was the last state.
+			pilots: [pilot("solo", "2026-12-02T00:00:00Z", "2026-12-04T00:00:00Z")],
+		});
+		assert.equal(paused.state, "paused");
+		assert.equal(paused.package, "studio");
+		assert.equal(paused.bundleId, "studio-bundle");
+	});
+
 	test("a period that counts for nothing or has not started yet keeps the trial", ({
 		assert,
 	}) => {

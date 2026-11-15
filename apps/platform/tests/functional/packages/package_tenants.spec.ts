@@ -1,6 +1,7 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { dbClient } from "#services/db_context";
+import { seedBilling } from "#tests/helpers/online_payments";
 import { sql } from "#tests/helpers/sql";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
@@ -20,6 +21,8 @@ test.group("package_tenants()", (group) => {
 		const live = await studioWithOwner("pkg-ten-live", "Pkg Live");
 		const other = await studioWithOwner("pkg-ten-other", "Pkg Other");
 		const gone = await studioWithOwner("pkg-ten-gone", "Pkg Gone");
+		// One billing customer; the others never subscribed.
+		await seedBilling(live.tenant);
 		await inTenant(gone.tenant, () =>
 			dbClient().rawQuery(
 				"update tenants set deleted_at = now() where id = ?",
