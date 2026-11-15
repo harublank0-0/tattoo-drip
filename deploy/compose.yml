@@ -146,8 +146,8 @@ services:
   # builds and starts it when TD_ENV_DIR has discover.env (D11, stage B of the
   # release plan in docs/discover/domain-migration.md); by hand:
   # docker compose --profile discover up -d discover. nginx's split layout
-  # (hosts.split.conf) names this address; the live layout doesn't use it, so
-  # Discover is reachable only from inside the stack until the cutover.
+  # (hosts.split.conf), live since the D11 cutover, sends tattoodrip.app to this
+  # address; the rollback layout (hosts.current.conf) doesn't use it.
   discover:
     profiles: ["discover"]
     build:
