@@ -295,6 +295,11 @@ test.group("Admin reviews", (group) => {
 				response,
 				"note" in body && body.note ? "note" : "reason",
 			);
+			// Checked after each refusal, before anything below takes it down.
+			const row = await reviewOf(a);
+			assert.isNull(row.takenDownAt, JSON.stringify(body));
+			assert.isNull(row.takedownReason, JSON.stringify(body));
+			assert.isNull(row.takedownNote, JSON.stringify(body));
 		}
 		// 500 code points of emoji (1000 UTF-16 units) is allowed.
 		const ok = await send(client, admin, "post", base, {
@@ -326,7 +331,6 @@ test.group("Admin reviews", (group) => {
 			{ reason: "hate" },
 		);
 		missing.assertFlashMessage("error", "No studio has a post with this id.");
-		assert.isNull((await reviewOf(a)).takenDownAt);
 	});
 
 	test("an owner gets a 404 on every action", async ({ client }) => {
