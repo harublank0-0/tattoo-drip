@@ -108,13 +108,15 @@ describe("Reviews and Fresh ink on the built server", { skip }, () => {
 		assert.match(all, /"Person"/);
 	});
 
-	test("reviews and Fresh ink that fail or are empty render nothing (the flag off answers empty)", async () => {
+	test("reviews and Fresh ink that fail or are empty render nothing", async () => {
 		api.scenario.fail.add("profile-reviews");
 		api.scenario.fail.add("profile-fresh-ink");
 		const response = await discover.get("/studios/stub-studio-1");
 		assert.equal(response.status, 200, "optional reads never fail the page");
 		const page = await html(response);
-		assert.doesNotMatch(page, /Reviews of|Healed work from|Fresh ink/);
+		// The page's own content: the header and footer link to the Fresh ink feed.
+		const main = page.slice(page.indexOf("<main"), page.indexOf("</main>"));
+		assert.doesNotMatch(main, /Reviews of|Healed work from|Fresh ink/);
 		assert.doesNotMatch(JSON.stringify(nodes(page)), /AggregateRating/);
 	});
 

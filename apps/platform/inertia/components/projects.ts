@@ -218,7 +218,7 @@ export type ProjectPageProps = {
 	payments: PaymentsCardProps;
 	/**
 	 * "Ask for a review" (Reviews and Fresh ink, slice 2): once the tattoo work is done, for
-	 * owners and the project's artist; null otherwise and while reviews are off.
+	 * owners and the project's artist; null otherwise.
 	 */
 	review: ReviewPanelProps | null;
 };

@@ -20,8 +20,8 @@ const SETTINGS = {
 const id = (n: number) =>
 	`00000000-0000-7000-8000-${String(n).padStart(12, "0")}`;
 
-/** A fake Discover client: the sitemap lists page by `size`, and every call is recorded. */
-function fakeClient(size = 2) {
+/** A fake Discover client: the sitemap lists page by `size`, and every call is recorded; `freshInkIn` is the country whose feed has a post. */
+function fakeClient(size = 2, freshInkIn = "NP") {
 	const calls: string[] = [];
 	const paged =
 		<T>(name: string, rows: (T & { key: string })[]) =>
@@ -78,6 +78,15 @@ function fakeClient(size = 2) {
 				nextCursor: null,
 			}),
 		},
+		freshInk: {
+			list: async (query: { country?: string; limit?: number }) => {
+				calls.push(`freshInk.list ${JSON.stringify(query)}`);
+				return {
+					data: query.country === freshInkIn ? [{}] : [],
+					nextCursor: null,
+				};
+			},
+		},
 		locations: {
 			list: async () => [
 				{ country: "NP", slug: "kathmandu", name: "Kathmandu", region: null },
@@ -129,16 +138,22 @@ describe("sitemaps (D10)", () => {
 	});
 
 	test("children: canonical addresses on DISCOVER_URL, one API page each", async () => {
-		const { client } = fakeClient(2);
+		const { client, calls } = fakeClient(2);
 		const urls = (kind: string, after: string | null = null) =>
 			sitemapUrls(client, SETTINGS, kind, after);
+		// The Fresh ink feed only while the default country's feed has a post.
 		assert.deepEqual(await urls("static"), [
 			"https://tattoodrip.app/",
 			"https://tattoodrip.app/for-studios",
 			"https://tattoodrip.app/explore/studios",
 			"https://tattoodrip.app/explore/artists",
 			"https://tattoodrip.app/tattoos",
+			"https://tattoodrip.app/fresh-ink",
 		]);
+		assert.deepEqual(
+			calls.filter((call) => call.startsWith("freshInk.list")),
+			['freshInk.list {"country":"NP","limit":1}'],
+		);
 		// Only styles listed in the default country (an empty style page is noindex).
 		assert.deepEqual(await urls("styles"), [
 			"https://tattoodrip.app/styles/blackwork",
@@ -167,6 +182,14 @@ describe("sitemaps (D10)", () => {
 		assert.equal(await urls("profiles"), null);
 		assert.equal(await urls("static", id(1)), null);
 		assert.equal(await urls("tattoos", "nope"), null);
+	});
+
+	test("an empty Fresh ink feed (noindex) stays out of the static sitemap", async () => {
+		const { client } = fakeClient(2, "IN");
+		const urls = await sitemapUrls(client, SETTINGS, "static", null);
+		assert.ok(urls);
+		assert.ok(!urls.includes("https://tattoodrip.app/fresh-ink"));
+		assert.equal(urls.length, 5);
 	});
 
 	test("bounded concurrency keeps the order", async () => {

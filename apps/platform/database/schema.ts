@@ -1960,6 +1960,7 @@ export class ReviewLinkSchema extends BaseModel {
 export class StaffAlertSchema extends BaseModel {
 	static $columns = [
 		"createdAt",
+		"gatewayPaymentId",
 		"id",
 		"inquiryId",
 		"kind",
@@ -1974,6 +1975,8 @@ export class StaffAlertSchema extends BaseModel {
 	$columns = StaffAlertSchema.$columns;
 	@column.dateTime({ autoCreate: true })
 	declare createdAt: DateTime;
+	@column()
+	declare gatewayPaymentId: string | null;
 	@column({ isPrimary: true })
 	declare id: string;
 	@column()

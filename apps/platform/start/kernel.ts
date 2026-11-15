@@ -71,7 +71,6 @@ export const middleware = router.named({
 	apiLimit: () => import("#middleware/api_limit_middleware"),
 	intakeGuard: () => import("#middleware/intake_guard_middleware"),
 	reviewGuard: () => import("#middleware/review_guard_middleware"),
-	reviewsOn: () => import("#middleware/reviews_on_middleware"),
 	verifiedEmail: () => import("#middleware/verified_email_middleware"),
 	platformAdmin: () => import("#middleware/platform_admin_middleware"),
 });

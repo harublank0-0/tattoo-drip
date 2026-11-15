@@ -11,9 +11,8 @@ import { LINK_DONE, LINK_RULE_MESSAGES } from "#modules/reviews/studio_copy";
  * ruling 3): make the project's review link, or get the one it has, and
  * revoke it. Owners and the project's artist: ReviewLinkService opens the
  * project through ProjectService.findFor, so another studio's project, or
- * another artist's, is a 404. Behind REVIEWS_ENABLED (the `reviewsOn`
- * middleware). The page then shows the link and the chat links that send
- * it; the token is never in a flash or a log.
+ * another artist's, is a 404. The page then shows the link and the chat
+ * links that send it; the token is never in a flash or a log.
  */
 @inject()
 export default class ReviewLinksController {

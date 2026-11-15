@@ -731,10 +731,10 @@ export interface Registry {
     methods: ["PUT"]
     pattern: '/t/:tenant/settings/messages'
     types: {
-      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>|InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesWithoutReviewValidator)>>
+      body: ExtractBody<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
       paramsTuple: [ParamValue]
       params: { tenant: ParamValue }
-      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>|InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesWithoutReviewValidator)>>
+      query: ExtractQuery<InferInput<(typeof import('#modules/notifications/validators/message_templates').messageTemplatesValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/message_templates_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
     }

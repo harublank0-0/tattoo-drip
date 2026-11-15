@@ -9,7 +9,8 @@ import { buttonVariants } from "~/components/ui/button";
 /**
  * The way to the member's alerts (TAT-52), a bell in the top bar at every
  * width, with the unread count no tab counts (`alertCount`, TAT-107: the
- * Inbox and Today count an owner's, so an owner's bell shows no number). Not
+ * Inbox, Today and Reviews count an owner's other alerts, so an owner's bell
+ * shows only online-payment alerts). Not
  * a destination: the sidebar and the tab bar keep theirs. Screen readers
  * hear "Alerts, 3 unread".
  */

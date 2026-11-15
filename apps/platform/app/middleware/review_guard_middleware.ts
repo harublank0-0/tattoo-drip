@@ -9,7 +9,6 @@ import {
 import {
 	REVIEW_TOKEN,
 	REVIEW_TOKEN_HEADER,
-	reviewsEnabled,
 } from "#modules/reviews/review_links";
 import { callerIp } from "#services/api_caller";
 import { READ_METHODS } from "#services/public_api";
@@ -30,11 +29,9 @@ const UPLOAD_ROUTES = new Set([
 
 /**
  * Every review page route (Reviews and Fresh ink, slice 1), after
- * publicTenant: the feature flag first (off, every route is the same 404 as
- * an unknown path, before anything is counted or read), then the rate
- * limits per client address and per link token (reads, writes and uploads
- * apart; the deposit page's model, TAT-65), before the handler reads any
- * body. The token comes from the X-Review-Token header, never the URL: a
+ * publicTenant: the rate limits per client address and per link token
+ * (reads, writes and uploads apart; the deposit page's model, TAT-65),
+ * before the handler reads any body. The token comes from the X-Review-Token header, never the URL: a
  * missing or malformed one is counted against its address and is the 404,
  * so guessing costs the guesser. The counts live on the limiter's own
  * connection, so a request that fails later still counts. Counted by the
@@ -43,7 +40,6 @@ const UPLOAD_ROUTES = new Set([
  */
 export default class ReviewGuardMiddleware {
 	async handle(ctx: HttpContext, next: NextFn) {
-		if (!reviewsEnabled()) throw ApiException.notFound();
 		const action: ReviewAction = READ_METHODS.has(ctx.request.method())
 			? "read"
 			: UPLOAD_ROUTES.has(ctx.route?.name ?? "")

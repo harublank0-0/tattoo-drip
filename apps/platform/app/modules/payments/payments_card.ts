@@ -100,6 +100,8 @@ export type PaymentsCardInput = {
 	timezone: string;
 	/** Who decided or recorded, by user id (PaymentService.memberNames). */
 	names: Map<string, string | null>;
+	/** The rows PayBridgeNP made, by payment id (PaymentService.onlineIds). */
+	online: ReadonlySet<string>;
 	/** Owners only: signed screenshot URLs by payment id. */
 	proofUrls: Map<string, string>;
 	/** The project's deposit-link reference code, if it has a link. */
@@ -130,6 +132,7 @@ export function paymentsCard({
 	isOwner,
 	timezone,
 	names,
+	online,
 	proofUrls,
 	referenceCode,
 }: PaymentsCardInput): PaymentsCardProps {
@@ -161,7 +164,7 @@ export function paymentsCard({
 			method: payment.method,
 			status: payment.status,
 			dateText: day(payment.createdAt),
-			decisionText: decisionText(payment, who, day),
+			decisionText: decisionText(payment, online.has(payment.id), who, day),
 			note: payment.note,
 			reversalText: original
 				? `Reverses the ${formatMoney(Math.abs(original.amount))} ${KIND_WORDS[original.kind]} of ${day(original.createdAt)}`
@@ -303,15 +306,22 @@ export function paymentsCard({
 
 /**
  * Who decided a payment, and when. A verified payment without a screenshot
- * was entered at the desk: "Recorded by".
+ * was entered at the desk: "Recorded by". A row PayBridgeNP made (`online`)
+ * names no member: it was paid, or refunded, through PayBridgeNP.
  */
 function decisionText(
 	payment: Payment,
+	online: boolean,
 	who: (id: string | null) => string,
 	day: (at: DateTime) => string,
 ): string {
 	if (payment.status === "submitted") return "Waiting for an owner";
 	const at = day(payment.verifiedAt ?? payment.createdAt);
+	if (online) {
+		return payment.kind === "refund"
+			? `Refunded through PayBridgeNP, ${at}`
+			: `Paid online through PayBridgeNP, ${at}`;
+	}
 	const by = who(payment.verifiedByUserId);
 	if (payment.status === "rejected") return `Rejected by ${by}, ${at}`;
 	return payment.proofImageKey

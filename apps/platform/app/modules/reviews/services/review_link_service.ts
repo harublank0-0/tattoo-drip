@@ -13,7 +13,6 @@ import {
 	newReviewNonce,
 	REVIEW_LINK_MONTHS,
 	reviewPageUrl,
-	reviewsEnabled,
 	reviewTokenFor,
 } from "#modules/reviews/review_links";
 import { REVIEWABLE_STATUSES } from "#modules/reviews/rules";
@@ -66,17 +65,17 @@ export default class ReviewLinkService {
 	 * revoked or expired). `member` must be able to open the project
 	 * (ProjectService.findFor: owners, and the artist the project is
 	 * assigned to), else E_ROW_NOT_FOUND. Refused with ReviewLinkRuleError
-	 * while reviews are off (`disabled`) and until the tattoo work is done
-	 * (`not_done`: in progress, healing check or completed, with a completed
-	 * tattoo session). Under the project's row lock (ProjectService.lockFor, which re-checks an artist's assignment), so two clicks make one
-	 * link; an expired link is retired (revoked) when its successor is made.
+	 * until the tattoo work is done (`not_done`: in progress, healing check
+	 * or completed, with a completed tattoo session). Under the project's row
+	 * lock (ProjectService.lockFor, which re-checks an artist's assignment),
+	 * so two clicks make one link; an expired link is retired (revoked) when
+	 * its successor is made.
 	 */
 	async linkFor(
 		tenant: Pick<Tenant, "id" | "slug">,
 		member: Member,
 		projectId: string,
 	): Promise<IssuedReviewLink> {
-		if (!reviewsEnabled()) throw new ReviewLinkRuleError("disabled");
 		const project = await this.projects.findFor(tenant, member, projectId);
 		return withTransaction(async (trx) => {
 			// The project's lock, re-checking under it that an artist still has

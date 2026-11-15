@@ -46,13 +46,12 @@ export type ShellNavItem = {
 
 /**
  * The shell's counts (TAT-107): new requests (owners) and the projects that need the member; and
- * the Fresh ink waiting for the member (Reviews and Fresh ink, slice 2), null while reviews are
- * off, which also hides the Reviews item.
+ * the Fresh ink waiting for the member (Reviews and Fresh ink, slice 2).
  */
 export type NavCounts = {
 	inbox: number | null;
 	today: number | null;
-	reviews?: number | null;
+	reviews: number | null;
 };
 
 const counted = (count: number | null, badgeLabel?: string) =>
@@ -62,14 +61,14 @@ const counted = (count: number | null, badgeLabel?: string) =>
 
 /**
  * What `tenant`'s member sees (TAT-107): Today, Inbox (owners), Projects and
- * Calendar, and for owners Reviews (while reviews are on), Clients, Artists, Portfolio,
- * Inventory, Transactions and Settings under More. An artist has Portfolio (their own work) as a fourth tab,
- * Reviews as a fifth while reviews are on, and Inventory under More when their owner grants
- * access. AI Design Lab is under More for every member while the server has it on
- * (`tenant.designLab`). Nothing
- * is counted twice: the Inbox counts new requests, Today the projects that
- * need the member, and the bell (not an item) the alerts neither counts. The
- * server 404s the rest anyway.
+ * Calendar, and for owners Reviews, Clients, Artists, Portfolio, Inventory,
+ * Transactions and Settings under More. An artist has Portfolio (their own
+ * work) as a fourth tab, Reviews as a fifth, and Inventory under More when
+ * their owner grants access. Nothing is counted twice: the Inbox counts new
+ * requests, Today the projects that need the member, Reviews the Fresh ink
+ * waiting for the member, and the bell (not an item) the alerts none of them
+ * counts. AI Design Lab is under More for every member while the server has
+ * it on (`tenant.designLab`). The server 404s the rest anyway.
  */
 export function navItems(
 	tenant: {
@@ -119,18 +118,15 @@ export function navItems(
 		route: "tenant.portfolio",
 		place: owner ? "more" : "bar",
 	};
-	// Reviews (slice 2): only while reviews are on. Under More for owners (their four tabs stay),
-	// a fifth tab for artists; its badge is the Fresh ink waiting for the member.
-	const reviews: ShellNavItem | null =
-		counts.reviews === null || counts.reviews === undefined
-			? null
-			: {
-					key: "reviews",
-					label: "Reviews",
-					route: "tenant.reviews.index",
-					place: owner ? "more" : "bar",
-					...counted(counts.reviews, "waiting"),
-				};
+	// Reviews (slice 2): under More for owners (their four tabs stay), a
+	// fifth tab for artists; its badge is the Fresh ink waiting for the member.
+	const reviews: ShellNavItem = {
+		key: "reviews",
+		label: "Reviews",
+		route: "tenant.reviews.index",
+		place: owner ? "more" : "bar",
+		...counted(counts.reviews, "waiting"),
+	};
 	const inventory: ShellNavItem = {
 		key: "inventory",
 		label: "Inventory",
@@ -147,14 +143,13 @@ export function navItems(
 			}
 		: null;
 	if (!owner) {
-		items.push(portfolio);
-		if (reviews) items.push(reviews);
+		items.push(portfolio, reviews);
 		if (designLab) items.push(designLab);
 		if (tenant.inventoryAccess) items.push(inventory);
 	}
 	if (owner) {
-		if (reviews) items.push(reviews);
 		items.push(
+			reviews,
 			{
 				key: "clients",
 				label: "Clients",

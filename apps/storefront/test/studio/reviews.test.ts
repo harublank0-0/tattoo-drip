@@ -267,7 +267,7 @@ describe("the home page's Reviews and Fresh ink, in every theme", () => {
 			assert.doesNotMatch(html, /id="reviews"/);
 			assert.doesNotMatch(html, /id="fresh-ink"/);
 			assert.doesNotMatch(html, /client-review-list|fresh-ink-photo/);
-			// A failed read or reviews off (an empty or garbled answer) is the same.
+			// A failed read (an empty or garbled answer) is the same.
 			assert.equal(home(theme, null, "broken"), html);
 		});
 

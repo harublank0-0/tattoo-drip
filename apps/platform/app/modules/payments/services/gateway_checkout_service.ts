@@ -5,6 +5,7 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 import { storefrontTemplate } from "#modules/payments/deposit_links";
 import { GatewayRuleError } from "#modules/payments/errors";
+import OnlinePaymentAlertJob from "#modules/payments/jobs/online_payment_alert_job";
 import GatewayAccount from "#modules/payments/models/gateway_account";
 import GatewayCheckout, {
 	type CheckoutStatus,
@@ -35,6 +36,7 @@ import {
 	type ProviderPayment,
 	type ProviderSession,
 } from "#services/paybridge";
+import { dispatchInTransaction } from "#services/queue";
 import { studioPageUrl } from "#services/storefront_url";
 
 type TenantRef = Pick<Tenant, "id">;
@@ -626,6 +628,7 @@ export default class GatewayCheckoutService {
 					"Online payment held for review",
 				);
 				await stored.merge({ reviewReason: reason }).save();
+				await alertStaff(trx, tenant, stored);
 				return stored;
 			}
 			const recorded = await this.payments.recordOnlineDeposit(
@@ -640,10 +643,12 @@ export default class GatewayCheckoutService {
 			);
 			if (!recorded) {
 				await stored.merge({ reviewReason: "project_deleted" }).save();
+				await alertStaff(trx, tenant, stored);
 				return stored;
 			}
 			await stored.merge({ paymentId: recorded.payment.id }).save();
 			await checkout.merge({ status: "paid", failureReason: null }).save();
+			await alertStaff(trx, tenant, stored);
 			logger.info(
 				{
 					tenantId: tenant.id,
@@ -856,4 +861,22 @@ export function inStudio<T>(
 	fn: () => Promise<T>,
 ): Promise<T> {
 	return withDbContext({ tenantId }, () => fn());
+}
+
+/**
+ * Queues the staff alert for a payment just recorded or held, in the
+ * transaction that decided it: each is decided once, so it alerts once.
+ */
+async function alertStaff(
+	trx: TransactionClientContract,
+	tenant: TenantRef,
+	payment: GatewayPayment,
+): Promise<void> {
+	await dispatchInTransaction(
+		OnlinePaymentAlertJob.dispatch({
+			tenantId: tenant.id,
+			gatewayPaymentId: payment.id,
+		}),
+		trx,
+	);
 }

@@ -14,7 +14,6 @@ import VideoService from "#modules/media/services/video_service";
 import ClientPost from "#modules/reviews/models/client_post";
 import ClientPostMedia from "#modules/reviews/models/client_post_media";
 import ClientReview from "#modules/reviews/models/client_review";
-import { reviewsEnabled } from "#modules/reviews/review_links";
 import {
 	PUBLIC_PHOTO_PURPOSE,
 	PUBLIC_VIDEO_PURPOSE,
@@ -102,9 +101,6 @@ const cursorAt = (column: string) =>
  * artist tag is the artist's slug and name only while the gallery shows that
  * artist (`ArtistService.listVisible`). Names are the shown name only (ruling
  * 9); never a client's full name, phone, email or id.
- *
- * While REVIEWS_ENABLED is off both reads are empty pages without a query:
- * the storefront's sections then render nothing.
  */
 @inject()
 export default class PublicReviewService {
@@ -128,7 +124,7 @@ export default class PublicReviewService {
 		tenant: Tenant,
 		query: PublicPageQuery,
 	): Promise<ShownReviewsPage> {
-		if (!reviewsEnabled() || tenant.deletedAt) {
+		if (tenant.deletedAt) {
 			return { reviews: [], nextCursor: null, rating: null };
 		}
 		const tags = await this.artistTags(tenant);
@@ -193,7 +189,7 @@ export default class PublicReviewService {
 		tenant: Tenant,
 		query: PublicPageQuery,
 	): Promise<ShownFreshInkPage> {
-		if (!reviewsEnabled() || tenant.deletedAt) {
+		if (tenant.deletedAt) {
 			return { posts: [], nextCursor: null };
 		}
 		const tags = await this.artistTags(tenant);

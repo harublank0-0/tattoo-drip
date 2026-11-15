@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import app from "@adonisjs/core/services/app";
+import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import GatewayCheckout from "#modules/payments/models/gateway_checkout";
 import GatewayPayment from "#modules/payments/models/gateway_payment";
@@ -27,8 +28,14 @@ import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 const slugs: string[] = [];
 
 test.group("Online payments under concurrent delivery", (group) => {
-	group.each.setup(() => paybridge.reset());
+	group.each.setup(() => {
+		paybridge.reset();
+		// The admin email and the alert job would be committed to the shared
+		// queue table.
+		queue.fake();
+	});
 	group.each.teardown(async () => {
+		queue.restore();
 		for (const slug of slugs.splice(0)) await forgetStudio(slug);
 	});
 

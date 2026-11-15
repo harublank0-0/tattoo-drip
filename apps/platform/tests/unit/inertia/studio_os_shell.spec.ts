@@ -21,7 +21,11 @@ const { navGroups, navItems } = navModule as {
 	navGroups(items: Item[]): { key: string; label: string; items: Item[] }[];
 	navItems(
 		tenant: { slug: string; role: string },
-		counts: { inbox: number | null; today: number | null },
+		counts: {
+			inbox: number | null;
+			today: number | null;
+			reviews: number | null;
+		},
 	): Item[];
 };
 const { monogram } = studioModule as { monogram(name: string): string };
@@ -33,7 +37,7 @@ const { preferenceFromCookie, resolveTheme, themeCookie, THEME_CHOICES } =
 		THEME_CHOICES: { value: Preference; label: string }[];
 	};
 
-const counts = { inbox: null, today: null };
+const counts = { inbox: null, today: null, reviews: null };
 
 test.group("Studio OS shell: the sidebar's groups", () => {
 	test("an owner sees the day's work, then the studio's set-up", ({
@@ -47,6 +51,7 @@ test.group("Studio OS shell: the sidebar's groups", () => {
 				[
 					"Studio",
 					[
+						"reviews",
 						"clients",
 						"artists",
 						"portfolio",
