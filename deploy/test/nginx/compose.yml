@@ -14,7 +14,7 @@
 #   outsider         client at 172.30.42.99, any other address
 
 x-node: &node
-  image: docker.io/library/node:24.3.0-bookworm-slim
+  image: docker.io/library/node:24.22.3-bookworm-slim
   networks:
     - tattoo_drip
 
