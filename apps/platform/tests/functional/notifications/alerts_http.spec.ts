@@ -282,7 +282,7 @@ test.group("Alerts", (group) => {
 		assert.equal(artistProps.alertCount, 2);
 	});
 
-	test("an owner's pages run no alerts query; the Alerts page still counts every unread alert", async ({
+	test("an owner's bell counts only the online-payment kinds no tab counts; the Alerts page still counts every unread alert", async ({
 		client,
 		assert,
 	}) => {
@@ -290,13 +290,15 @@ test.group("Alerts", (group) => {
 		await alertFor(tenant, owner.id);
 		await proofAlertFor(tenant, owner.id);
 
-		const { queries } = await recordQueries(() =>
+		const { queries, result: response } = await recordQueries(() =>
 			client.get("/t/black-needle/projects").withInertia().loginAs(owner),
 		);
-		assert.deepEqual(
-			queries.filter((sql) => sql.includes("staff_alerts")),
-			[],
-		);
+		// One count, of the two online-payment kinds (bellKinds): the Inbox
+		// and Today already count the inquiry and the screenshot.
+		const counts = queries.filter((sql) => sql.includes("staff_alerts"));
+		assert.lengthOf(counts, 1);
+		assert.include(counts[0], '"kind" in ($3, $4)');
+		assert.equal(response.inertiaProps.alertCount, 0);
 
 		const list = (await client.get(alertsPage()).withInertia().loginAs(owner))
 			.inertiaProps;

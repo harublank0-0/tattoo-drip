@@ -12,13 +12,16 @@ import {
 	freshInkIntro,
 	inquiryIntro,
 	inquiryRecipients,
+	onlinePaymentIntro,
 	paymentsCardPath,
 	proofIntro,
 	reviewsPath,
+	transactionsPath,
 } from "#modules/notifications/alerts";
 import DepositProofMail from "#modules/notifications/emails/deposit_proof_mail";
 import FreshInkMail from "#modules/notifications/emails/fresh_ink_mail";
 import NewInquiryMail from "#modules/notifications/emails/new_inquiry_mail";
+import OnlinePaymentMail from "#modules/notifications/emails/online_payment_mail";
 import StaffAlert from "#modules/notifications/models/staff_alert";
 import type Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -65,6 +68,19 @@ export type FreshInk = {
 	round: number;
 	artistId: string | null;
 	shownName: string;
+};
+
+/**
+ * What an online-payment alert needs (OnlinePaymentAlertJob gathers it): the
+ * gateway payment, whether it was held for review, its project, the
+ * project's artist profile and the client's name as the studio stores it.
+ */
+export type OnlinePayment = {
+	gatewayPaymentId: string;
+	held: boolean;
+	projectId: string;
+	artistId: string | null;
+	clientName: string;
 };
 
 /**
@@ -263,6 +279,78 @@ export default class AlertService {
 		});
 	}
 
+	/**
+	 * Alerts the studio to a client's online payment through PayBridgeNP
+	 * (OnlinePaymentAlertJob). A recorded deposit reaches the owners and the
+	 * member linked to the project's live artist profile, as a deposit
+	 * screenshot does, and points at the project's Payments card. A payment
+	 * held for review reaches the owners only, who alone can open
+	 * Transactions, where it points. Each member gets one alert and one email
+	 * per gateway payment, once: the unique (user_id, gateway_payment_id) and
+	 * `on conflict do nothing` make a repeated run add nothing, and each
+	 * email is queued in the same transaction as its alert. Returns the
+	 * users alerted by this call.
+	 */
+	async onlinePayment(
+		tenant: TenantRef,
+		paid: OnlinePayment,
+		options: AlertOptions = {},
+	): Promise<string[]> {
+		const studio = await this.tenancy.find(tenant.id);
+		if (!studio) return [];
+		const members = await this.tenancy.members(tenant);
+		const artist =
+			paid.artistId && !paid.held
+				? (await this.artists.list(tenant)).find(
+						({ id }) => id === paid.artistId,
+					)
+				: undefined;
+		// askedForYou marks the project's artist here: "for your project".
+		const recipients = inquiryRecipients(members, artist?.userId ?? null);
+		const emails = options.emails ?? env.get("ALERT_EMAILS") !== false;
+		const url = dashboardUrl(
+			env.get("APP_URL"),
+			paid.held
+				? transactionsPath(studio.slug)
+				: paymentsCardPath(studio.slug, paid.projectId),
+		);
+
+		return withTransaction(async (trx) => {
+			const inserted = await insertAlerts(
+				trx,
+				tenant,
+				{
+					kind: paid.held ? "online_review" : "online_deposit",
+					projectId: paid.projectId,
+					gatewayPaymentId: paid.gatewayPaymentId,
+				},
+				recipients.map(({ userId }) => userId),
+			);
+			const alerted = recipients.filter(({ userId }) => inserted.has(userId));
+			if (emails) {
+				for (const recipient of alerted) {
+					await sendMailInTransaction(
+						new OnlinePaymentMail({
+							to: recipient.email,
+							recipientName: recipient.fullName,
+							studioName: studio.name,
+							intro: onlinePaymentIntro({
+								clientName: paid.clientName,
+								studioName: studio.name,
+								held: paid.held,
+								yourProject: recipient.askedForYou,
+							}),
+							held: paid.held,
+							url,
+						}),
+						trx,
+					);
+				}
+			}
+			return alerted.map(({ userId }) => userId);
+		});
+	}
+
 	/** The member's alerts in this studio, newest first, 25 a page. */
 	async list(
 		tenant: TenantRef,
@@ -334,11 +422,19 @@ export default class AlertService {
 	}
 }
 
-/** What one alert row names: an inquiry, a payment and its project (TAT-88), or a post and its round (slice 2). */
+/**
+ * What one alert row names: an inquiry, a payment and its project (TAT-88),
+ * a post and its round (slice 2), or a gateway payment and its project.
+ */
 type AlertSubject =
 	| { kind: "new_inquiry"; inquiryId: string }
 	| { kind: "deposit_proof"; projectId: string; paymentId: string }
-	| { kind: "fresh_ink"; postId: string; round: number };
+	| { kind: "fresh_ink"; postId: string; round: number }
+	| {
+			kind: "online_deposit" | "online_review";
+			projectId: string;
+			gatewayPaymentId: string;
+	  };
 
 /** Inserts one alert per user about `subject`, skipping those that exist; returns the users inserted now. */
 async function insertAlerts(
@@ -349,18 +445,7 @@ async function insertAlerts(
 ): Promise<Set<string>> {
 	if (userIds.length === 0) return new Set();
 	// Only the columns the kind names: constants, never request data.
-	const { columns, ids } =
-		subject.kind === "new_inquiry"
-			? { columns: ["inquiry_id"], ids: [subject.inquiryId] }
-			: subject.kind === "deposit_proof"
-				? {
-						columns: ["project_id", "payment_id"],
-						ids: [subject.projectId, subject.paymentId],
-					}
-				: {
-						columns: ["post_id", "post_round"],
-						ids: [subject.postId, subject.round],
-					};
+	const { columns, ids } = subjectColumns(subject);
 	const row = `(?, ?, ?, ${ids.map(() => "?").join(", ")}, now())`;
 	const { rows } = await trx.rawQuery(
 		`insert into staff_alerts (tenant_id, user_id, kind, ${columns.join(", ")}, created_at)
@@ -370,4 +455,30 @@ async function insertAlerts(
 		userIds.flatMap((userId) => [tenant.id, userId, subject.kind, ...ids]),
 	);
 	return new Set((rows as { user_id: string }[]).map((row) => row.user_id));
+}
+
+/** The columns and values an alert about `subject` sets: constants, never request data. */
+function subjectColumns(subject: AlertSubject): {
+	columns: string[];
+	ids: (string | number)[];
+} {
+	switch (subject.kind) {
+		case "new_inquiry":
+			return { columns: ["inquiry_id"], ids: [subject.inquiryId] };
+		case "deposit_proof":
+			return {
+				columns: ["project_id", "payment_id"],
+				ids: [subject.projectId, subject.paymentId],
+			};
+		case "fresh_ink":
+			return {
+				columns: ["post_id", "post_round"],
+				ids: [subject.postId, subject.round],
+			};
+		default:
+			return {
+				columns: ["project_id", "gateway_payment_id"],
+				ids: [subject.projectId, subject.gatewayPaymentId],
+			};
+	}
 }
