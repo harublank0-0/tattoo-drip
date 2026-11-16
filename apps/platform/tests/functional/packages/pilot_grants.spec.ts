@@ -133,4 +133,38 @@ test.group("Packages: pilot grants", (group) => {
 			);
 		}
 	});
+
+	test("a grant that would overlap a later one is refused in words, not a database error", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("pilot-overlap", "Pilot Overlap");
+		const now = DateTime.utc().startOf("second");
+		// A grant that starts next week: not running now, so not ended.
+		await pilots.grant(
+			"pilot-overlap",
+			{
+				package: "studio",
+				endsAt: now.plus({ months: 2 }),
+				note: "Later",
+				grantedBy: "Ops",
+			},
+			now.plus({ days: 7 }),
+		);
+
+		await assert.rejects(
+			() =>
+				pilots.grant(
+					"pilot-overlap",
+					{
+						package: "studio",
+						endsAt: now.plus({ months: 1 }),
+						note: "Now",
+						grantedBy: "Ops",
+					},
+					now,
+				),
+			"This grant would overlap another of this studio's grants. Check its grants and run it again.",
+		);
+		assert.lengthOf(await inTenant(tenant, () => pilots.forTenant(tenant)), 1);
+	});
 });

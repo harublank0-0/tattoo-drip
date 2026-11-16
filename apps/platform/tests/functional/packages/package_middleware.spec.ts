@@ -10,6 +10,7 @@ import { dbClient } from "#services/db_context";
 import env from "#start/env";
 import { captureLogs } from "#tests/helpers/logs";
 import { seedBilling } from "#tests/helpers/online_payments";
+import { paybridge } from "#tests/helpers/paybridge";
 import {
 	makeArtist,
 	makeClient,
@@ -59,6 +60,7 @@ const projectsOf = (tenant: Tenant, inquiryId: string) =>
 	inTenant(tenant, () => TattooProject.query().where("inquiry_id", inquiryId));
 
 test.group("Packages: refusing new client work while paused", (group) => {
+	group.each.setup(() => paybridge.reset());
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
 	group.each.teardown(() => {
 		// env.set also writes process.env, which later specs' child processes
