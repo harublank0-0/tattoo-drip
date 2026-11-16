@@ -83,9 +83,15 @@ export function operatorName(user: {
 const dayText = (value: DateTime) =>
 	formatDay(value.toUTC().toISODate() as string);
 
-const grantRow = (grant: PilotGrant) => ({
+/**
+ * One grant as the Package section lists it. A grant that has ended says
+ * when (`endedText`): a replaced or ended one stopped at that instant, not
+ * on its planned day.
+ */
+const grantRow = (grant: PilotGrant, now: DateTime) => ({
 	packageName: PACKAGES[grant.package].name,
 	untilText: dayText(grant.endsAt),
+	endedText: grant.endsAt <= now ? at(grant.endsAt) : null,
 	note: grant.note,
 	grantedBy: grant.grantedBy,
 	grantedText: at(grant.startsAt),
@@ -309,15 +315,18 @@ export default class AdminStudiosController {
 					dayText,
 					packageEnforcement() === "enforce",
 				),
-				running: running ? grantRow(running) : null,
+				running: running ? grantRow(running, now) : null,
 				past: grants
 					.filter((grant) => grant.endsAt <= now)
 					.reverse()
-					.map(grantRow),
+					.map((grant) => grantRow(grant, now)),
 				packages: PACKAGE_KEYS.map((key) => ({
 					value: key,
 					label: PACKAGES[key].name,
 				})),
+				// A new grant starts on the running one's package (extending a
+				// Studio pilot never quietly makes it Solo), else on none.
+				defaultPackage: running?.package ?? null,
 			};
 		});
 	}

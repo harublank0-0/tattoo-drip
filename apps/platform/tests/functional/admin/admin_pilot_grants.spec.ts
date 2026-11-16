@@ -64,10 +64,33 @@ test.group("Admin pilot grants", (group) => {
 		assert.equal(pilot.running.grantedBy, "Ops");
 		assert.lengthOf(pilot.past, 1);
 		assert.equal(pilot.past[0].note, "First agreement");
+		// A replaced grant ended when the next began, not on its planned day.
+		assert.equal(
+			pilot.past[0].endedText,
+			now.minus({ days: 1 }).toFormat("yyyy-MM-dd HH:mm 'UTC'"),
+		);
+		assert.isNull(pilot.running.endedText);
 		assert.deepEqual(
 			pilot.packages.map((option: { value: string }) => option.value),
 			["solo", "studio"],
 		);
+		// Extending a Studio pilot starts on Studio, never quietly on Solo.
+		assert.equal(pilot.defaultPackage, "studio");
+	});
+
+	test("with no grant running, the form starts on no package", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("pg-fresh", "PG Fresh");
+		const page = await client
+			.get(`/admin/studios/${tenant.slug}`)
+			.loginAs(await adminUser())
+			.withInertia();
+		// biome-ignore lint/suspicious/noExplicitAny: the page's props, read as the page reads them
+		const pilot = (page.inertiaProps as any).pilot;
+		assert.isNull(pilot.running);
+		assert.isNull(pilot.defaultPackage);
 	});
 
 	test("the admin gives a grant: ends at 00:00 UTC on the day, recorded by the admin", async ({

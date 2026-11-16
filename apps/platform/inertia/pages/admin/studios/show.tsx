@@ -1,5 +1,6 @@
 import { Form } from "@adonisjs/inertia/react";
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
+import { useRef } from "react";
 import { urlFor } from "~/client";
 import {
 	KeepItUp,
@@ -8,6 +9,7 @@ import {
 	ReviewTakedownForm,
 } from "~/components/admin_moderation";
 import AdminNav from "~/components/admin_nav";
+import InlineConfirm from "~/components/inline_confirm";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
@@ -32,6 +34,8 @@ type Item = {
 type GrantRow = {
 	packageName: string;
 	untilText: string;
+	/** When an ended grant stopped; null while it runs. */
+	endedText: string | null;
 	note: string;
 	grantedBy: string | null;
 	grantedText: string;
@@ -46,6 +50,8 @@ type Props = {
 		/** Ended grants, newest first. */
 		past: GrantRow[];
 		packages: { value: string; label: string }[];
+		/** The running grant's package, which a new grant starts on; null when none runs. */
+		defaultPackage: string | null;
 	};
 	discover: {
 		statusLabel: string;
@@ -98,9 +104,11 @@ export default function AdminStudio({
 	reports,
 	takedownReasons,
 }: Props) {
+	const heading = useRef<HTMLHeadingElement>(null);
 	return (
 		<Page
 			title={studio.name}
+			titleRef={heading}
 			description={studio.slug}
 			actions={<AdminNav current="studios" />}
 		>
@@ -111,28 +119,33 @@ export default function AdminStudio({
 				{pilot.running ? (
 					<div className="flex flex-col gap-2 text-sm">
 						<GrantLine grant={pilot.running} />
-						<Form
-							route="admin.studios.pilot.end"
-							routeParams={{ slug: studio.slug }}
-						>
-							{({ processing }) => (
-								<Button
-									type="submit"
-									variant="outline"
-									className="h-11"
-									disabled={processing}
-								>
-									{processing ? "Saving…" : "End grant now"}
-								</Button>
-							)}
-						</Form>
+						{/* Ending can pause an unpaid pilot once limits are on: ask in the page first. */}
+						<InlineConfirm
+							label="End grant now"
+							variant="outline"
+							question="End this pilot grant now? The studio's package then follows its payments, and an unpaid studio is paused once limits are switched on."
+							confirmLabel="End grant"
+							keepLabel="Keep the grant"
+							fallback={heading}
+							onConfirm={(finished) =>
+								router.post(
+									urlFor("admin.studios.pilot.end", { slug: studio.slug }),
+									{},
+									{ preserveScroll: true, onFinish: finished },
+								)
+							}
+						/>
 					</div>
 				) : (
 					<p className="text-sm text-muted-foreground">
 						No pilot grant running.
 					</p>
 				)}
-				<PilotGrantForm slug={studio.slug} packages={pilot.packages} />
+				<PilotGrantForm
+					slug={studio.slug}
+					packages={pilot.packages}
+					defaultPackage={pilot.defaultPackage}
+				/>
 				{pilot.past.length > 0 && (
 					<div className="flex flex-col gap-2">
 						<h3 className="text-sm font-medium">Past grants</h3>
@@ -272,7 +285,9 @@ function GrantLine({ grant }: { grant: GrantRow }) {
 	return (
 		<span className="flex flex-col gap-1">
 			<span className="font-medium">
-				{grant.packageName} until {grant.untilText} (00:00 UTC)
+				{grant.endedText
+					? `${grant.packageName}, ended ${grant.endedText}`
+					: `${grant.packageName} until ${grant.untilText} (00:00 UTC)`}
 			</span>
 			<span>{grant.note}</span>
 			<span className="text-muted-foreground">
@@ -287,9 +302,12 @@ function GrantLine({ grant }: { grant: GrantRow }) {
 function PilotGrantForm({
 	slug,
 	packages,
+	defaultPackage,
 }: {
 	slug: string;
 	packages: { value: string; label: string }[];
+	/** The running grant's package; none makes the admin choose. */
+	defaultPackage: string | null;
 }) {
 	return (
 		<Form
@@ -310,10 +328,13 @@ function PilotGrantForm({
 							id="pilot-package"
 							name="package"
 							required
-							defaultValue={packages[0]?.value}
+							defaultValue={defaultPackage ?? ""}
 							className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm lg:min-h-9"
 							aria-invalid={!!errors.package}
 						>
+							<option value="" disabled>
+								Choose a package
+							</option>
 							{packages.map((option) => (
 								<option key={option.value} value={option.value}>
 									{option.label}
