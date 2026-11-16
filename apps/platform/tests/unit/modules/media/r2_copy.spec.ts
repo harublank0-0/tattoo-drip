@@ -144,6 +144,33 @@ test.group("Copies between R2 buckets (Fresh ink publishing)", (group) => {
 		});
 	});
 
+	test("a wrong poster key is a caller bug: thrown as it is, never as ImageCopyError, and the renditions copied are removed", async ({
+		assert,
+	}) => {
+		const tenant = { id: randomUUID() };
+		const rendition = `tenants/${tenant.id}/client_post_video/${randomUUID()}.720.mp4`;
+		r2.put("private", rendition, Buffer.alloc(2_000, 3));
+		const otherTenant = randomUUID();
+		const poster = `tenants/${otherTenant}/client_post_video/${randomUUID()}.jpg`;
+
+		let thrown: unknown;
+		try {
+			await (await app.container.make(VideoService)).copyTo(
+				tenant,
+				poster,
+				[rendition],
+				"client_post_video",
+				"fresh_ink_video",
+			);
+		} catch (error) {
+			thrown = error;
+		}
+
+		assert.notInstanceOf(thrown, ImageCopyError);
+		assert.match(String(thrown), /key of another tenant or purpose/);
+		assert.deepEqual(r2.keys("public"), []);
+	});
+
 	test("a video copy R2 fails removes what it wrote, is logged once and throws ImageCopyError", async ({
 		assert,
 	}) => {

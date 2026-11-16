@@ -473,12 +473,15 @@ export default class ImageService {
 		key: string,
 		tenant: Pick<Tenant, "id">,
 	): Promise<string> {
+		// A wrong key is a caller bug, thrown as it is: only storage failures
+		// below become ImageCopyError.
 		assertKeyOf(from, key, tenant);
-		const files = [key, ...variantsOfKey(key).map((copy) => copy.key)];
+		const files = [key, ...variantsOfKey(key).map((copy) => copy.key)].map(
+			(file) => ({ file, target: keyUnder(file, from, to) }),
+		);
 		const written: string[] = [];
 		try {
-			for (const file of files) {
-				const target = keyUnder(file, from, to);
+			for (const { file, target } of files) {
 				written.push(target);
 				// Copied whole, never streamed: R2 refuses an upload without
 				// Content-Length (MissingContentLength), which a download's stream

@@ -1132,9 +1132,12 @@ export interface paths {
          *     its name and its delete still work), `taken_down` (409: a new review
          *     after TattooDrip took the last one down), `post_needs_photo` (409: a
          *     video can't lead), `challenge_failed` (403),
-         *     `challenge_unavailable` (503) and `publish_failed` (503: a consent
-         *     that shows an approved post needs its public copies made, and storage
-         *     couldn't make them, so nothing sent was saved; try again).
+         *     `challenge_unavailable` (503), `publish_failed` (503: a consent that
+         *     shows an approved post needs its public copies made, and storage
+         *     couldn't make them) and `remove_failed` (503: a withdrawn last consent
+         *     or a change to a published post needs its public copies deleted, and
+         *     storage couldn't delete them). After either, nothing sent was saved;
+         *     try again.
          */
         put: operations["submitReviewPage"];
         post?: never;
@@ -4502,7 +4505,7 @@ export interface operations {
             };
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
-            /** @description The bot challenge could not be checked (`challenge_unavailable`), storage couldn't make the post's public copies (`publish_failed`; nothing was saved, try again), or the API is busy (`service_busy`). */
+            /** @description The bot challenge could not be checked (`challenge_unavailable`), storage couldn't make or delete the post's public copies (`publish_failed`, `remove_failed`; nothing was saved, try again), or the API is busy (`service_busy`). */
             503: {
                 headers: {
                     [name: string]: unknown;

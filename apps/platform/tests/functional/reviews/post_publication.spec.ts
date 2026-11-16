@@ -72,10 +72,11 @@ async function addPhoto(client: ApiClient, s: Ready, width = 900) {
 function submit(
 	client: ApiClient,
 	s: Ready,
-	over: { studio?: boolean; caption?: string } = {},
+	over: { studio?: boolean; caption?: string; name?: string } = {},
 ) {
 	return reviewRequest(client, "PUT", s.tenant.slug, "", s.token).json(
 		reviewBody({
+			...(over.name ? { shownName: over.name } : {}),
 			review: undefined,
 			consentStudioPage: over.studio ?? true,
 			post: { caption: over.caption ?? "Healed after six weeks.", styles: [] },
@@ -444,9 +445,10 @@ test.group("Fresh ink publishing: storage failures", (group) => {
 		const broken = failPuts("public", (key) =>
 			key.includes("/fresh_ink_photo/"),
 		);
+		const before = await post(s);
 		try {
 			assertApiError(
-				await submit(client, s, { studio: true }),
+				await submit(client, s, { studio: true, name: "Sita Rai" }),
 				503,
 				"publish_failed",
 			);
@@ -454,6 +456,8 @@ test.group("Fresh ink publishing: storage failures", (group) => {
 			broken.restore();
 		}
 		const row = await post(s);
+		assert.equal(row.shownName, before.shownName);
+		assert.notEqual(row.shownName, "Sita Rai");
 		assert.isFalse(row.consentStudioPage);
 		assert.isNull(row.publishedAt);
 		assert.deepEqual(await published(s), []);
