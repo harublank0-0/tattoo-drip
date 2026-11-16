@@ -1,20 +1,34 @@
+import { inject } from "@adonisjs/core";
+import logger from "@adonisjs/core/services/logger";
 import { DateTime } from "luxon";
 import DesignUsageRecord from "#modules/design_lab/models/design_usage_record";
 import { designLabSettings } from "#modules/design_lab/settings";
+import AllowanceBundle from "#modules/packages/models/allowance_bundle";
+import { PACKAGES, type PackageKey } from "#modules/packages/packages";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import EntitlementService from "#modules/packages/services/entitlement_service";
+import { packageEnforcement } from "#modules/packages/settings";
+import { formatDay } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withTransaction } from "#services/db_context";
 
 type TenantRef = Pick<Tenant, "id">;
 
-/** The studio has no generations left this month. */
+/**
+ * The studio has no generations left this month (ruling 12: name the
+ * blocked action, say what still works, give a real next step). Studio is
+ * offered only when its bundle gives more (`studioLimit`).
+ */
 export class AllowanceError extends Error {
 	constructor(
 		readonly remaining: number,
 		readonly limit: number,
+		resetsAt: DateTime,
+		studioLimit: number | null,
 	) {
 		super(
 			remaining === 0
-				? `Your studio has used all ${limit} generations for this month. The allowance resets on the 1st.`
+				? `Your studio has used all ${limit} generations for this month. New generations are paused until ${formatDay(resetsAt.toUTC().toISODate() as string)}; your designs and history stay available.${studioLimit === null ? "" : ` The Studio package includes ${studioLimit} a month.`}`
 				: `Your studio has ${remaining} of ${limit} generations left this month: ask for ${remaining} or fewer.`,
 		);
 	}
@@ -34,7 +48,10 @@ export const RELEASED_CAP = 10;
 export class UsageLimitError extends Error {}
 
 export type Allowance = {
+	/** The limit in force (see DesignUsageService). */
 	limit: number;
+	/** The studio's package bundle's images a month, whatever the mode; null when not metered. */
+	packageLimit: number | null;
 	/** Settled (stored images) this month. */
 	used: number;
 	/** Accepted and still running this month. */
@@ -46,8 +63,13 @@ export type Allowance = {
 
 /**
  * The Design Lab allowance (docs/design-lab.md, Usage). TattooDrip pays the
- * provider; each studio may start DESIGN_LAB_MONTHLY_LIMIT generations a
- * calendar month (UTC). Every accepted generation attempt is one ledger row:
+ * provider; each studio may start its limit of generations a calendar month
+ * (UTC). The limit in force (the image meter, studio packages phase 5): 0 in
+ * DESIGN_LAB_MONTHLY_LIMIT turns generation off everywhere; otherwise, with
+ * enforcement on, the studio's package bundle's `images_per_month`; else (in
+ * observe mode, or a bundle not metered) DESIGN_LAB_MONTHLY_LIMIT, and a
+ * request the bundle would refuse is logged ("Package rule would refuse").
+ * Every accepted generation attempt is one ledger row:
  * `reserved` when accepted (counted at once, so the limit holds while the
  * worker runs), `settled` once its image is stored, `released` (not counted)
  * when the provider failed, refused or moderated it. Settling and releasing
@@ -56,13 +78,17 @@ export type Allowance = {
  * once cannot both take the last generation. Nothing the browser sends
  * decides a count, a cost or the limit.
  */
+@inject()
 export default class DesignUsageService {
+	constructor(private entitlements: EntitlementService) {}
+
 	/** The studio's allowance this month. */
 	async allowance(tenant: TenantRef, now = DateTime.utc()): Promise<Allowance> {
-		const { limit } = this.limitNow();
+		const { limit, packageLimit } = await this.limitsFor(tenant, now);
 		const counts = await this.monthCounts(tenant, now);
 		return {
 			limit,
+			packageLimit,
 			used: counts.settled,
 			reserved: counts.reserved,
 			remaining: Math.max(0, limit - counts.settled - counts.reserved),
@@ -90,11 +116,35 @@ export default class DesignUsageService {
 				"select pg_advisory_xact_lock(hashtextextended(?, 0))",
 				[`design_usage:${tenant.id}`],
 			);
-			const { limit, creditsPerImage } = this.limitNow();
+			const limits = await this.limitsFor(tenant, now);
+			const { limit, creditsPerImage } = limits;
 			const counts = await this.monthCounts(tenant, now);
-			const remaining = Math.max(0, limit - counts.settled - counts.reserved);
+			const used = counts.settled + counts.reserved;
+			const remaining = Math.max(0, limit - used);
 			if (attempts.length > remaining) {
-				throw new AllowanceError(remaining, limit);
+				throw new AllowanceError(
+					remaining,
+					limit,
+					monthStart(now).plus({ months: 1 }),
+					limits.studioLimit,
+				);
+			}
+			if (
+				packageEnforcement() === "observe" &&
+				limits.packageLimit !== null &&
+				attempts.length > Math.max(0, limits.packageLimit - used)
+			) {
+				logger.info(
+					{
+						tenantId: tenant.id,
+						rule: "image_allowance",
+						package: limits.package,
+						packageLimit: limits.packageLimit,
+						used,
+						requested: attempts.length,
+					},
+					"Package rule would refuse",
+				);
 			}
 			// Failed and declined attempts give their unit back but were still
 			// sent to the provider: at most RELEASED_CAP (or the limit, if higher)
@@ -187,9 +237,49 @@ export default class DesignUsageService {
 		return Number(changed[0] ?? 0) > 0;
 	}
 
-	private limitNow() {
+	/**
+	 * The limit in force for the studio now, its package bundle's number
+	 * (whatever the mode), and Studio's number when offering Studio would give
+	 * more (enforce mode, a Solo studio). Reads run in the studio's context.
+	 */
+	private async limitsFor(
+		tenant: TenantRef,
+		now: DateTime,
+	): Promise<{
+		limit: number;
+		packageLimit: number | null;
+		package: PackageKey;
+		studioLimit: number | null;
+		creditsPerImage: number | null;
+	}> {
 		const { monthlyLimit, creditsPerImage } = designLabSettings();
-		return { limit: monthlyLimit, creditsPerImage };
+		const entitlement = await this.entitlements.for(tenant, now);
+		const bundle = await AllowanceBundle.find(entitlement.bundleId);
+		const packageLimit = bundle?.imagesPerMonth ?? null;
+		const enforced = packageEnforcement() === "enforce";
+		// 0 in the setting is the documented off switch, whatever a bundle says.
+		const limit =
+			monthlyLimit === 0
+				? 0
+				: enforced && packageLimit !== null
+					? packageLimit
+					: monthlyLimit;
+		let studioLimit: number | null = null;
+		if (enforced && entitlement.package === "solo") {
+			const studio = await AllowanceBundle.findBy(
+				"key",
+				PACKAGES.studio.defaultBundleKey,
+			);
+			const offered = studio?.imagesPerMonth ?? null;
+			if (offered !== null && offered > limit) studioLimit = offered;
+		}
+		return {
+			limit,
+			packageLimit,
+			package: entitlement.package,
+			studioLimit,
+			creditsPerImage,
+		};
 	}
 
 	private async monthCounts(tenant: TenantRef, now: DateTime) {

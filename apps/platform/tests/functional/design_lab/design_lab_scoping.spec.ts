@@ -72,10 +72,12 @@ test.group("AI Design Lab service scoping", (group) => {
 				() => lab.retry(a.tenant, asOwner, bLab.designGeneration.id, 1),
 				/Row not found/,
 			);
-			// B's settled generation is not counted in A's allowance.
-			const allowance = await usage.allowance(a.tenant);
-			assert.equal(allowance.used, 0);
-			assert.equal(allowance.reserved, 0);
+			// A's allowance can't be read from B's context at all: its limit
+			// comes from A's package (the image meter), which RLS hides here.
+			await assert.rejects(
+				() => usage.allowance(a.tenant),
+				/isn't visible in this context/,
+			);
 			assert.isFalse(
 				await usage.settle(a.tenant, bLab.designGeneration.id, 1, null),
 			);
