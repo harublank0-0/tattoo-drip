@@ -1,6 +1,7 @@
-import { Link, router } from "@inertiajs/react";
+import { router } from "@inertiajs/react";
 import { useState } from "react";
 import { urlFor } from "~/client";
+import AdminNav from "~/components/admin_nav";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
@@ -54,14 +55,7 @@ export default function AdminBilling({
 		<Page
 			title="TattooDrip billing"
 			description="Studios' subscriptions to TattooDrip and their invoices. Studio client payments are never included."
-			actions={
-				<Link
-					href={urlFor("admin.payments")}
-					className="text-sm underline underline-offset-4"
-				>
-					Studio payment connections
-				</Link>
-			}
+			actions={<AdminNav current="billing" />}
 		>
 			{!configured && (
 				<p className="rounded-md border border-dashed p-3 text-sm">

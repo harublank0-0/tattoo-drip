@@ -1,7 +1,9 @@
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import Artist from "#modules/artists/models/artist";
+import ArtistService from "#modules/artists/services/artist_service";
 import { hashAccountToken } from "#modules/identity/account_tokens";
+import ImageService from "#modules/media/services/image_service";
 import {
 	INVITATION_LINK_FLASH,
 	type NewInvitationLink,
@@ -43,6 +45,14 @@ test.group("Settings, Members (TAT-33)", (group) => {
 			slug: "oona",
 			linkToMe: true,
 		});
+		// Archived (studio packages, phase 2): never offered to a new member.
+		const archived = await addArtist(tenant, owner, {
+			name: "Asha",
+			slug: "asha",
+		});
+		await inTenant(tenant, () =>
+			new ArtistService(new ImageService()).archive(tenant, archived.id),
+		);
 		await invite(tenant, owner, { email: "mira@members-33.example" });
 
 		const response = await client.get(base).withInertia().loginAs(owner);

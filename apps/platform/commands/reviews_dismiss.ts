@@ -4,7 +4,8 @@ import type { CommandOptions } from "@adonisjs/core/types/ace";
 /**
  * Closes a studio's report of a review without a takedown (Reviews and Fresh
  * ink, rulings 6 and 12): TattooDrip keeps the review up. The report's
- * record stays; the studio may report the review again.
+ * record stays; the studio may report the review again. The admin Reports
+ * page (/admin/reports) does the same.
  *
  *   node ace reviews:dismiss <review id>
  */

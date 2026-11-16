@@ -340,7 +340,7 @@ test.group("InquiryService accept and decline", (group) => {
 		});
 	});
 
-	test("a deleted or another tenant's artist is refused and nothing changes", async ({
+	test("a deleted, archived or another tenant's artist is refused and nothing changes", async ({
 		assert,
 	}) => {
 		const { tenant } = await studioWithOwner("studio-a", "Studio A");
@@ -350,9 +350,14 @@ test.group("InquiryService accept and decline", (group) => {
 		await inTenant(tenant, async () => {
 			const gone = await makeArtist(tenant, "gone");
 			await gone.softDelete();
+			// Archived (studio packages, phase 2): kept, but no new work.
+			const archived = await makeArtist(tenant, "archived");
+			await archived
+				.merge({ archivedAt: DateTime.now(), visible: false })
+				.save();
 			const inquiry = await inquiryIn(tenant);
 
-			for (const artistId of [gone.id, theirs.id, randomUUID()]) {
+			for (const artistId of [gone.id, archived.id, theirs.id, randomUUID()]) {
 				assert.equal(
 					await reasonOf(() => inquiries.accept(tenant, inquiry, artistId)),
 					"artist_unavailable",

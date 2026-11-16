@@ -131,6 +131,8 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.artists.edit": MEMBERS,
 	"tenant.artists.update": MEMBERS,
 	"tenant.artists.destroy": OWNERS,
+	"tenant.artists.archive": OWNERS,
+	"tenant.artists.restore": OWNERS,
 	// The artist's own Discover switch (D04): the same rule as the profile
 	// (ArtistService.lockEditable); turning a profile someone else manages
 	// back on is refused (PublicationService.setArtistListed).

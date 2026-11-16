@@ -4,7 +4,8 @@ import type { CommandOptions } from "@adonisjs/core/types/ace";
 /**
  * Lifts a Discover takedown (Discover D04): the listing, or the photo, then
  * follows the owner's own choices again. It never lists anything by itself:
- * a business whose owner turned the listing off stays off Discover.
+ * a business whose owner turned the listing off stays off Discover. The
+ * admin Studios pages (/admin/studios) do the same.
  *
  *   node ace discover:restore black-needle
  *   node ace discover:restore black-needle --photo <photo id>

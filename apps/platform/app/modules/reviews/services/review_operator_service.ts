@@ -1,6 +1,7 @@
 import { inject } from "@adonisjs/core";
 import logger from "@adonisjs/core/services/logger";
 import { DateTime } from "luxon";
+import { excerpt } from "#modules/notifications/alerts";
 import ClientPost from "#modules/reviews/models/client_post";
 import ClientReview from "#modules/reviews/models/client_review";
 import type { TakedownKind, TakedownReason } from "#modules/reviews/rules";
@@ -26,18 +27,41 @@ export type OpenReport = {
 	shownName: string;
 };
 
+/** One review, reply or post on the operator's studio page. */
+export type OperatorItem = {
+	kind: TakedownKind;
+	/** The review's id for a review and its reply, the post's id for a post. */
+	id: string;
+	/** When it was written or published. */
+	at: DateTime;
+	shownName: string;
+	/** Null for a post. */
+	rating: number | null;
+	excerpt: string;
+	takedown: {
+		at: DateTime;
+		reason: TakedownReason;
+		note: string | null;
+	} | null;
+};
+
 /** The SECURITY DEFINER lookup that finds an item's tenant (ids only, live tenants). */
 const LOOKUPS: Record<"review" | "post", string> = {
 	review: "select public.client_review_tenant(?::uuid) as id",
 	post: "select public.client_post_tenant(?::uuid) as id",
 };
 
+/** Characters of a review, reply or caption the studio page shows. */
+const EXCERPT = 200;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * TattooDrip's own tools for reviews and Fresh ink (ruling 12, slice 2),
- * for the operator commands only (`reviews:takedown`, `reviews:restore`,
- * `reviews:dismiss`, `reviews:reports`), never the web or the worker. The
+ * for the operator commands (`reviews:takedown`, `reviews:restore`,
+ * `reviews:dismiss`, `reviews:reports`) and the platform admin pages, never
+ * a studio's or a client's request and never the worker. A request never
+ * uses the owner connection: it reads as the app role in a tenant context. The
  * model of `discover:suspend`: an item's tenant comes from a SECURITY
  * DEFINER lookup that returns one id (`client_review_tenant`,
  * `client_post_tenant`), and everything is then read and written as the app
@@ -181,6 +205,92 @@ export default class ReviewOperatorService {
 			if (report) reports.push(report);
 		}
 		return reports;
+	}
+
+	/**
+	 * A studio's reviews, replies and posts for the operator's studio page,
+	 * read in the studio's own context (`tenantId` is already resolved).
+	 * `takenDown` holds every item with a TattooDrip takedown, newest
+	 * takedown first; `live` the reviews, replies (not taken down) and
+	 * published posts that are not taken down, newest first, at most
+	 * `limit`. Deleted rows are left out of both.
+	 */
+	async studioItems(
+		tenantId: string,
+		live: { limit: number },
+	): Promise<{ takenDown: OperatorItem[]; live: OperatorItem[] }> {
+		return withDbContext({ tenantId }, async () => {
+			const reviews = await ClientReview.query().where("tenant_id", tenantId);
+			const posts = await ClientPost.query().where("tenant_id", tenantId);
+			const items: OperatorItem[] = [];
+			for (const review of reviews) {
+				items.push({
+					kind: "review",
+					id: review.id,
+					at: review.createdAt,
+					shownName: review.shownName,
+					rating: review.rating,
+					excerpt: excerpt(review.body, EXCERPT),
+					takedown: review.takenDownAt
+						? {
+								at: review.takenDownAt,
+								reason: review.takedownReason as TakedownReason,
+								note: review.takedownNote,
+							}
+						: null,
+				});
+				if (review.reply !== null) {
+					items.push({
+						kind: "reply",
+						id: review.id,
+						at: review.repliedAt ?? review.createdAt,
+						shownName: review.shownName,
+						rating: review.rating,
+						excerpt: excerpt(review.reply, EXCERPT),
+						takedown: review.replyTakenDownAt
+							? {
+									at: review.replyTakenDownAt,
+									reason: review.replyTakedownReason as TakedownReason,
+									note: review.replyTakedownNote,
+								}
+							: null,
+					});
+				}
+			}
+			for (const post of posts) {
+				// A takedown withdraws the post, clearing publishedAt.
+				const at = post.publishedAt ?? post.submittedAt ?? post.createdAt;
+				if (!post.takenDownAt && !post.publishedAt) continue;
+				items.push({
+					kind: "post",
+					id: post.id,
+					at,
+					shownName: post.shownName,
+					rating: null,
+					excerpt: excerpt(post.caption ?? "", EXCERPT),
+					takedown: post.takenDownAt
+						? {
+								at: post.takenDownAt,
+								reason: post.takedownReason as TakedownReason,
+								note: post.takedownNote,
+							}
+						: null,
+				});
+			}
+			const newest = (left: DateTime, right: DateTime) =>
+				right.toMillis() - left.toMillis();
+			return {
+				takenDown: items
+					.filter((item) => item.takedown)
+					.sort((a, b) =>
+						newest(a.takedown?.at as DateTime, b.takedown?.at as DateTime),
+					),
+				live: items
+					.filter((item) => !item.takedown)
+					.sort((a, b) => newest(a.at, b.at))
+					.slice(0, live.limit),
+			};
+		});
 	}
 
 	/**

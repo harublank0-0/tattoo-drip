@@ -6,6 +6,7 @@ import { DateTime } from "luxon";
 import ClientPost from "#modules/reviews/models/client_post";
 import ClientReview from "#modules/reviews/models/client_review";
 import { TAKEDOWN_SENTENCES } from "#modules/reviews/rules";
+import ReviewOperatorService from "#modules/reviews/services/review_operator_service";
 import { reviewRequest } from "#tests/helpers/reviews";
 import { failDeletes } from "#tests/helpers/storage_failures";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
@@ -247,5 +248,72 @@ test.group("reviews operator commands", (group) => {
 			a.clientReview.id,
 		);
 		(await exec(ReviewsDismiss, [a.clientReview.id])).assertFailed();
+	});
+});
+
+test.group("reviews operator: studio items", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	const operator = () =>
+		new ReviewOperatorService(
+			// Takedown of a review never touches the publication service.
+			{} as never,
+		);
+
+	test("lists live items, moves a taken-down review across, and keeps studios apart", async ({
+		assert,
+	}) => {
+		const { a, b } = await twoStudios();
+
+		const before = await operator().studioItems(a.tenant.id, { limit: 50 });
+		assert.isEmpty(before.takenDown);
+		const review = before.live.find((item) => item.kind === "review");
+		assert.equal(review?.id, a.clientReview.id);
+		assert.isTrue(
+			before.live.some(
+				(item) => item.kind === "post" && item.id === a.freshInkPost.id,
+			),
+		);
+
+		await operator().takedown("review", a.clientReview.id, "hate", "note");
+
+		const after = await operator().studioItems(a.tenant.id, { limit: 50 });
+		const taken = after.takenDown.find(
+			(item) => item.kind === "review" && item.id === a.clientReview.id,
+		);
+		assert.equal(taken?.takedown?.reason, "hate");
+		assert.equal(taken?.takedown?.note, "note");
+		assert.isFalse(
+			after.live.some(
+				(item) => item.kind === "review" && item.id === a.clientReview.id,
+			),
+		);
+		const ids = [...after.live, ...after.takenDown].map((item) => item.id);
+		assert.notInclude(ids, b.clientReview.id);
+		assert.notInclude(ids, b.freshInkPost.id);
+	});
+
+	test("a taken-down reply is listed as a reply item; limit caps the live items", async ({
+		assert,
+	}) => {
+		const { a } = await twoStudios();
+
+		const all = await operator().studioItems(a.tenant.id, { limit: 50 });
+		assert.isTrue(all.live.some((item) => item.kind === "reply"));
+		await operator().takedown("reply", a.clientReview.id, "hate", null);
+		const after = await operator().studioItems(a.tenant.id, { limit: 50 });
+		assert.isTrue(
+			after.takenDown.some(
+				(item) => item.kind === "reply" && item.id === a.clientReview.id,
+			),
+		);
+		assert.isFalse(
+			after.live.some(
+				(item) => item.kind === "reply" && item.id === a.clientReview.id,
+			),
+		);
+
+		const one = await operator().studioItems(a.tenant.id, { limit: 1 });
+		assert.lengthOf(one.live, 1);
 	});
 });

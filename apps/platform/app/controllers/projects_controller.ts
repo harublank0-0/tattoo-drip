@@ -388,7 +388,7 @@ export default class ProjectsController {
 
 		// Scheduling a session here (TAT-85 part 2): whom this member may
 		// schedule, the default, and what a tattoo session would do.
-		const bookable = this.bookings.bookableFrom(artists, membership);
+		const bookable = this.bookings.bookableOn(artists, membership, project);
 		const depositDue =
 			project.status === "deposit_pending" && current
 				? await this.deposits.remaining(tenant, project, current)
@@ -671,7 +671,14 @@ export default class ProjectsController {
 				membership.role === "owner" && !closed
 					? {
 							artistId: project.artistId,
-							choices: artists.map(({ id, name }) => ({ id, name })),
+							// Archived artists (studio packages) take no new work: only
+							// the project's own stays offered.
+							choices: artists
+								.filter(
+									({ id, archivedAt }) =>
+										archivedAt === null || id === project.artistId,
+								)
+								.map(({ id, name }) => ({ id, name })),
 						}
 					: null,
 			request,

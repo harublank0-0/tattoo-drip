@@ -167,9 +167,9 @@ export default class ProjectSessionsController {
 		);
 		const form = await ctx.request.validateUsing(scheduleValidator);
 		const input = toNewSession(form, tenant.timezone);
-		const artist = (
-			await this.bookings.bookableArtists(tenant, membership)
-		).find(({ id }) => id === input.artistId);
+		const artist = this.bookings
+			.bookableOn(await this.artists.list(tenant), membership, project)
+			.find(({ id }) => id === input.artistId);
 		if (!artist) {
 			throw fieldError(
 				"sessionArtistId",

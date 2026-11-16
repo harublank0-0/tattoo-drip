@@ -18,6 +18,7 @@ import {
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { ensureDbContext } from "#services/db_context";
 import { encryptsHistory } from "#services/history_encryption";
+import { isPlatformAdmin } from "#services/platform_admins";
 import { isApiRequest } from "#services/public_api";
 import UserTransformer from "#transformers/user_transformer";
 
@@ -147,6 +148,10 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 				auth?.user ? UserTransformer.transform(auth.user) : undefined,
 			),
 			preferences: ctx.inertia.always({ theme }),
+			/** Shows the account menu's Admin link; false for everyone else and when signed out. */
+			platformAdmin: ctx.inertia.always(
+				auth?.user ? isPlatformAdmin(auth.user) : false,
+			),
 			/**
 			 * Set on /t/:tenant pages by the tenant middleware, which runs
 			 * before the page renders; undefined everywhere else.

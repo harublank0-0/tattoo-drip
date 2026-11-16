@@ -5,7 +5,8 @@ import { terminalText } from "#services/terminal_text";
 /**
  * A business's Discover state for an operator (Discover D04): the owner's
  * switch, whether the public API returns it, a takedown and its reason, and
- * every photo taken down. Prints no contact detail.
+ * every photo taken down. Prints no contact detail. The admin studio page
+ * (/admin/studios) shows the same.
  *
  *   node ace discover:status black-needle
  */

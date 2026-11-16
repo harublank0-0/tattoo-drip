@@ -6,6 +6,7 @@ import PilotGrant from "#modules/packages/models/pilot_grant";
 import { PACKAGES, type PackageKey } from "#modules/packages/packages";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { dbClient, withDbContext } from "#services/db_context";
+import { isExclusionViolation } from "#services/db_errors";
 
 /** A refused grant, in words for the operator's terminal. */
 export class PilotGrantError extends Error {}
@@ -60,6 +61,28 @@ export default class PilotGrantService {
 			bundleKey,
 		) as string;
 
+		try {
+			return await this.write(tenantId, bundleId, input, grantedBy, note, now);
+		} catch (error) {
+			// The database's own rule (pilot_grants_one_running): a grant that
+			// starts later, or one recorded at the same moment, overlaps.
+			if (isExclusionViolation(error, "pilot_grants_one_running")) {
+				throw new PilotGrantError(
+					"This grant would overlap another of this studio's grants. Check its grants and run it again.",
+				);
+			}
+			throw error;
+		}
+	}
+
+	private write(
+		tenantId: string,
+		bundleId: string,
+		input: { package: PackageKey; endsAt: DateTime },
+		grantedBy: string,
+		note: string,
+		now: DateTime,
+	): Promise<PilotGrant> {
 		return withDbContext({ tenantId }, async (trx) => {
 			const at = now.toUTC().toISO() as string;
 			await trx.rawQuery(

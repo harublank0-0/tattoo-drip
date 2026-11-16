@@ -34,6 +34,8 @@ type Props = {
 		name: string;
 		line: string;
 		text: string;
+		/** Active artists against the package's limit: "1 of 1 active artist". */
+		artists: { active: number; limit: number | null; text: string };
 	};
 	access: { state: "paid" | "trial" | "none"; text: string };
 	plans: Plan[];
@@ -86,8 +88,16 @@ export default function Billing({
 	const [syncing, setSyncing] = useState(false);
 
 	if (!configured) {
+		// The package (a pilot, a trial) doesn't depend on billing being set
+		// up, so it shows either way.
 		return (
-			<Section title="Billing">
+			<Section
+				title="Your plan"
+				description="What your studio pays TattooDrip. Separate from your clients' payments."
+			>
+				<div className="mb-4">
+					<PackageSummary studioPackage={studioPackage} />
+				</div>
 				<Empty className="border">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
@@ -147,20 +157,7 @@ export default function Billing({
 					</p>
 				)}
 				<div className="flex flex-col gap-3">
-					<div className="text-sm">
-						<p className="flex flex-wrap items-center gap-2">
-							<span className="font-medium">Package</span>
-							<Badge
-								variant={
-									studioPackage.state === "paused" ? "outline" : "secondary"
-								}
-							>
-								{studioPackage.name}
-							</Badge>
-							{studioPackage.text}
-						</p>
-						<p className="text-muted-foreground">{studioPackage.line}</p>
-					</div>
+					<PackageSummary studioPackage={studioPackage} />
 					<p className="flex flex-wrap items-center gap-2 text-sm">
 						<Badge variant={access.state === "none" ? "outline" : "secondary"}>
 							{access.state === "paid"
@@ -358,3 +355,26 @@ export default function Billing({
 }
 
 Billing.layout = [AppLayout, SettingsLayout];
+
+/** The studio's package, its state and its active artists (studio packages). */
+function PackageSummary({
+	studioPackage,
+}: {
+	studioPackage: Props["package"];
+}) {
+	return (
+		<div className="text-sm">
+			<p className="flex flex-wrap items-center gap-2">
+				<span className="font-medium">Package</span>
+				<Badge
+					variant={studioPackage.state === "paused" ? "outline" : "secondary"}
+				>
+					{studioPackage.name}
+				</Badge>
+				{studioPackage.text}
+			</p>
+			<p className="text-muted-foreground">{studioPackage.line}</p>
+			<p className="text-muted-foreground">{studioPackage.artists.text}</p>
+		</div>
+	);
+}

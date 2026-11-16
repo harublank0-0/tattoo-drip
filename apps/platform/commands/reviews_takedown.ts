@@ -24,6 +24,8 @@ import {
  * closes its report. A post's takedown deletes its public copies in the same
  * step: while storage can't delete them the takedown fails and changes
  * nothing; run it again once storage recovers.
+ * The admin Reports and studio pages (/admin/reports, /admin/studios) do the
+ * same.
  *
  *   node ace reviews:takedown review <review id> --reason hate --note "Report #12"
  *   node ace reviews:takedown reply <review id> --reason personal_data

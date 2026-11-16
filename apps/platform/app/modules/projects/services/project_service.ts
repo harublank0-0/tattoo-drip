@@ -729,8 +729,17 @@ export default class ProjectService {
 		if (member.role !== "owner") {
 			throw new lucidErrors.E_ROW_NOT_FOUND(TattooProject);
 		}
+		// A new assignment needs an artist who may take new work (not
+		// archived); keeping the project's own artist is no new work.
 		const artist =
-			artistId === null ? null : await this.artists.findFor(tenant, artistId);
+			artistId === null
+				? null
+				: artistId === project.artistId
+					? await this.artists.findFor(tenant, artistId)
+					: await this.artists.findAssignable(tenant, artistId);
+		if (artistId !== null && !artist) {
+			throw new lucidErrors.E_ROW_NOT_FOUND(TattooProject);
+		}
 		await withTransaction(async (trx) => {
 			const live = await this.lockFor(trx, tenant, member, project.id);
 			live.artistId = artist?.id ?? null;

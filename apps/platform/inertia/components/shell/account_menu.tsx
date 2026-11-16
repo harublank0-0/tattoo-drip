@@ -7,6 +7,7 @@ import {
 	LogOut,
 	Monitor,
 	Moon,
+	ShieldCheck,
 	Sun,
 	UserRound,
 } from "lucide-react";
@@ -45,7 +46,7 @@ export default function AccountMenu({
 }: {
 	variant?: "sidebar" | "rail" | "bar";
 }) {
-	const { user, tenant } = usePage().props;
+	const { user, tenant, platformAdmin } = usePage().props;
 	const { preference, setPreference } = useTheme();
 	if (!user) return null;
 	const name = user.fullName ?? user.email;
@@ -121,6 +122,14 @@ export default function AccountMenu({
 							Your account
 						</Link>
 					</DropdownMenuItem>
+					{platformAdmin && (
+						<DropdownMenuItem asChild>
+							<Link route="admin.index">
+								<ShieldCheck />
+								Admin
+							</Link>
+						</DropdownMenuItem>
+					)}
 					{tenant?.role === "artist" && (
 						<DropdownMenuItem asChild>
 							<Link

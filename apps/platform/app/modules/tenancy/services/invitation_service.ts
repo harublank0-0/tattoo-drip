@@ -448,7 +448,9 @@ export default class InvitationService {
 		tenant: TenantRef,
 		artistId: string,
 	): Promise<string | null> {
-		const profile = (await this.artists.list(tenant)).find(
+		// Unarchived only (studio packages, phase 2): a new member linked to an
+		// archived profile would be new work for it.
+		const profile = (await this.artists.listAssignable(tenant)).find(
 			({ id }) => id === artistId,
 		);
 		return profile && profile.userId === null ? profile.name : null;

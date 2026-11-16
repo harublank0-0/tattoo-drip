@@ -299,6 +299,44 @@ test.group("Project notes, contact and artist", (group) => {
 		assert.isNull((await reload(tenant, project)).artistId);
 	});
 
+	test("an archived artist can't be assigned; one already assigned stays", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const project = await projectIn(tenant);
+		const asha = await inTenant(tenant, () => makeArtist(tenant, "asha"));
+		const bina = await inTenant(tenant, () => makeArtist(tenant, "bina"));
+		const send = (artistId: string) =>
+			client
+				.put(url(project.id, "/artist"))
+				.form({ artistId })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+		(await send(asha.id)).assertFlashMessage("success", "Artist assigned.");
+		await inTenant(tenant, async () => {
+			for (const artist of [asha, bina]) {
+				await artist
+					.merge({ archivedAt: DateTime.now(), visible: false })
+					.save();
+			}
+		});
+
+		// Archived (studio packages, phase 2): no new work. The picker offers
+		// the project's own archived artist only, so it never leads to a 404.
+		const page = await client.get(url(project.id)).withInertia().loginAs(owner);
+		assert.deepEqual(
+			page.inertiaProps.assignment.choices.map(({ id }: { id: string }) => id),
+			[asha.id],
+		);
+		(await send(bina.id)).assertStatus(404);
+		assert.equal((await reload(tenant, project)).artistId, asha.id);
+		// Saving the project's own archived artist again changes nothing.
+		(await send(asha.id)).assertFlashMessage("success", "Artist assigned.");
+		assert.equal((await reload(tenant, project)).artistId, asha.id);
+	});
+
 	test("artists: the assigned one can move and note, but not assign; others get 404s", async ({
 		client,
 		assert,

@@ -2,6 +2,7 @@ import { inject } from "@adonisjs/core";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { QueryClientContract } from "@adonisjs/lucid/types/database";
+import { DateTime } from "luxon";
 import {
 	ArtistProfileExistsError,
 	ArtistSlugTakenError,
@@ -125,6 +126,90 @@ export default class ArtistService {
 		return Artist.query()
 			.where("tenant_id", tenant.id)
 			.where("id", id)
+			.firstOrFail();
+	}
+
+	/**
+	 * The tenant's live profiles that may take new work (studio packages,
+	 * phase 2): `list` without archived artists, in the same order. `list`
+	 * keeps them, for history and for a member's own projects.
+	 */
+	async listAssignable(tenant: TenantRef): Promise<Artist[]> {
+		return Artist.query()
+			.where("tenant_id", tenant.id)
+			.whereNull("archived_at")
+			.orderByRaw("lower(name) asc")
+			.orderBy("id", "asc");
+	}
+
+	/**
+	 * The tenant's live, unarchived profile with this id, or null: an
+	 * archived artist gets no new projects, sessions or bookings.
+	 */
+	async findAssignable(
+		tenant: TenantRef,
+		artistId: string,
+	): Promise<Artist | null> {
+		return Artist.query()
+			.where("tenant_id", tenant.id)
+			.where("id", artistId)
+			.whereNull("archived_at")
+			.first();
+	}
+
+	/**
+	 * The tenant's active artists: live and not archived. A hidden artist
+	 * counts (spec ruling 4); this is what the package's limit compares.
+	 */
+	async countActive(tenant: TenantRef): Promise<number> {
+		const row = await Artist.query()
+			.where("tenant_id", tenant.id)
+			.whereNull("archived_at")
+			.count("* as total")
+			.firstOrFail();
+		return Number(row.$extras.total);
+	}
+
+	/**
+	 * Archives the live artist `artistId` (owners): they keep their projects,
+	 * sessions and portfolio, leave every public surface (hidden) and stop
+	 * counting. Archiving an archived artist changes nothing. An unknown,
+	 * deleted or other tenant's id is E_ROW_NOT_FOUND (a 404).
+	 */
+	async archive(tenant: TenantRef, artistId: string): Promise<Artist> {
+		return withTransaction(async (trx) => {
+			const live = await this.lockLive(trx, tenant, artistId);
+			if (live.archivedAt) return live;
+			live.merge({ archivedAt: DateTime.now(), visible: false });
+			await live.save();
+			return live;
+		});
+	}
+
+	/**
+	 * Restores an archived artist: they count again and may take new work,
+	 * but stay hidden until the owner shows them. The package's limit is the
+	 * caller's check (PackageGate.checkArtistActivation).
+	 */
+	async restore(tenant: TenantRef, artistId: string): Promise<Artist> {
+		return withTransaction(async (trx) => {
+			const live = await this.lockLive(trx, tenant, artistId);
+			if (!live.archivedAt) return live;
+			live.archivedAt = null;
+			await live.save();
+			return live;
+		});
+	}
+
+	private lockLive(
+		trx: QueryClientContract,
+		tenant: TenantRef,
+		artistId: string,
+	): Promise<Artist> {
+		return Artist.query({ client: trx })
+			.where("tenant_id", tenant.id)
+			.where("id", artistId)
+			.forUpdate()
 			.firstOrFail();
 	}
 
@@ -299,7 +384,10 @@ export default class ArtistService {
 				.where("id", artistId)
 				.forUpdate()
 				.first();
-			if (!live || live.userId !== null) return false;
+			// An archived profile (studio packages, phase 2) takes no new member.
+			if (!live || live.userId !== null || live.archivedAt !== null) {
+				return false;
+			}
 			live.userId = userId;
 			await live.save();
 			return true;
@@ -353,6 +441,9 @@ export default class ArtistService {
 					userId: linkFor(live),
 					...(keepsPhoto ? {} : photoColumns(photo)),
 				});
+				// An archived artist is never shown (artists_archived_hidden):
+				// restoring them, then showing them, are the owner's two steps.
+				if (live.archivedAt) live.visible = false;
 				await live.save();
 				// The replaced file goes only once the change is committed for good.
 				if (previous && previous !== live.photoKey) {

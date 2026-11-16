@@ -68,6 +68,10 @@ export default class BookingsController {
 				? await this.lookup(tenant, membership.role, typed)
 				: null,
 			artists: artists.map(({ id, name }) => ({ id, name })),
+			// Every artist open to the member is archived (studio packages).
+			archivedOnly:
+				artists.length === 0 &&
+				(await this.bookings.onlyArchived(tenant, membership)),
 			isOwner: membership.role === "owner",
 			dates: {
 				today,

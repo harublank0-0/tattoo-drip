@@ -1063,6 +1063,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
     }
   }
+  'tenant.artists.archive': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/:id/archive'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['archive']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['archive']>>>
+    }
+  }
+  'tenant.artists.restore': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/:id/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['restore']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['restore']>>>
+    }
+  }
   'tenant.artists.discover.update': {
     methods: ["PUT"]
     pattern: '/t/:tenant/artists/:id/discover'
@@ -2093,6 +2117,222 @@ export interface Registry {
       query: {}
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/account_controller').default['signOutOthers']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/account_controller').default['signOutOthers']>>>
+    }
+  }
+  'admin.index': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: unknown
+      errorResponse: unknown
+    }
+  }
+  'admin.studios': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/studios'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['index']>>>
+    }
+  }
+  'admin.studios.show': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/studios/:slug'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { slug: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['show']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['show']>>>
+    }
+  }
+  'admin.studios.discover.suspend': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/discover/suspend'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/admin').discoverReasonValidator)>>
+      paramsTuple: [ParamValue]
+      params: { slug: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#validators/admin').discoverReasonValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['suspendDiscover']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['suspendDiscover']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'admin.studios.discover.restore': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/discover/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { slug: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restoreDiscover']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restoreDiscover']>>>
+    }
+  }
+  'admin.studios.photos.suspend': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/photos/:photo/suspend'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/admin').discoverReasonValidator)>>
+      paramsTuple: [ParamValue, ParamValue]
+      params: { slug: ParamValue; photo: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#validators/admin').discoverReasonValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['suspendPhoto']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['suspendPhoto']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'admin.studios.photos.restore': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/photos/:photo/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { slug: ParamValue; photo: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restorePhoto']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restorePhoto']>>>
+    }
+  }
+  'admin.reports': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/reports'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['reports']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['reports']>>>
+    }
+  }
+  'admin.reviews.takedown': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/takedown'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownReview']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownReview']>>>
+    }
+  }
+  'admin.reviews.restore': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restoreReview']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restoreReview']>>>
+    }
+  }
+  'admin.reviews.dismiss': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/dismiss'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['dismiss']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['dismiss']>>>
+    }
+  }
+  'admin.reviews.reply.takedown': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/reply/takedown'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownReply']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownReply']>>>
+    }
+  }
+  'admin.reviews.reply.restore': {
+    methods: ["POST"]
+    pattern: '/admin/reviews/:id/reply/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restoreReply']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restoreReply']>>>
+    }
+  }
+  'admin.posts.takedown': {
+    methods: ["POST"]
+    pattern: '/admin/posts/:id/takedown'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownPost']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['takedownPost']>>>
+    }
+  }
+  'admin.posts.restore': {
+    methods: ["POST"]
+    pattern: '/admin/posts/:id/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restorePost']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_reviews_controller').default['restorePost']>>>
+    }
+  }
+  'admin.metrics': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/metrics'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_metrics_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_metrics_controller').default['index']>>>
+    }
+  }
+  'admin.accounts': {
+    methods: ["GET","HEAD"]
+    pattern: '/admin/accounts'
+    types: {
+      body: {}
+      paramsTuple: []
+      params: {}
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_accounts_controller').default['index']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_accounts_controller').default['index']>>>
+    }
+  }
+  'admin.accounts.verify': {
+    methods: ["POST"]
+    pattern: '/admin/accounts/verify'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/admin').verifyAccountValidator)>>
+      paramsTuple: []
+      params: {}
+      query: ExtractQuery<InferInput<(typeof import('#validators/admin').verifyAccountValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_accounts_controller').default['verify']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_accounts_controller').default['verify']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
   'admin.billing': {

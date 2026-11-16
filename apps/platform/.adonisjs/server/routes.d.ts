@@ -92,6 +92,8 @@ export type ScannedRoutes = {
     'tenant.artists.edit': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.destroy': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.archive': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.discover.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -178,6 +180,24 @@ export type ScannedRoutes = {
     'account.show': { paramsTuple?: []; params?: {} }
     'account.password.update': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
+    'admin.index': { paramsTuple?: []; params?: {} }
+    'admin.studios': { paramsTuple?: []; params?: {} }
+    'admin.studios.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.discover.suspend': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.discover.restore': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.photos.suspend': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
+    'admin.studios.photos.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
+    'admin.reports': { paramsTuple?: []; params?: {} }
+    'admin.reviews.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.reviews.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.reviews.dismiss': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.reviews.reply.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.reviews.reply.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.posts.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.posts.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.metrics': { paramsTuple?: []; params?: {} }
+    'admin.accounts': { paramsTuple?: []; params?: {} }
+    'admin.accounts.verify': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
@@ -289,6 +309,12 @@ export type ScannedRoutes = {
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
+    'admin.index': { paramsTuple?: []; params?: {} }
+    'admin.studios': { paramsTuple?: []; params?: {} }
+    'admin.studios.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.reports': { paramsTuple?: []; params?: {} }
+    'admin.metrics': { paramsTuple?: []; params?: {} }
+    'admin.accounts': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
@@ -384,6 +410,12 @@ export type ScannedRoutes = {
     'email_verification.notice': { paramsTuple?: []; params?: {} }
     'onboarding.create': { paramsTuple?: []; params?: {} }
     'account.show': { paramsTuple?: []; params?: {} }
+    'admin.index': { paramsTuple?: []; params?: {} }
+    'admin.studios': { paramsTuple?: []; params?: {} }
+    'admin.studios.show': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.reports': { paramsTuple?: []; params?: {} }
+    'admin.metrics': { paramsTuple?: []; params?: {} }
+    'admin.accounts': { paramsTuple?: []; params?: {} }
     'admin.billing': { paramsTuple?: []; params?: {} }
     'admin.payments': { paramsTuple?: []; params?: {} }
     'api.v1.styles.index': { paramsTuple?: []; params?: {} }
@@ -440,6 +472,8 @@ export type ScannedRoutes = {
     'tenant.settings.members.invitations.renew': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.settings.discover.listing.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.artists.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.artists.archive': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
+    'tenant.artists.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.store': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.ungroup': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.artists.photos.videos.sign': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -484,6 +518,18 @@ export type ScannedRoutes = {
     'onboarding.store': { paramsTuple?: []; params?: {} }
     'invitations.accept': { paramsTuple?: []; params?: {} }
     'account.sign_out_others': { paramsTuple?: []; params?: {} }
+    'admin.studios.discover.suspend': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.discover.restore': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.photos.suspend': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
+    'admin.studios.photos.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
+    'admin.reviews.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.reviews.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.reviews.dismiss': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.reviews.reply.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.reviews.reply.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.posts.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.posts.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
+    'admin.accounts.verify': { paramsTuple?: []; params?: {} }
     'admin.billing.end_access': { paramsTuple?: []; params?: {} }
     'admin.payments.review': { paramsTuple?: []; params?: {} }
     'api.v1.webhooks.platform': { paramsTuple?: []; params?: {} }

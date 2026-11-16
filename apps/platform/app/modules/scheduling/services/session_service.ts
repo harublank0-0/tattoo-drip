@@ -504,7 +504,13 @@ export default class SessionService {
 	): Promise<Scheduled> {
 		assertRange(input);
 		assertProjectOf(tenant, project);
-		const artist = await this.artists.findFor(tenant, input.artistId);
+		// An archived artist (studio packages, phase 2) gets sessions only on
+		// the project already theirs.
+		const artist =
+			input.artistId === project.artistId
+				? await this.artists.findFor(tenant, input.artistId)
+				: await this.artists.findAssignable(tenant, input.artistId);
+		if (!artist) throw new lucidErrors.E_ROW_NOT_FOUND(ProjectSession);
 		try {
 			return await withTransaction(async (trx) => {
 				const live = await lockProject(trx, tenant, project.id);
