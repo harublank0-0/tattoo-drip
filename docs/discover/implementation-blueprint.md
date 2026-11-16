@@ -391,7 +391,7 @@ Views: `discovery.studios`, `discovery.artists`, `discovery.artworks`, `discover
 | Artist shown | The studio is shown; the artist is `visible`, `discovery_listed` and not deleted; ≥3 published photos (default) |
 | Artwork shown | Its artist is shown; not `hidden`; not suspended |
 | Independent artist | The tenant's owner controls `discovery_listed`. With one artist row, the Studio OS UI shows a single "List me on TattooDrip" switch, and the artist-level switch is hidden. The same completeness rules apply |
-| Who can change what | Studio listing, place, branding: owners (`TENANT_ROUTE_ROLES`). Artist opt-out: owners, or the linked artist on their own profile (same rule as `ArtistService.findEditable`). Suspension: operator only (`node ace discover:suspend` / `discover:restore`, no admin UI) |
+| Who can change what | Studio listing, place, branding: owners (`TENANT_ROUTE_ROLES`). Artist opt-out: owners, or the linked artist on their own profile (same rule as `ArtistService.findEditable`). Suspension: operator only (`node ace discover:suspend` / `discover:restore`, or the admin Studios pages) |
 | Not eligible / unpublished / suspended / deleted | Absent from lists, filters and sitemaps; its pages are a 404 (never 403/410, so they don't reveal existence). The storefront is unaffected by a Discover suspension |
 | Propagation | Immediate at the API. Caches (60 s + SWR 600 s, Discover pages likewise) mean up to about 11 minutes; the suspend command can purge the Cloudflare cache when configured |
 | Consent | Turning listing on records `discovery_listed_at` after the owner accepts the listing terms (the right to publish the photos, clients' consent for recognisable bodies or faces) |

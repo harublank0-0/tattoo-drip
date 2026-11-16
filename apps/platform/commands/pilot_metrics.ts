@@ -28,7 +28,8 @@ export type Studio = { id: string; slug: string; name: string };
  * role that bypasses RLS, since RLS is what proves each studio's numbers are
  * its own (the owner connection only lists the studios). Run it where the
  * owner role's password is (the migration step's environment, which also has
- * DB_USER set to the app role), never from the web or the worker:
+ * DB_USER set to the app role), never from the web or the worker. The admin
+ * Metrics page (/admin/metrics) shows the same numbers, as the app role only.
  *
  *   node ace metrics:pilot --days=42           (development)
  *   node build/ace.js metrics:pilot --days=42  (production)

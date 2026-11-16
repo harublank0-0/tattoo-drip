@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import { test } from "@japa/runner";
 // @ts-expect-error TS6305: the server project only references the inertia project, so it cannot read its sources and the module is untyped here; the types below restate its shape and the inertia project type-checks the real one.
 import * as crumbsModule from "../../../inertia/components/shell/breadcrumbs.js";
@@ -128,6 +129,26 @@ test.group("Studio OS shell: breadcrumbs", () => {
 			breadcrumbs("errors/not_found", "/t/bn/nope", sections),
 			[],
 		);
+	});
+
+	test("every admin page names itself, keyed by its Inertia component", async ({
+		assert,
+	}) => {
+		const pages = new URL("../../../inertia/pages/", import.meta.url);
+		const files = await readdir(new URL("admin/", pages), { recursive: true });
+		const components = files
+			.filter((file) => file.endsWith(".tsx"))
+			.map((file) => `admin/${file.replace(/\.tsx$/, "")}`);
+		assert.includeMembers(components, [
+			"admin/studios/index",
+			"admin/studios/show",
+		]);
+		for (const component of components) {
+			assert.lengthOf(breadcrumbs(component, "/admin", []), 1, component);
+		}
+		assert.deepEqual(breadcrumbs("admin/studios/index", "/admin/studios", []), [
+			{ label: "Studios" },
+		]);
 	});
 
 	test("every dashboard page below a destination has a name", ({ assert }) => {

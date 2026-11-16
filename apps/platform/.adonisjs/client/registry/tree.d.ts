@@ -315,6 +315,36 @@ export interface ApiDefinition {
     signOutOthers: typeof routes['account.sign_out_others']
   }
   admin: {
+    index: typeof routes['admin.index']
+    studios: typeof routes['admin.studios'] & {
+      show: typeof routes['admin.studios.show']
+      discover: {
+        suspend: typeof routes['admin.studios.discover.suspend']
+        restore: typeof routes['admin.studios.discover.restore']
+      }
+      photos: {
+        suspend: typeof routes['admin.studios.photos.suspend']
+        restore: typeof routes['admin.studios.photos.restore']
+      }
+    }
+    reports: typeof routes['admin.reports']
+    reviews: {
+      takedown: typeof routes['admin.reviews.takedown']
+      restore: typeof routes['admin.reviews.restore']
+      dismiss: typeof routes['admin.reviews.dismiss']
+      reply: {
+        takedown: typeof routes['admin.reviews.reply.takedown']
+        restore: typeof routes['admin.reviews.reply.restore']
+      }
+    }
+    posts: {
+      takedown: typeof routes['admin.posts.takedown']
+      restore: typeof routes['admin.posts.restore']
+    }
+    metrics: typeof routes['admin.metrics']
+    accounts: typeof routes['admin.accounts'] & {
+      verify: typeof routes['admin.accounts.verify']
+    }
     billing: typeof routes['admin.billing'] & {
       endAccess: typeof routes['admin.billing.end_access']
     }

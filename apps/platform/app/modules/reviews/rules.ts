@@ -92,6 +92,24 @@ export const REPORT_LABELS: Record<ReportReason, string> = {
 	not_a_client: "Not a client",
 };
 
+/** A stored report reason's label; an unknown one shows as stored. */
+export function reportReasonLabel(reason: string): string {
+	return REPORT_LABELS[reason as ReportReason] ?? reason;
+}
+
+/** What the admin pages call each takedown reason. */
+export const TAKEDOWN_LABELS: Record<TakedownReason, string> = {
+	...REPORT_LABELS,
+	client_request: "Client's request",
+	other: "Other",
+};
+
+/** The takedown reasons in order, with their labels, as the admin forms offer them. */
+export const TAKEDOWN_REASON_OPTIONS = TAKEDOWN_REASONS.map((value) => ({
+	value,
+	label: TAKEDOWN_LABELS[value],
+}));
+
 /** The Reviews page's post filters: waiting, approved, and declined (declined or unpublished). */
 export const POST_FILTERS = ["waiting", "approved", "declined"] as const;
 export type PostFilter = (typeof POST_FILTERS)[number];
@@ -102,6 +120,13 @@ export type ReviewFilter = (typeof REVIEW_FILTERS)[number];
 /** What TattooDrip can take down (ruling 12): a review, the studio's reply to it, or a post. */
 export const TAKEDOWN_KINDS = ["review", "reply", "post"] as const;
 export type TakedownKind = (typeof TAKEDOWN_KINDS)[number];
+
+/** What the admin pages call each takedown kind: a reply is the studio's. */
+export const TAKEDOWN_KIND_LABELS: Record<TakedownKind, string> = {
+	review: "Review",
+	reply: "Reply",
+	post: "Fresh ink post",
+};
 
 /**
  * Whether a post may have public copies of its photos and videos now (the

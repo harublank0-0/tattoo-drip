@@ -7,12 +7,24 @@ import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
 import ArtistService from "#modules/artists/services/artist_service";
 import { LISTING_CONSENT_VERSION } from "#modules/discovery/publication";
-import PublicationService from "#modules/discovery/services/publication_service";
+import PublicationService, {
+	OperatorTargetError,
+} from "#modules/discovery/services/publication_service";
 import ImageService from "#modules/media/services/image_service";
 import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient } from "#services/db_context";
-import { addArtist, addWorkPhoto } from "#tests/helpers/artists";
+import { addArtist, addWorkPhoto, addWorkVideo } from "#tests/helpers/artists";
+import {
+	listThroughDashboard,
+	placeId,
+	publicStatus,
+	send,
+	setCity,
+	studio,
+	turnOff,
+	turnOn,
+} from "#tests/helpers/discover";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
@@ -34,51 +46,8 @@ const publication = () =>
 const reload = (tenant: { id: string }) =>
 	inTenant(tenant, () => Tenant.findOrFail(tenant.id));
 
-async function placeId(slug = "kathmandu"): Promise<string> {
-	const { rows } = await dbClient().rawQuery(
-		"select id from places where country_code = 'NP' and slug = ?",
-		[slug],
-	);
-	return rows[0].id;
-}
-
 const settings = (client: ApiClient, user: User, slug: string) =>
 	client.get(`/t/${slug}/settings/discover`).withInertia().loginAs(user);
-
-function send(
-	client: ApiClient,
-	user: User,
-	method: "put" | "post" | "delete",
-	path: string,
-	body?: Record<string, unknown>,
-) {
-	const request = client[method](path).withCsrfToken();
-	if (body) request.form(body);
-	return request.loginAs(user).redirects(0);
-}
-
-const setCity = (
-	client: ApiClient,
-	user: User,
-	slug: string,
-	id: string | null,
-) =>
-	send(client, user, "put", `/t/${slug}/settings/discover/place`, {
-		placeId: id ?? "",
-	});
-
-const turnOn = (
-	client: ApiClient,
-	user: User,
-	slug: string,
-	body: Record<string, unknown> = {
-		consent: "on",
-		consentVersion: LISTING_CONSENT_VERSION,
-	},
-) => send(client, user, "post", `/t/${slug}/settings/discover/listing`, body);
-
-const turnOff = (client: ApiClient, user: User, slug: string) =>
-	send(client, user, "delete", `/t/${slug}/settings/discover/listing`);
 
 const artistSwitch = (
 	client: ApiClient,
@@ -91,35 +60,6 @@ const artistSwitch = (
 		// As the profile form sends it.
 		listed: listed ? "true" : "false",
 	});
-
-/** The public Discover API's answer status for a path. */
-const publicStatus = async (client: ApiClient, path: string) =>
-	(await client.get(`/api/v1/discover${path}`)).status();
-
-/** A studio with one artist and two published photos, not listed. */
-async function studio(slug: string, name = "Black Needle") {
-	const { owner, tenant } = await studioWithOwner(slug, name);
-	const sita = await addArtist(tenant, owner, {
-		name: "Sita Rai",
-		slug: "sita",
-		styles: ["blackwork"],
-	});
-	const [first, second] = await inTenant(tenant, async () => [
-		await addWorkPhoto(tenant, sita, { styles: ["blackwork"] }),
-		await addWorkPhoto(tenant, sita),
-	]);
-	return { owner, tenant, sita, photos: [first, second] };
-}
-
-/** Lists `slug` through the dashboard: a city, then consent. */
-async function listThroughDashboard(
-	client: ApiClient,
-	owner: User,
-	slug: string,
-) {
-	(await setCity(client, owner, slug, await placeId())).assertStatus(302);
-	(await turnOn(client, owner, slug)).assertStatus(302);
-}
 
 test.group("Discover settings: the listing", (group) => {
 	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
@@ -732,5 +672,86 @@ test.group("Discover settings: preview", (group) => {
 			photos.map((photo) => photo.id),
 		);
 		assert.notInclude(shown, angle.id);
+	});
+});
+
+test.group("Discover settings: operator photos", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("lists the studio's photos, taken-down first with its note; other studios' never appear", async ({
+		assert,
+	}) => {
+		const { tenant, sita, photos } = await studio("d04-op-photos");
+		const other = await studio("d04-op-other");
+		await publication().suspendPhoto(tenant.slug, photos[1].id, "DMCA");
+
+		const listed = await publication().operatorPhotos(tenant.slug);
+
+		assert.deepEqual(
+			listed.map((photo) => photo.id),
+			[photos[1].id, photos[0].id],
+		);
+		assert.equal(listed[0].takedown?.note, "DMCA");
+		assert.isNull(listed[1].takedown);
+		assert.equal(listed[0].artistId, sita.id);
+		assert.equal(listed[0].artistName, "Sita Rai");
+		assert.equal(listed[0].imageKey, photos[1].imageKey);
+		assert.notInclude(
+			listed.map((photo) => photo.id),
+			other.photos[0].id,
+		);
+	});
+
+	test("lists angles and video angles in every state: no key while a video has no poster", async ({
+		assert,
+	}) => {
+		const { tenant, sita, photos } = await studio("d04-op-videos");
+		const [lead] = photos;
+		const { angle, processing, failed, ready } = await inTenant(
+			tenant,
+			async () => ({
+				angle: await addWorkPhoto(tenant, sita, {
+					angleOf: { lead, position: 1 },
+				}),
+				processing: await addWorkVideo(tenant, sita, lead, 2, {
+					state: "processing",
+				}),
+				failed: await addWorkVideo(tenant, sita, lead, 3, {
+					state: "failed",
+				}),
+				ready: await addWorkVideo(tenant, sita, lead, 4),
+			}),
+		);
+
+		const listed = await publication().operatorPhotos(tenant.slug);
+		const byId = new Map(listed.map((photo) => [photo.id, photo]));
+
+		assert.deepInclude(byId.get(angle.id), {
+			kind: "photo",
+			videoState: null,
+			imageKey: angle.imageKey,
+		});
+		assert.deepInclude(byId.get(processing.id), {
+			kind: "video",
+			videoState: "processing",
+			imageKey: null,
+		});
+		assert.deepInclude(byId.get(failed.id), {
+			kind: "video",
+			videoState: "failed",
+			imageKey: null,
+		});
+		assert.deepInclude(byId.get(ready.id), {
+			kind: "video",
+			videoState: "ready",
+			imageKey: ready.imageKey,
+		});
+	});
+
+	test("an unknown slug is an OperatorTargetError", async ({ assert }) => {
+		await assert.rejects(
+			() => publication().operatorPhotos("d04-no-such-studio"),
+			OperatorTargetError,
+		);
 	});
 });

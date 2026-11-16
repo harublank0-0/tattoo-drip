@@ -1,5 +1,7 @@
 import router from "@adonisjs/core/services/router";
+import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
+import User from "#models/user";
 import { ACCOUNT_LINK_ROUTES } from "#services/rate_limits";
 
 /**
@@ -82,10 +84,28 @@ const SIGNED_IN = [
 	"POST /account/sign-out-others",
 	// TattooDrip's own staff pages (docs/payments-paybridgenp.md): signed in,
 	// then platformAdmin, which 404s anyone not in PLATFORM_ADMIN_EMAILS.
+	"GET /admin/metrics",
+	"GET /admin/accounts",
+	"POST /admin/accounts/verify",
 	"GET /admin/billing",
 	"POST /admin/billing/end-access",
 	"GET /admin/payments",
 	"POST /admin/payments/review",
+	"GET /admin",
+	"GET /admin/studios",
+	"GET /admin/studios/:slug",
+	"POST /admin/studios/:slug/discover/suspend",
+	"POST /admin/studios/:slug/discover/restore",
+	"POST /admin/studios/:slug/photos/:photo/suspend",
+	"POST /admin/studios/:slug/photos/:photo/restore",
+	"GET /admin/reports",
+	"POST /admin/reviews/:id/takedown",
+	"POST /admin/reviews/:id/restore",
+	"POST /admin/reviews/:id/dismiss",
+	"POST /admin/reviews/:id/reply/takedown",
+	"POST /admin/reviews/:id/reply/restore",
+	"POST /admin/posts/:id/takedown",
+	"POST /admin/posts/:id/restore",
 ];
 
 /** What drive serves (config/drive.ts): uploads and files, not pages. */
@@ -185,6 +205,25 @@ test.group("Account routes (TAT-18)", () => {
 		}
 	});
 
+	test("every /admin route runs platformAdmin after auth and dbContext", ({
+		assert,
+	}) => {
+		const admin = allRouteKeys().filter((key) =>
+			key.split(" ")[1].startsWith("/admin"),
+		);
+		assert.isAbove(admin.length, 0);
+		for (const key of admin) {
+			const names = middlewareOf(key);
+			assert.isAtLeast(names.indexOf("auth"), 0, key);
+			assert.isAbove(names.indexOf("dbContext"), names.indexOf("auth"), key);
+			assert.isAbove(
+				names.indexOf("platformAdmin"),
+				names.indexOf("dbContext"),
+				key,
+			);
+		}
+	});
+
 	test("every route outside a studio, the API and the test and file routes is listed as guest, open or signed-in (TAT-95)", ({
 		assert,
 	}) => {
@@ -220,5 +259,26 @@ test.group("Account routes (TAT-18)", () => {
 			[],
 			"file routes that are not routes",
 		);
+	});
+});
+
+test.group("Admin gate", (group) => {
+	group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+	test("a listed but unconfirmed address gets a 404; a signed-out visitor is sent to sign in", async ({
+		client,
+		assert,
+	}) => {
+		// admin@platform.example is in .env.test's PLATFORM_ADMIN_EMAILS.
+		const unconfirmed = await User.create({
+			email: "admin@platform.example",
+			password: "secret-password",
+			emailVerifiedAt: null,
+		});
+		(await client.get("/admin/studios").loginAs(unconfirmed)).assertStatus(404);
+
+		const signedOut = await client.get("/admin/studios").redirects(0);
+		signedOut.assertStatus(302);
+		assert.equal(signedOut.header("location"), "/login");
 	});
 });

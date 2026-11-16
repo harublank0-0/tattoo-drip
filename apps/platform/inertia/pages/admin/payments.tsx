@@ -1,6 +1,5 @@
 import { Form } from "@adonisjs/inertia/react";
-import { Link } from "@inertiajs/react";
-import { urlFor } from "~/client";
+import AdminNav from "~/components/admin_nav";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
@@ -34,14 +33,7 @@ export default function AdminPayments({ mode, accounts }: Props) {
 		<Page
 			title="Studio payment connections"
 			description={`Studio online payments are ${mode}. Verify a connection only after checking, with the studio, that its PayBridgeNP project's eSewa, Khalti and Fonepay accounts are the studio's own.`}
-			actions={
-				<Link
-					href={urlFor("admin.billing")}
-					className="text-sm underline underline-offset-4"
-				>
-					TattooDrip billing
-				</Link>
-			}
+			actions={<AdminNav current="payments" />}
 		>
 			<Section title="Connections">
 				{accounts.length === 0 ? (

@@ -72,6 +72,22 @@ export type PublicationOverview = {
 
 type TenantRef = Pick<Tenant, "id">;
 
+/** One work photo as the operator's studio page lists it. */
+export type OperatorPhoto = {
+	id: string;
+	artistId: string;
+	artistName: string;
+	kind: "photo" | "video";
+	/** A video's state; null for a photo. */
+	videoState: "processing" | "ready" | "failed" | null;
+	/**
+	 * The still's storage key (a video's poster, under the video's purpose),
+	 * ready for ImageService.urlFor; null while a video has no poster.
+	 */
+	imageKey: string | null;
+	takedown: { at: DateTime; note: string | null } | null;
+};
+
 /** How many of the newest photos the preview shows, as a Discover profile does. */
 const PREVIEW_PHOTOS = 12;
 
@@ -526,6 +542,56 @@ export default class PublicationService {
 					note: photo.discoverySuspensionNote,
 				})),
 			};
+		});
+	}
+
+	/**
+	 * Every work photo and video of the business's live artists (leads and
+	 * angles: each is a Discover takedown target), for the operator's
+	 * studio page: taken-down first (newest takedown first), then by artist
+	 * name, then newest photo first.
+	 */
+	async operatorPhotos(slug: string): Promise<OperatorPhoto[]> {
+		return this.asOperator(slug, async (trx, tenantId) => {
+			const artists = await Artist.query({ client: trx }).where(
+				"tenant_id",
+				tenantId,
+			);
+			const names = new Map(artists.map((artist) => [artist.id, artist.name]));
+			const photos = await ArtistWorkPhoto.query({ client: trx })
+				.where("tenant_id", tenantId)
+				.whereIn("artist_id", [...names.keys()])
+				.orderBy("created_at", "desc")
+				.orderBy("id", "desc");
+			return photos
+				.map((photo) => ({
+					id: photo.id,
+					artistId: photo.artistId,
+					artistName: names.get(photo.artistId) as string,
+					kind:
+						photo.kind === "video" ? ("video" as const) : ("photo" as const),
+					videoState:
+						photo.kind === "video"
+							? ((photo.videoState ?? "processing") as
+									| "processing"
+									| "ready"
+									| "failed")
+							: null,
+					imageKey: photo.imageKey,
+					takedown: photo.discoverySuspendedAt
+						? {
+								at: photo.discoverySuspendedAt,
+								note: photo.discoverySuspensionNote,
+							}
+						: null,
+				}))
+				.sort((left, right) => {
+					if (left.takedown && right.takedown) {
+						return right.takedown.at.toMillis() - left.takedown.at.toMillis();
+					}
+					if (left.takedown || right.takedown) return left.takedown ? -1 : 1;
+					return left.artistName.localeCompare(right.artistName);
+				});
 		});
 	}
 

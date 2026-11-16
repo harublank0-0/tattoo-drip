@@ -6,7 +6,8 @@ import { TAKEDOWN_KINDS, type TakedownKind } from "#modules/reviews/rules";
  * Lifts a TattooDrip takedown (Reviews and Fresh ink, ruling 12): the item
  * then follows the client's and the studio's own choices again. A post is
  * published again only while it is still approved and the client still
- * allows a surface; it is never approved by this.
+ * allows a surface; it is never approved by this. The admin Reports and
+ * studio pages (/admin/reports, /admin/studios) do the same.
  *
  *   node ace reviews:restore review <review id>
  *   node ace reviews:restore reply <review id>

@@ -37,7 +37,7 @@ Where this setup differs from the general advice below:
 ### Account email
 
 - Signup, email confirmation and password reset (TAT-18) need working mail: `MAIL_FROM_ADDRESS` on the platform's sending domain with SPF, DKIM and DMARC (TAT-20), `SMTP_*` a provider allowed to send for it, `APP_URL` the dashboard's public https origin (the links point there), and a running worker. `ALERT_EMAILS=false` doesn't stop these emails.
-- Until mail reaches inboxes, a new account can sign in but can't create a studio. Confirm a pilot's account by hand with `node build/ace.js account:verify <email>` once you have checked who is asking (in person or by phone: it skips the proof the link gives). It prints no token, id or link.
+- Until mail reaches inboxes, a new account can sign in but can't create a studio. Confirm a pilot's account from the admin Accounts page (`/admin/accounts`), or by hand with `node build/ace.js account:verify <email>`, once you have checked who is asking (in person or by phone: it skips the proof the link gives). It prints no token, id or link.
 - Invitees need a confirmed address too (TAT-33): until mail reaches inboxes, an artist joins by signing up, being confirmed with `account:verify` after you checked who they are, then opening the owner's invitation link again. The owner sends the invitation link themselves (no invitation email).
 - A send that fails retries 3 times, then logs one "Sending email failed." line with the recipient and the subject, never the link. The account is untouched; the person asks for a new link ("Send a new link", or a new reset request).
 - Every signed-in session signs out once after this release: sessions now carry the account's session version.
