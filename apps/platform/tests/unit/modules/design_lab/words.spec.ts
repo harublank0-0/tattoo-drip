@@ -5,6 +5,7 @@ import * as wordsModule from "../../../../inertia/components/design_lab.js";
 type Status = "queued" | "processing" | "completed" | "failed" | "moderated";
 type Allowance = {
 	limit: number;
+	limitText?: string | null;
 	used: number;
 	reserved: number;
 	remaining: number;
@@ -52,6 +53,21 @@ test.group("Design Lab page words", () => {
 		// At 0 the form's own "no generations left" says it.
 		assert.isNull(left(0));
 		assert.isNull(left(0, 0));
+	});
+
+	test("at 0 left the form says the server's at-limit words (ruling 12)", ({
+		assert,
+	}) => {
+		const words =
+			"Your studio has used all 40 generations for this month. New generations are paused until 1 Dec 2026; your designs and history stay available.";
+		assert.equal(
+			usageText(1, { ...allowance, remaining: 0, limitText: words }),
+			words,
+		);
+		assert.equal(
+			usageText(1, { ...allowance, remaining: 0, limitText: null }),
+			"Your studio has no generations left this month.",
+		);
 	});
 
 	test("usage is said before a submit", ({ assert }) => {

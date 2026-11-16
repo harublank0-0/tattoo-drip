@@ -14,23 +14,46 @@ import { withTransaction } from "#services/db_context";
 
 type TenantRef = Pick<Tenant, "id">;
 
+/** What the limit in force is made of, as `limitReachedText` words it. */
+export type LimitWords = {
+	/** DESIGN_LAB_MONTHLY_LIMIT is 0: generation is off for everyone. */
+	off: boolean;
+	limit: number;
+	resetsAt: DateTime;
+	/** Studio's images a month, when offering Studio gives more; else null. */
+	studioLimit: number | null;
+};
+
 /**
- * The studio has no generations left this month (ruling 12: name the
- * blocked action, say what still works, give a real next step). Studio is
- * offered only when its bundle gives more (`studioLimit`).
+ * The words at the limit (ruling 12: name the blocked action, say what still
+ * works, give a real next step), the same on the page and in the refusal.
+ * The off switch says only that: no reset date and no offer are true then.
  */
+export function limitReachedText(words: LimitWords): string {
+	if (words.off) {
+		return "Design Lab generation is turned off for now. Your designs and history stay available.";
+	}
+	const offer =
+		words.studioLimit === null
+			? ""
+			: ` The Studio package includes ${words.studioLimit} a month.`;
+	return `Your studio has used all ${words.limit} generations for this month. New generations are paused until ${formatDay(words.resetsAt.toUTC().toISODate() as string)}; your designs and history stay available.${offer}`;
+}
+
+/** The studio has no generations left this month, or fewer than it asked for. */
 export class AllowanceError extends Error {
+	readonly limit: number;
+
 	constructor(
 		readonly remaining: number,
-		readonly limit: number,
-		resetsAt: DateTime,
-		studioLimit: number | null,
+		words: LimitWords,
 	) {
 		super(
 			remaining === 0
-				? `Your studio has used all ${limit} generations for this month. New generations are paused until ${formatDay(resetsAt.toUTC().toISODate() as string)}; your designs and history stay available.${studioLimit === null ? "" : ` The Studio package includes ${studioLimit} a month.`}`
-				: `Your studio has ${remaining} of ${limit} generations left this month: ask for ${remaining} or fewer.`,
+				? limitReachedText(words)
+				: `Your studio has ${remaining} of ${words.limit} generations left this month: ask for ${remaining} or fewer.`,
 		);
+		this.limit = words.limit;
 	}
 }
 
@@ -57,6 +80,8 @@ export type Allowance = {
 	/** Accepted and still running this month. */
 	reserved: number;
 	remaining: number;
+	/** At the limit, what the page says (the refusal's words); null below it. */
+	limitText: string | null;
 	/** When the allowance resets: the first of next month, UTC, ISO. */
 	resetsAt: string;
 };
@@ -84,15 +109,33 @@ export default class DesignUsageService {
 
 	/** The studio's allowance this month. */
 	async allowance(tenant: TenantRef, now = DateTime.utc()): Promise<Allowance> {
-		const { limit, packageLimit } = await this.limitsFor(tenant, now);
+		const limits = await this.limitsFor(tenant, now);
+		const { limit, packageLimit } = limits;
 		const counts = await this.monthCounts(tenant, now);
+		const remaining = Math.max(0, limit - counts.settled - counts.reserved);
 		return {
 			limit,
 			packageLimit,
 			used: counts.settled,
 			reserved: counts.reserved,
-			remaining: Math.max(0, limit - counts.settled - counts.reserved),
+			remaining,
 			resetsAt: monthStart(now).plus({ months: 1 }).toISO() ?? "",
+			// The page says the refusal's own words at the limit (ruling 12).
+			limitText:
+				remaining === 0 ? limitReachedText(this.words(limits, now)) : null,
+		};
+	}
+
+	/** The limit in force as the at-limit words need it. */
+	private words(
+		limits: { off: boolean; limit: number; studioLimit: number | null },
+		now: DateTime,
+	): LimitWords {
+		return {
+			off: limits.off,
+			limit: limits.limit,
+			resetsAt: monthStart(now).plus({ months: 1 }),
+			studioLimit: limits.studioLimit,
 		};
 	}
 
@@ -122,12 +165,7 @@ export default class DesignUsageService {
 			const used = counts.settled + counts.reserved;
 			const remaining = Math.max(0, limit - used);
 			if (attempts.length > remaining) {
-				throw new AllowanceError(
-					remaining,
-					limit,
-					monthStart(now).plus({ months: 1 }),
-					limits.studioLimit,
-				);
+				throw new AllowanceError(remaining, this.words(limits, now));
 			}
 			if (
 				packageEnforcement() === "observe" &&
@@ -246,6 +284,8 @@ export default class DesignUsageService {
 		tenant: TenantRef,
 		now: DateTime,
 	): Promise<{
+		/** DESIGN_LAB_MONTHLY_LIMIT is 0: generation is off for everyone. */
+		off: boolean;
 		limit: number;
 		packageLimit: number | null;
 		package: PackageKey;
@@ -258,14 +298,15 @@ export default class DesignUsageService {
 		const packageLimit = bundle?.imagesPerMonth ?? null;
 		const enforced = packageEnforcement() === "enforce";
 		// 0 in the setting is the documented off switch, whatever a bundle says.
-		const limit =
-			monthlyLimit === 0
-				? 0
-				: enforced && packageLimit !== null
-					? packageLimit
-					: monthlyLimit;
+		const off = monthlyLimit === 0;
+		const limit = off
+			? 0
+			: enforced && packageLimit !== null
+				? packageLimit
+				: monthlyLimit;
 		let studioLimit: number | null = null;
-		if (enforced && entitlement.package === "solo") {
+		// No offer while generation is off: upgrading wouldn't turn it on.
+		if (!off && enforced && entitlement.package === "solo") {
 			const studio = await AllowanceBundle.findBy(
 				"key",
 				PACKAGES.studio.defaultBundleKey,
@@ -274,6 +315,7 @@ export default class DesignUsageService {
 			if (offered !== null && offered > limit) studioLimit = offered;
 		}
 		return {
+			off,
 			limit,
 			packageLimit,
 			package: entitlement.package,

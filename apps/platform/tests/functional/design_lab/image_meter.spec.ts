@@ -196,6 +196,37 @@ test.group("Design Lab image meter", (group) => {
 		assert.instanceOf(await refusalOf(s.reserve(1)), AllowanceError);
 	});
 
+	test("the off switch says generation is off and never offers Studio", async ({
+		assert,
+	}) => {
+		const s = await studio("meter-off-words");
+		await soloPilotOn(s.tenant, "test-solo-off", 3);
+		enforce(true);
+		setting(0);
+		const off =
+			"Design Lab generation is turned off for now. Your designs and history stay available.";
+
+		const refusal = (await refusalOf(s.reserve(1))) as Error;
+		assert.equal(refusal.message, off);
+		assert.equal((await s.allowance()).limitText, off);
+	});
+
+	test("at the limit the page gets the refusal's words; below it, none", async ({
+		assert,
+	}) => {
+		const full = await studio("meter-page-full", 3);
+		await soloPilotOn(full.tenant, "test-solo-3e", 3);
+		const room = await studio("meter-page-room");
+		await soloPilotOn(room.tenant, "test-solo-3f", 3);
+		enforce(true);
+		setting(40);
+
+		const refusal = (await refusalOf(full.reserve(1))) as Error;
+		assert.equal((await full.allowance()).limitText, refusal.message);
+		assert.include(refusal.message, "The Studio package includes 40 a month.");
+		assert.isNull((await room.allowance()).limitText);
+	});
+
 	test("the refusal names the reset date, what still works, and offers Studio only when it gives more", async ({
 		assert,
 	}) => {

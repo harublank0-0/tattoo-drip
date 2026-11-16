@@ -16,6 +16,8 @@ export type Allowance = {
 	limit: number;
 	/** The package's images a month; null when not metered. */
 	packageLimit: number | null;
+	/** At the limit, the server's words for it (the refusal's); null below it. */
+	limitText: string | null;
 	used: number;
 	reserved: number;
 	remaining: number;
@@ -70,7 +72,11 @@ export function resetsText(resetsAt: string): string {
  */
 export function usageText(variations: number, allowance: Allowance): string {
 	if (allowance.remaining === 0) {
-		return "Your studio has no generations left this month.";
+		// The server's at-limit words (ruling 12): what's blocked, what still
+		// works, the next step; the bare line only when it sent none.
+		return (
+			allowance.limitText ?? "Your studio has no generations left this month."
+		);
 	}
 	if (variations > allowance.remaining) {
 		return `Only ${allowance.remaining} left this month: ask for ${allowance.remaining} or fewer.`;
