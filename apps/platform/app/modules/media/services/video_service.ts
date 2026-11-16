@@ -37,6 +37,7 @@ import {
 	VIDEO_REFUSALS,
 	type VideoType,
 } from "#modules/media/video";
+import { recordStoredFile } from "#modules/storage/record_stored_file";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { currentClient } from "#services/db_context";
 
@@ -310,6 +311,14 @@ export default class VideoService {
 					cacheControl: STORED_CACHE_CONTROL[visibilityOf(purpose)],
 				});
 				keys.push(key);
+				// The storage meter counts every rendition (the poster is
+				// recorded by ImageService.storeBytes below).
+				await recordStoredFile({
+					tenantId: tenant.id,
+					key,
+					purpose,
+					bytes: (await stat(output.path)).size,
+				});
 			}
 			const poster = await this.images.storeBytes(await readFile(posterPath), {
 				tenant,

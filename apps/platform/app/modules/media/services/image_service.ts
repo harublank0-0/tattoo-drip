@@ -26,6 +26,7 @@ import {
 	variantKey,
 	variantsOfKey,
 } from "#modules/media/variants";
+import { recordStoredFile } from "#modules/storage/record_stored_file";
 import type Tenant from "#modules/tenancy/models/tenant";
 
 /**
@@ -283,6 +284,13 @@ export default class ImageService {
 			]);
 			throw error;
 		}
+		// The storage meter counts the main file, never its copies.
+		await recordStoredFile({
+			tenantId: tenant.id,
+			key,
+			purpose,
+			bytes: bytes.length,
+		});
 		return { key, ...size };
 	}
 
@@ -309,6 +317,13 @@ export default class ImageService {
 			]);
 			throw error;
 		}
+		// The storage meter counts the main file, never its copies.
+		await recordStoredFile({
+			tenantId: tenant.id,
+			key,
+			purpose,
+			bytes: image.data.length,
+		});
 		return { key, width: image.width, height: image.height };
 	}
 
