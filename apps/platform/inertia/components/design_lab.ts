@@ -12,7 +12,10 @@ export type GenerationStatus =
 	| "moderated";
 
 export type Allowance = {
+	/** The limit in force: the package's once limits are on, else the platform's. */
 	limit: number;
+	/** The package's images a month; null when not metered. */
+	packageLimit: number | null;
 	used: number;
 	reserved: number;
 	remaining: number;
@@ -37,6 +40,21 @@ export function allowanceText(allowance: Allowance): string {
 	if (allowance.limit === 0)
 		return "Generation isn't available for your studio.";
 	return `${allowance.remaining} of ${allowance.limit} generations left this month`;
+}
+
+/** With this many or fewer generations left, the page warns (studio packages, ruling 12). */
+export const LOW_ALLOWANCE = 5;
+
+/**
+ * The warning before the limit, with the exact count and the reset date:
+ * "Only 3 generations left this month. Resets on 1 Dec." Null with more
+ * left, and at 0 (the form says it), or when generation is off.
+ */
+export function allowanceWarning(allowance: Allowance): string | null {
+	const { remaining, limit } = allowance;
+	if (limit === 0 || remaining < 1 || remaining > LOW_ALLOWANCE) return null;
+	const what = remaining === 1 ? "1 generation" : `${remaining} generations`;
+	return `Only ${what} left this month. ${resetsText(allowance.resetsAt)}.`;
 }
 
 /** "Resets on 1 Dec" from the server's ISO instant (UTC). */

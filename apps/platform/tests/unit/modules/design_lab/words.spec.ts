@@ -13,12 +13,18 @@ type Allowance = {
 type Row = { id: string; status: Status; attempt: number };
 type Words = {
 	allowanceText(allowance: Allowance): string;
+	allowanceWarning(allowance: Allowance): string | null;
 	usageText(variations: number, allowance: Allowance): string;
 	variationChoices(max: number, remaining: number): number[];
 	statusesChanged(shown: Row[], polled: Row[]): boolean;
 };
-const { allowanceText, statusesChanged, usageText, variationChoices } =
-	wordsModule as Words;
+const {
+	allowanceText,
+	allowanceWarning,
+	statusesChanged,
+	usageText,
+	variationChoices,
+} = wordsModule as Words;
 
 const allowance = {
 	limit: 40,
@@ -29,6 +35,25 @@ const allowance = {
 };
 
 test.group("Design Lab page words", () => {
+	test("a warning with the exact count shows only with 1 to 5 left (ruling 12)", ({
+		assert,
+	}) => {
+		const left = (remaining: number, limit = 40) =>
+			allowanceWarning({ ...allowance, limit, remaining });
+		assert.isNull(left(6));
+		assert.equal(
+			left(5),
+			"Only 5 generations left this month. Resets on 1 Dec.",
+		);
+		assert.equal(
+			left(1),
+			"Only 1 generation left this month. Resets on 1 Dec.",
+		);
+		// At 0 the form's own "no generations left" says it.
+		assert.isNull(left(0));
+		assert.isNull(left(0, 0));
+	});
+
 	test("usage is said before a submit", ({ assert }) => {
 		assert.equal(
 			allowanceText(allowance),

@@ -12,6 +12,7 @@ import { urlFor } from "~/client";
 import {
 	type Allowance,
 	allowanceText,
+	allowanceWarning,
 	type GenerationStatus,
 	isPending,
 	POLL_INTERVAL_MS,
@@ -197,6 +198,11 @@ export default function DesignLabShow({
 					title="Generate a concept"
 					description={`${allowanceText(allowance)}. ${resetsText(allowance.resetsAt)}.`}
 				>
+					{allowanceWarning(allowance) && (
+						<output className="block text-sm font-medium text-amber-700 dark:text-amber-400">
+							{allowanceWarning(allowance)}
+						</output>
+					)}
 					<GenerateForm
 						params={params}
 						requestId={requestId}
