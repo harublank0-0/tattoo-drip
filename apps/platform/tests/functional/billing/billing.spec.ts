@@ -14,6 +14,7 @@ import BillingService from "#modules/billing/services/billing_service";
 import { entitlementText } from "#modules/packages/entitlement";
 import AllowanceBundle from "#modules/packages/models/allowance_bundle";
 import EntitlementService from "#modules/packages/services/entitlement_service";
+import PilotGrantService from "#modules/packages/services/pilot_grant_service";
 import { formatDay } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -348,6 +349,38 @@ test.group("Billing: subscribing and access", (group) => {
 			limit: 1,
 			text: "1 of 1 active artist",
 		});
+	});
+
+	test("without billing set up, the page still carries the studio's package and artists", async ({
+		client,
+		assert,
+	}) => {
+		paybridge.platformEnabled = false;
+		const { tenant, owner } = await studioWithOwner(
+			"bill-unconfigured",
+			"Bill Unconfigured",
+		);
+		await new PilotGrantService().grant(
+			"bill-unconfigured",
+			{
+				package: "studio",
+				endsAt: DateTime.fromISO("2027-11-16T00:00:00Z", { zone: "utc" }),
+				note: "Founder",
+				grantedBy: "Ops",
+			},
+			DateTime.utc().minus({ minutes: 1 }),
+		);
+
+		const page = await client
+			.get(`/t/${tenant.slug}/settings/billing`)
+			.loginAs(owner)
+			.withInertia();
+		assert.isFalse(page.inertiaProps.configured);
+		assert.equal(
+			page.inertiaProps.package.text,
+			"Studio, pilot until 16 Nov 2027",
+		);
+		assert.equal(page.inertiaProps.package.artists.text, "0 active artists");
 	});
 
 	test("an artist can't reach billing; a provider outage changes nothing", async ({
