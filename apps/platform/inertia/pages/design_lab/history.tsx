@@ -87,6 +87,9 @@ export default function DesignLabHistory({
 		>
 			<Section title="Filters">
 				<form
+					// Paging is a visit to this same page: remount so the selects
+					// show the filters applied, never a choice left unsubmitted.
+					key={[filters.month, filters.artist, filters.status, page].join("|")}
 					method="get"
 					action={base}
 					className="grid gap-3 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto] sm:items-end"
