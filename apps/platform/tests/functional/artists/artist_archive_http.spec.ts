@@ -11,6 +11,7 @@ import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { dbClient } from "#services/db_context";
 import env from "#start/env";
 import { addArtist } from "#tests/helpers/artists";
+import { captureLogs } from "#tests/helpers/logs";
 import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 /**
@@ -108,6 +109,14 @@ test.group("Artists: archiving from the dashboard", (group) => {
 		const back = await rowOf(tenant, sita.id);
 		assert.isNull(back.archivedAt);
 		assert.isFalse(back.visible);
+
+		// A stale tab restoring an artist who is already active.
+		const again = await client
+			.post(`${base}/${sita.id}/restore`)
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		again.assertFlashMessage("success", '"Sita Rai" is already active.');
 	});
 
 	test("an archived artist leaves the studio page and Discover", async ({
@@ -190,5 +199,52 @@ test.group("Artists: archiving from the dashboard", (group) => {
 			"Solo includes one active artist. Archive an artist, or upgrade to Studio.",
 		);
 		assert.isNotNull((await rowOf(tenant, bina.id)).archivedAt);
+	});
+
+	test("in observe mode a paused studio adds and restores artists, and the rule is logged", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner("arch-http-observe", "Obs");
+		await inTenant(tenant, () =>
+			dbClient().rawQuery("update tenants set created_at = ? where id = ?", [
+				"2025-01-01T00:00:00Z",
+				tenant.id,
+			]),
+		);
+		const base = `/t/${tenant.slug}/artists`;
+		const logs = captureLogs();
+		try {
+			const added = await client
+				.post(base)
+				.fields({ name: "Bina", slug: "bina" })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+			added.assertFlashMessage("success", '"Bina" added.');
+			const bina = await inTenant(tenant, () =>
+				Artist.query().where("slug", "bina").firstOrFail(),
+			);
+			await inTenant(tenant, () => artists.archive(tenant, bina.id));
+			const restored = await client
+				.post(`${base}/${bina.id}/restore`)
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+			restored.assertFlashMessage(
+				"success",
+				'"Bina" is active again. They stay hidden until you show them on your page.',
+			);
+		} finally {
+			logs.restore();
+		}
+		const refused = logs
+			.everything()
+			.filter((args) => args.includes("Package rule would refuse"))
+			.map((args) => args[0] as Record<string, unknown>);
+		assert.lengthOf(refused, 2);
+		for (const fields of refused) {
+			assert.include(fields, { tenantId: tenant.id, rule: "paused" });
+		}
 	});
 });

@@ -63,6 +63,7 @@ const carriedDate = (dates: BookingPageProps["dates"]) =>
 export default function BookingNew({
 	lookup,
 	artists,
+	archivedOnly,
 	isOwner,
 	dates,
 }: BookingPageProps) {
@@ -73,7 +74,7 @@ export default function BookingNew({
 		>
 			<div className="flex max-w-2xl flex-col gap-6">
 				{artists.length === 0 ? (
-					<NoArtist isOwner={isOwner} />
+					<NoArtist isOwner={isOwner} archivedOnly={archivedOnly} />
 				) : lookup === null || lookup.state === "invalid" ? (
 					<PhoneLookup invalid={lookup} date={carriedDate(dates)} />
 				) : (
@@ -89,16 +90,26 @@ export default function BookingNew({
 	);
 }
 
-function NoArtist({ isOwner }: { isOwner: boolean }) {
+function NoArtist({
+	isOwner,
+	archivedOnly,
+}: {
+	isOwner: boolean;
+	archivedOnly: boolean;
+}) {
 	const tenant = useTenant();
 
 	return (
 		<Card>
 			<CardContent className="flex flex-col items-start gap-3">
 				<p className="text-sm">
-					{isOwner
-						? "Add an artist before booking a session: every session belongs to one."
-						: "Only artists with their own profile can book sessions, and your account isn't linked to one yet."}
+					{archivedOnly
+						? isOwner
+							? "Every artist here is archived. Restore one on the Artists page, or add an artist, before booking a session."
+							: "Your artist profile is archived, so it takes no new bookings. Ask the studio's owner to restore it."
+						: isOwner
+							? "Add an artist before booking a session: every session belongs to one."
+							: "Only artists with their own profile can book sessions, and your account isn't linked to one yet."}
 				</p>
 				{isOwner && (
 					<Link

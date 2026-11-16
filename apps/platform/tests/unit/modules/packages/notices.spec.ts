@@ -144,4 +144,16 @@ test.group("Packages: notices", () => {
 			at("2026-11-27T03:17:00Z").toISO(),
 		);
 	});
+
+	test("a moment exactly at a sweep is due in that sweep, not the next", ({
+		assert,
+	}) => {
+		const value = entitlement("paid", "2026-12-10T03:17:00Z");
+		assert.equal(
+			dueNotice(value, at("2026-12-07T03:17:00Z")),
+			"paid_ends_in_3_days",
+		);
+		assert.isNull(dueNotice(value, at("2026-12-08T03:17:00Z")));
+		assert.isNull(dueNotice(value, at("2026-12-06T03:17:00Z")));
+	});
 });

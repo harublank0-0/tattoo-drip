@@ -106,6 +106,31 @@ test.group("Packages: notices", (group) => {
 		);
 	});
 
+	test("a studio deleted between the sweep and its job is skipped quietly", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("notice-deleted", "Deleted");
+		// Live, it would get its 3-day trial notice today.
+		await createdAt(
+			tenant,
+			sweepMoment(DateTime.utc()).minus({ days: 11, hours: 12 }),
+		);
+		await inTenant(tenant, () =>
+			dbClient().rawQuery(
+				"update tenants set deleted_at = now() where id = ?",
+				[tenant.id],
+			),
+		);
+
+		const logs = captureLogs();
+		try {
+			await runNoticeJob(tenant);
+		} finally {
+			logs.restore();
+		}
+		assert.lengthOf(noticesIn(logs), 0);
+	});
+
 	test("the sweep queues one notice job per live studio", async ({
 		assert,
 	}) => {

@@ -182,6 +182,9 @@ export default function CreateTenant({
 												value={option.value}
 												id={`package-${option.value}`}
 												aria-invalid={!!errors.package}
+												// Choosing the package already shown counts as choosing it:
+												// a later change of type then leaves it alone.
+												onClick={() => setPkgTouched(true)}
 											/>
 										</Field>
 									</FieldLabel>

@@ -2,6 +2,7 @@ import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import ArtistService from "#modules/artists/services/artist_service";
 import ImageService from "#modules/media/services/image_service";
 import PaymentMethodService from "#modules/payments/services/payment_method_service";
 import SetupService from "#modules/tenancy/services/setup_service";
@@ -70,6 +71,16 @@ test.group("SetupService (TAT-101)", (group) => {
 		const list = await checklistOf(tenant);
 		assert.isTrue(ticks(list).artists);
 		assert.equal(list.steps.find(({ next }) => next)?.key, "payments");
+	});
+
+	test("an archived artist doesn't tick the first step", async ({ assert }) => {
+		const { owner, tenant } = await studioWithOwner("setup-archived", "Arch");
+		const artist = await addArtist(tenant, owner);
+		await inTenant(tenant, () =>
+			new ArtistService(new ImageService()).archive(tenant, artist.id),
+		);
+
+		assert.isFalse(ticks(await checklistOf(tenant)).artists);
 	});
 
 	test("only a method shown on the deposit page ticks the payments step", async ({
