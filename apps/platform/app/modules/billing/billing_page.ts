@@ -13,6 +13,7 @@ import {
 	entitlementText,
 } from "#modules/packages/entitlement";
 import { PACKAGES } from "#modules/packages/packages";
+import { packageEnforcement } from "#modules/packages/settings";
 import { formatDay, formatMoney } from "#modules/projects/quotes";
 
 /** Words for each subscription status (PayBridgeNP's display statuses). */
@@ -118,7 +119,11 @@ export function billingPage(
 			state: entitlement.state,
 			name: PACKAGES[entitlement.package].name,
 			line: PACKAGES[entitlement.package].line,
-			text: entitlementText(entitlement, (at) => day(at) as string),
+			text: entitlementText(
+				entitlement,
+				(at) => day(at) as string,
+				packageEnforcement() === "enforce",
+			),
 			artists: { ...artists, text: artistUsageText(artists) },
 		},
 		access: {

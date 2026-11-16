@@ -384,5 +384,14 @@ test.group("Entitlement: resolving a studio's package state", () => {
 			entitlementText(entitlement("paused", "studio", null), day),
 			"No paid package yet",
 		);
+		// Once enforced (phase 3), the paused line says what it means.
+		assert.equal(
+			entitlementText(entitlement("paused", "solo", null), day, true),
+			"Solo paused: pay to start new client work",
+		);
+		assert.equal(
+			entitlementText(entitlement("paused", "solo", null), day, false),
+			"No paid package yet",
+		);
 	});
 });
