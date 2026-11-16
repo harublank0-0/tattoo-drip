@@ -16,6 +16,7 @@ import AllowanceBundle from "#modules/packages/models/allowance_bundle";
 import EntitlementService from "#modules/packages/services/entitlement_service";
 import { formatDay } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
+import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withDbContext, withTransaction } from "#services/db_context";
 import { queuedMails } from "#tests/helpers/accounts";
 import {
@@ -320,6 +321,33 @@ test.group("Billing: subscribing and access", (group) => {
 			page.inertiaProps.subscription.cancelText,
 			/^Cancels at the end of the period/,
 		);
+	});
+
+	test("the package line counts active artists against Solo's limit", async ({
+		client,
+		assert,
+	}) => {
+		const owner = await User.create({
+			email: "solo@bill-artists.example",
+			password: "secret-password",
+			emailVerifiedAt: DateTime.utc(),
+		});
+		const tenant = await new TenancyService().createTenant(owner, {
+			type: "independent",
+			name: "Bill Artists",
+			slug: "bill-artists",
+			timezone: "Asia/Kathmandu",
+		});
+
+		const page = await client
+			.get(`/t/${tenant.slug}/settings/billing`)
+			.loginAs(owner)
+			.withInertia();
+		assert.deepEqual(page.inertiaProps.package.artists, {
+			active: 1,
+			limit: 1,
+			text: "1 of 1 active artist",
+		});
 	});
 
 	test("an artist can't reach billing; a provider outage changes nothing", async ({

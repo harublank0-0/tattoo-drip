@@ -16,6 +16,7 @@ import BillingService, {
 import { entitlementText } from "#modules/packages/entitlement";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import EntitlementService from "#modules/packages/services/entitlement_service";
+import { packageEnforcement } from "#modules/packages/settings";
 import type GatewayAccount from "#modules/payments/models/gateway_account";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import GatewayAccountService from "#modules/payments/services/gateway_account_service";
@@ -132,7 +133,11 @@ export default class AdminController {
 						access.state === "none"
 							? "No paid period"
 							: `${access.state === "paid" ? "Paid" : "Trial"} until ${day(access.until)}`,
-					packageText: entitlementText(entitlement, (at) => day(at) as string),
+					packageText: entitlementText(
+						entitlement,
+						(at) => day(at) as string,
+						packageEnforcement() === "enforce",
+					),
 				});
 				if (!mode) return;
 				const rows = await BillingInvoice.query()

@@ -14,6 +14,8 @@ export type BookingPageProps = {
 	lookup: BookingLookup;
 	/** Who this member may book: every live artist for an owner, their own profile for an artist. */
 	artists: { id: string; name: string }[];
+	/** Every artist open to the member is archived (studio packages). */
+	archivedOnly: boolean;
 	isOwner: boolean;
 	/**
 	 * yyyy-MM-dd in the studio's timezone: the first and last bookable day,

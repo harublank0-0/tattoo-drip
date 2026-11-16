@@ -392,6 +392,16 @@ router
 					.delete(":id", [controllers.Artists, "destroy"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.artists.destroy");
+				// Archiving (studio packages, phase 2): owners only; restoring goes
+				// through the package gate (PackageGate.checkArtistActivation).
+				router
+					.post(":id/archive", [controllers.Artists, "archive"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.archive");
+				router
+					.post(":id/restore", [controllers.Artists, "restore"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.artists.restore");
 				// The artist's own Discover switch (D04): an owner any profile, an
 				// artist their own (ArtistService.findEditable).
 				router
@@ -805,6 +815,9 @@ router
 		middleware.dbContext(),
 		middleware.tenant(),
 		middleware.role(),
+		// Studio packages (phase 3): refuses what the package state doesn't
+		// allow, by ROUTE_CAPABILITIES; observe mode only logs.
+		middleware.packages(),
 	]);
 
 /**

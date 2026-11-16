@@ -1,6 +1,6 @@
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
-import { billingPage } from "#modules/billing/billing_page";
+import { artistUsageText, billingPage } from "#modules/billing/billing_page";
 import type { BillingOverview } from "#modules/billing/services/billing_service";
 import type { Entitlement } from "#modules/packages/entitlement";
 
@@ -31,6 +31,7 @@ test.group("Billing page props", () => {
 			new Map(),
 			"Asia/Kathmandu",
 			entitlement,
+			{ active: 1, limit: 1 },
 		);
 
 		assert.deepEqual(props.package, {
@@ -38,6 +39,29 @@ test.group("Billing page props", () => {
 			name: "Solo",
 			line: "One artist, with help running the business.",
 			text: "Solo trial until 15 Nov 2026",
+			artists: { active: 1, limit: 1, text: "1 of 1 active artist" },
 		});
+	});
+
+	test("active artists read against the package's limit, or alone with none", ({
+		assert,
+	}) => {
+		assert.equal(
+			artistUsageText({ active: 1, limit: 1 }),
+			"1 of 1 active artist",
+		);
+		assert.equal(
+			artistUsageText({ active: 3, limit: null }),
+			"3 active artists",
+		);
+		assert.equal(
+			artistUsageText({ active: 1, limit: null }),
+			"1 active artist",
+		);
+		// Over the limit (a studio from before packages, or observe mode).
+		assert.equal(
+			artistUsageText({ active: 3, limit: 1 }),
+			"3 active artists, 1 included",
+		);
 	});
 });

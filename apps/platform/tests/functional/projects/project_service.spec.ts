@@ -174,6 +174,14 @@ test.group("ProjectService.findFor", (group) => {
 				);
 			}
 
+			// Archived (studio packages, phase 2): the artist still finishes
+			// their own projects.
+			await mine.merge({ archivedAt: DateTime.now(), visible: false }).save();
+			assert.equal(
+				(await projects.findFor(tenant, asha, assigned.id)).id,
+				assigned.id,
+			);
+
 			// An artist with no profile of their own sees no project at all.
 			const ram = { userId: stranger.id, role: "artist" as const };
 			await assert.rejects(

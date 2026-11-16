@@ -296,6 +296,68 @@ test.group("Scheduling on a project over HTTP (TAT-85)", (group) => {
 		);
 	});
 
+	test("an archived artist finishes their own project but gets no other session", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant, customer, sita, anu } = await setup();
+		const theirs = await projectIn(tenant, customer, "booked", sita.id);
+		const anuProject = await projectIn(tenant, customer, "booked", anu.id);
+		const unassigned = await inTenant(tenant, () =>
+			makeProject(tenant, customer, { status: "booked" }),
+		);
+		// Archived (studio packages, phase 2): existing projects continue.
+		await inTenant(tenant, () =>
+			sita.merge({ archivedAt: DateTime.now(), visible: false }).save(),
+		);
+
+		const kept = await post(
+			client,
+			scheduleUrl(theirs.id),
+			tattoo(sita.id),
+			owner,
+		);
+		kept.assertStatus(302);
+		assert.lengthOf(await sessionsOf(tenant, theirs.id), 1);
+
+		for (const [days, project] of [
+			[4, anuProject],
+			[5, unassigned],
+		] as const) {
+			assertValidationError(
+				await post(
+					client,
+					scheduleUrl(project.id),
+					tattoo(sita.id, { date: dayFromNow(days) }),
+					owner,
+				),
+				"sessionArtistId",
+				"Choose an artist from the list.",
+			);
+			assert.lengthOf(await sessionsOf(tenant, project.id), 0);
+		}
+	});
+
+	test("an archived artist's own member still schedules on their own project", async ({
+		client,
+		assert,
+	}) => {
+		const { asha, tenant, customer, sita } = await setup();
+		const theirs = await projectIn(tenant, customer, "booked", sita.id);
+		await inTenant(tenant, () =>
+			sita.merge({ archivedAt: DateTime.now(), visible: false }).save(),
+		);
+
+		const response = await post(
+			client,
+			scheduleUrl(theirs.id),
+			tattoo(sita.id, { date: dayFromNow(6) }),
+			asha,
+		);
+		response.assertStatus(302);
+		assert.lengthOf(await sessionsOf(tenant, theirs.id), 1);
+	});
+
 	test("a closed or finished project refuses with a flash", async ({
 		client,
 		assert,

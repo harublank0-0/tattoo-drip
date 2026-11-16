@@ -1063,6 +1063,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['destroy']>>>
     }
   }
+  'tenant.artists.archive': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/:id/archive'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['archive']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['archive']>>>
+    }
+  }
+  'tenant.artists.restore': {
+    methods: ["POST"]
+    pattern: '/t/:tenant/artists/:id/restore'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['restore']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/artists_controller').default['restore']>>>
+    }
+  }
   'tenant.artists.discover.update': {
     methods: ["PUT"]
     pattern: '/t/:tenant/artists/:id/discover'

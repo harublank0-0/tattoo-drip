@@ -191,6 +191,7 @@ export function resolveEntitlement(input: EntitlementInput): Entitlement {
 export function entitlementText(
 	value: Entitlement,
 	day: (at: DateTime) => string,
+	enforced = false,
 ): string {
 	const name = PACKAGES[value.package].name;
 	const until = value.until ? ` until ${day(value.until)}` : "";
@@ -204,8 +205,10 @@ export function entitlementText(
 		case "pilot":
 			return `${name}, pilot${until}`;
 		case "paused":
-			// Observe mode (phase 1): nothing is paused yet, so say only what is
-			// true. The paused wording comes with enforcement (phase 3).
-			return "No paid package yet";
+			// In observe mode nothing is paused, so say only what is true; once
+			// enforced, new client work waits for payment (spec ruling 8).
+			return enforced
+				? `${name} paused: pay to start new client work`
+				: "No paid package yet";
 	}
 }

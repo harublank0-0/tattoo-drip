@@ -534,6 +534,18 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.destroy']['types'],
   },
+  'tenant.artists.archive': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/:id/archive',
+    tokens: [{"old":"/t/:tenant/artists/:id/archive","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id/archive","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id/archive","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id/archive","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/:id/archive","type":0,"val":"archive","end":""}],
+    types: placeholder as Registry['tenant.artists.archive']['types'],
+  },
+  'tenant.artists.restore': {
+    methods: ["POST"],
+    pattern: '/t/:tenant/artists/:id/restore',
+    tokens: [{"old":"/t/:tenant/artists/:id/restore","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/:id/restore","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/:id/restore","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/:id/restore","type":1,"val":"id","end":""},{"old":"/t/:tenant/artists/:id/restore","type":0,"val":"restore","end":""}],
+    types: placeholder as Registry['tenant.artists.restore']['types'],
+  },
   'tenant.artists.discover.update': {
     methods: ["PUT"],
     pattern: '/t/:tenant/artists/:id/discover',

@@ -55,7 +55,9 @@ export default class MembersController {
 		const { tenant, membership } = tenantContext(ctx);
 		const members = await this.tenancy.members(tenant);
 		const pending = await this.invitations.pending(tenant);
-		const profiles = (await this.artists.list(tenant)).filter(
+		// Unlinked, unarchived profiles: what an invitation may offer
+		// (InvitationService.claimable).
+		const profiles = (await this.artists.listAssignable(tenant)).filter(
 			({ userId }) => userId === null,
 		);
 

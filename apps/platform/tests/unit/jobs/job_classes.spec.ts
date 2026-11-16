@@ -26,6 +26,8 @@ const ALLOWLIST = {
 		"AI Design Lab: reads only ids from stuck_design_generation_candidates() and queues one FailStuckDesignGenerationJob (a TenantJob) per row; reads and writes no tenant table itself",
 	SweepExpiredQuotesJob:
 		"reads only ids from expired_quote_candidates() and queues one ExpireQuoteJob (a TenantJob) per row; reads and writes no tenant table itself",
+	SweepPackageNoticesJob:
+		"studio packages: reads only ids from package_tenants() and queues one PackageNoticeJob (a TenantJob) per studio; reads and writes no tenant table itself",
 };
 
 async function jobClasses() {
