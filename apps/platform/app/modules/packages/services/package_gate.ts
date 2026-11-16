@@ -3,6 +3,7 @@ import logger from "@adonisjs/core/services/logger";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ArtistService from "#modules/artists/services/artist_service";
 import { type PackageRule, PackageRuleError } from "#modules/packages/errors";
+import type { Capability } from "#modules/packages/route_capabilities";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import EntitlementService from "#modules/packages/services/entitlement_service";
 import { packageEnforcement } from "#modules/packages/settings";
@@ -57,6 +58,36 @@ export default class PackageGate {
 				package: entitlement.package,
 				active,
 				limit: entitlement.artistLimit,
+			},
+			"Package rule would refuse",
+		);
+	}
+
+	/**
+	 * Before a route the capability map restricts (route_capabilities,
+	 * studio packages phase 3): `new_work` and `design_lab` are refused
+	 * while the studio is paused. `open` and `artist_activation` (checked by
+	 * checkArtistActivation in its controller) pass without reading the
+	 * entitlement. Observe mode logs the refusal with its route and allows.
+	 */
+	async checkCapability(
+		tenant: TenantRef,
+		capability: Capability,
+		route: string,
+	): Promise<void> {
+		if (capability === "open" || capability === "artist_activation") return;
+		const entitlement = await this.entitlements.for(tenant);
+		if (entitlement.state !== "paused") return;
+		const rule: PackageRule =
+			capability === "new_work" ? "paused_new_work" : "paused_design_lab";
+		if (packageEnforcement() === "enforce") throw new PackageRuleError(rule);
+		logger.info(
+			{
+				tenantId: tenant.id,
+				rule,
+				route,
+				state: entitlement.state,
+				package: entitlement.package,
 			},
 			"Package rule would refuse",
 		);
