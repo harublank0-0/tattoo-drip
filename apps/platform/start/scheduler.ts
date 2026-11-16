@@ -18,6 +18,7 @@
 import app from "@adonisjs/core/services/app";
 import SweepStuckVideosJob from "#modules/artists/jobs/sweep_stuck_videos_job";
 import SweepStuckDesignGenerationsJob from "#modules/design_lab/jobs/sweep_stuck_design_generations_job";
+import SweepPackageNoticesJob from "#modules/packages/jobs/sweep_package_notices_job";
 import ReconcilePaymentsJob from "#modules/payments/jobs/reconcile_payments_job";
 import SweepExpiredQuotesJob from "#modules/projects/jobs/sweep_expired_quotes_job";
 import SweepStaleSubmittersJob from "#modules/reviews/jobs/sweep_stale_submitters_job";
@@ -46,5 +47,12 @@ if (app.getMode() === "run") {
 	await SweepStaleSubmittersJob.schedule({})
 		.id(SweepStaleSubmittersJob.scheduleId)
 		.cron(SweepStaleSubmittersJob.cron)
+		.run();
+
+	// Studio packages (phase 3): each studio's trial, paid, grace and pilot
+	// notices, logged until enforcement sends them.
+	await SweepPackageNoticesJob.schedule({})
+		.id(SweepPackageNoticesJob.scheduleId)
+		.cron(SweepPackageNoticesJob.cron)
 		.run();
 }
