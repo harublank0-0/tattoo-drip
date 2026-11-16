@@ -106,6 +106,26 @@ test.group("Packages: notices", (group) => {
 		);
 	});
 
+	test("a studio deleted between the sweep and its job is skipped quietly", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("notice-deleted", "Deleted");
+		await inTenant(tenant, () =>
+			dbClient().rawQuery(
+				"update tenants set deleted_at = now() where id = ?",
+				[tenant.id],
+			),
+		);
+
+		const logs = captureLogs();
+		try {
+			await runNoticeJob(tenant);
+		} finally {
+			logs.restore();
+		}
+		assert.lengthOf(noticesIn(logs), 0);
+	});
+
 	test("the sweep queues one notice job per live studio", async ({
 		assert,
 	}) => {

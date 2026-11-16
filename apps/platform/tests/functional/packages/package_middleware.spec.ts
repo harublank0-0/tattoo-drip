@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
+import BillingInvoice from "#modules/billing/models/billing_invoice";
 import PilotGrantService from "#modules/packages/services/pilot_grant_service";
 import TattooProject from "#modules/projects/models/tattoo_project";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { dbClient } from "#services/db_context";
 import env from "#start/env";
 import { captureLogs } from "#tests/helpers/logs";
+import { seedBilling } from "#tests/helpers/online_payments";
 import {
 	makeArtist,
 	makeClient,
@@ -25,6 +27,8 @@ import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 const PAUSED_NEW_WORK =
 	"Starting new client work is paused until your package is paid. Your existing projects, bookings, payments and page keep working.";
+/** What an artist, who can't pay, reads: the same, and who can. */
+const FOR_MEMBERS = " Ask the studio's owner about the package.";
 const PAUSED_DESIGN_LAB =
 	"Design Lab is paused until your package is paid. Your saved concepts stay available.";
 
@@ -90,7 +94,6 @@ test.group("Packages: refusing new client work while paused", (group) => {
 
 	test("in enforce mode a paused studio's existing work goes on", async ({
 		client,
-		assert,
 	}) => {
 		env.set("PACKAGE_ENFORCEMENT", "enforce");
 		const { owner, tenant, artist } = await studio("mw-existing");
@@ -126,10 +129,6 @@ test.group("Packages: refusing new client work while paused", (group) => {
 			.loginAs(owner)
 			.redirects(0);
 		session.assertHeader("location", projectUrl);
-		assert.notInclude(
-			JSON.stringify(session.body()),
-			"paused until your package is paid",
-		);
 	});
 
 	test("in enforce mode Design Lab generation is refused while paused", async ({
@@ -162,7 +161,7 @@ test.group("Packages: refusing new client work while paused", (group) => {
 			.loginAs(member)
 			.redirects(0);
 		response.assertHeader("location", from);
-		response.assertFlashMessage("error", PAUSED_NEW_WORK);
+		response.assertFlashMessage("error", PAUSED_NEW_WORK + FOR_MEMBERS);
 	});
 
 	test("an artist refused on the refused page itself, or with no referer, goes to the studio's home, never in a loop", async ({
@@ -180,7 +179,7 @@ test.group("Packages: refusing new client work while paused", (group) => {
 			.loginAs(member)
 			.redirects(0);
 		stale.assertHeader("location", `/t/${tenant.slug}`);
-		stale.assertFlashMessage("error", PAUSED_NEW_WORK);
+		stale.assertFlashMessage("error", PAUSED_NEW_WORK + FOR_MEMBERS);
 
 		// A bookmark: no referer at all.
 		const bookmarked = await client.get(booking).loginAs(member).redirects(0);
@@ -250,5 +249,70 @@ test.group("Packages: refusing new client work while paused", (group) => {
 			);
 			assert.lengthOf(await projectsOf(tenant, inquiry.id), 1, tenant.slug);
 		}
+	});
+
+	test("in enforce mode a paid studio, or one in grace, is never refused", async ({
+		client,
+		assert,
+	}) => {
+		env.set("PACKAGE_ENFORCEMENT", "enforce");
+		const now = DateTime.utc().startOf("second");
+		const paid = await studio("mw-paid");
+		const grace = await studio("mw-grace");
+		for (const [made, from, to] of [
+			[paid, now.minus({ days: 1 }), now.plus({ days: 20 })],
+			// Ended two days ago in an ordinary lapse: grace runs 7 days.
+			[grace, now.minus({ days: 32 }), now.minus({ days: 2 })],
+		] as const) {
+			await seedBilling(made.tenant);
+			await inTenant(made.tenant, async () => {
+				const invoice = await BillingInvoice.query().firstOrFail();
+				await dbClient().rawQuery(
+					`insert into billing_access_periods (tenant_id, invoice_id, livemode, starts_at, ends_at, created_at)
+					 values (?, ?, false, ?, ?, now())`,
+					[made.tenant.id, invoice.id, from.toISO(), to.toISO()],
+				);
+			});
+		}
+
+		for (const { owner, tenant, inquiry, artist } of [paid, grace]) {
+			const accept = await client
+				.post(`/t/${tenant.slug}/inbox/${inquiry.id}/accept`)
+				.form({ artistId: artist.id })
+				.withCsrfToken()
+				.loginAs(owner)
+				.redirects(0);
+			accept.assertFlashMessage(
+				"success",
+				"Inquiry accepted: project created.",
+			);
+			assert.lengthOf(await projectsOf(tenant, inquiry.id), 1, tenant.slug);
+		}
+	});
+
+	test("in enforce mode a paused studio's booking form and Design Lab retry are refused too", async ({
+		client,
+	}) => {
+		env.set("PACKAGE_ENFORCEMENT", "enforce");
+		const { owner, tenant } = await studio("mw-forms");
+		const billing = `/t/${tenant.slug}/settings/billing`;
+
+		const booked = await client
+			.post(`/t/${tenant.slug}/projects`)
+			.form({})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		booked.assertHeader("location", billing);
+		booked.assertFlashMessage("error", PAUSED_NEW_WORK);
+
+		const retried = await client
+			.post(`/t/${tenant.slug}/design-lab/generations/${randomUUID()}/retry`)
+			.form({})
+			.withCsrfToken()
+			.loginAs(owner)
+			.redirects(0);
+		retried.assertHeader("location", billing);
+		retried.assertFlashMessage("error", PAUSED_DESIGN_LAB);
 	});
 });

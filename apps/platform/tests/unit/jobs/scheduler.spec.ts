@@ -23,6 +23,7 @@ test.group("Scheduler", (group) => {
 		const notices = await Schedule.find("sweep-package-notices");
 		assert.equal(notices?.name, "SweepPackageNoticesJob");
 		assert.equal(notices?.cronExpression, "17 3 * * *");
+		assert.equal(notices?.timezone, "UTC");
 		assert.equal(notices?.status, "active");
 	});
 

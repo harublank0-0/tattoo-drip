@@ -69,14 +69,16 @@ export default class PackageGate {
 	 * while the studio is paused. `open` and `artist_activation` (checked by
 	 * checkArtistActivation in its controller) pass without reading the
 	 * entitlement. Observe mode logs the refusal with its route and allows.
+	 * `tenant` is the studio as the request loaded it.
 	 */
 	async checkCapability(
-		tenant: TenantRef,
+		tenant: Pick<Tenant, "id" | "createdAt" | "type" | "selectedPackage">,
 		capability: Capability,
 		route: string,
 	): Promise<void> {
 		if (capability === "open" || capability === "artist_activation") return;
-		const entitlement = await this.entitlements.for(tenant);
+		// The request's tenant is already loaded (the tenant middleware).
+		const entitlement = await this.entitlements.forLoaded(tenant);
 		if (entitlement.state !== "paused") return;
 		const rule: PackageRule =
 			capability === "new_work" ? "paused_new_work" : "paused_design_lab";

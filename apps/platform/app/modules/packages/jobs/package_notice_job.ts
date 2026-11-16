@@ -23,14 +23,21 @@ export default class PackageNoticeJob extends TenantJob<Payload> {
 		const { dueNotice, sweepMoment } = await import(
 			"#modules/packages/notices"
 		);
+		const { default: TenancyService } = await import(
+			"#modules/tenancy/services/tenancy_service"
+		);
 		const entitlements = await app.container.make(EntitlementService);
-		const tenant = { id: this.payload.tenantId };
+		// A studio deleted since the sweep listed it has nothing to be told.
+		const tenant = await (await app.container.make(TenancyService)).find(
+			this.payload.tenantId,
+		);
+		if (!tenant) return;
 		// The sweep's moment, not this run's clock: a job that runs late still
 		// judges the day it was queued for.
 		const at = this.payload.at
 			? DateTime.fromISO(this.payload.at, { zone: "utc" })
 			: sweepMoment(DateTime.utc());
-		const entitlement = await entitlements.for(tenant, at);
+		const entitlement = await entitlements.forLoaded(tenant, at);
 		const notice = dueNotice(entitlement, at);
 		if (!notice) return;
 		logger.info(

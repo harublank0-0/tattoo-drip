@@ -23,18 +23,26 @@ export default class PackageMiddleware {
 				`No ROUTE_CAPABILITIES entry for ${ctx.request.method()} ${ctx.route?.pattern ?? ctx.request.url()} (#modules/packages/route_capabilities)`,
 			);
 		}
-		if (capability === "open") return next();
+		// artist_activation is checked by its controller (phase 2).
+		if (capability === "open" || capability === "artist_activation") {
+			return next();
+		}
 		const gate = await ctx.containerResolver.make(PackageGate);
 		try {
 			await gate.checkCapability(tenant, capability, route as string);
 		} catch (error) {
 			if (!(error instanceof PackageRuleError)) throw error;
-			ctx.session.flash("error", error.message);
 			if (membership.role === "owner") {
+				ctx.session.flash("error", error.message);
 				return ctx.response
 					.redirect()
 					.toRoute("tenant.settings.billing", { tenant: tenant.slug });
 			}
+			// A member who can't pay is told who can.
+			ctx.session.flash(
+				"error",
+				`${error.message} Ask the studio's owner about the package.`,
+			);
 			// Never the refused request's own query string (redirects forward it).
 			return ctx.response
 				.redirect()
