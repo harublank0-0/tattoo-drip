@@ -391,5 +391,19 @@ test.group("Design Lab history service", (group) => {
 			history.list(b.tenant, filters()),
 		);
 		assert.lengthOf(crossed.entries, 0);
+		const crossedCounts = await inTenant(a.tenant, () =>
+			history.counts(b.tenant, { month: thisMonth(), artist: null }),
+		);
+		assert.deepEqual(crossedCounts, {
+			used: 0,
+			inProgress: 0,
+			failed: 0,
+			blocked: 0,
+		});
+		assert.deepEqual(
+			await inTenant(a.tenant, () => history.artists(b.tenant, thisMonth())),
+			[],
+		);
+		assert.isNull(await inTenant(a.tenant, () => history.firstMonth(b.tenant)));
 	});
 });

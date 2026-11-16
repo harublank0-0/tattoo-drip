@@ -24,6 +24,8 @@ export const ROUTE_CAPABILITIES = {
 	"tenant.transactions.export": "open",
 	"tenant.transactions.sync": "open",
 	"tenant.design_lab.index": "open",
+	// The owners' read-only history (docs/design-lab.md, "History").
+	"tenant.design_lab.history": "open",
 	"tenant.design_lab.store": "open",
 	"tenant.design_lab.show": "open",
 	"tenant.design_lab.update": "open",
