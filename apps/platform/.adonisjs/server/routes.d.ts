@@ -152,6 +152,7 @@ export type ScannedRoutes = {
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio.bulk': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.design_lab.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.history': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.design_lab.store': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.design_lab.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.design_lab.update': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -295,6 +296,7 @@ export type ScannedRoutes = {
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.design_lab.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.history': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.design_lab.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.design_lab.status': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.design_lab.assets.download': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
@@ -395,6 +397,7 @@ export type ScannedRoutes = {
     'tenant.calendar.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.portfolio': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.design_lab.index': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
+    'tenant.design_lab.history': { paramsTuple: [ParamValue]; params: {'tenant': ParamValue} }
     'tenant.design_lab.show': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.design_lab.status': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }
     'tenant.design_lab.assets.download': { paramsTuple: [ParamValue,ParamValue]; params: {'tenant': ParamValue,'id': ParamValue} }

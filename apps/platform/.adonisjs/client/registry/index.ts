@@ -894,6 +894,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/design-lab","type":0,"val":"t","end":""},{"old":"/t/:tenant/design-lab","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/design-lab","type":0,"val":"design-lab","end":""}],
     types: placeholder as Registry['tenant.design_lab.index']['types'],
   },
+  'tenant.design_lab.history': {
+    methods: ["GET","HEAD"],
+    pattern: '/t/:tenant/design-lab/history',
+    tokens: [{"old":"/t/:tenant/design-lab/history","type":0,"val":"t","end":""},{"old":"/t/:tenant/design-lab/history","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/design-lab/history","type":0,"val":"design-lab","end":""},{"old":"/t/:tenant/design-lab/history","type":0,"val":"history","end":""}],
+    types: placeholder as Registry['tenant.design_lab.history']['types'],
+  },
   'tenant.design_lab.store': {
     methods: ["POST"],
     pattern: '/t/:tenant/design-lab',

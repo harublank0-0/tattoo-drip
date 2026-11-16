@@ -1783,6 +1783,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['index']>>>
     }
   }
+  'tenant.design_lab.history': {
+    methods: ["GET","HEAD"]
+    pattern: '/t/:tenant/design-lab/history'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { tenant: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['history']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['history']>>>
+    }
+  }
   'tenant.design_lab.store': {
     methods: ["POST"]
     pattern: '/t/:tenant/design-lab'

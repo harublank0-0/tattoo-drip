@@ -49,7 +49,7 @@ export default function DesignLabIndex({
 	allowance: Allowance;
 	linkable: { id: string; label: string }[];
 }) {
-	const { slug } = useTenant();
+	const { slug, role } = useTenant();
 	const params = { tenant: slug };
 	const index = urlFor("tenant.design_lab.index", params);
 	const viewHref = (next: "active" | "archived", nextPage = 1) => {
@@ -138,6 +138,14 @@ export default function DesignLabIndex({
 					>
 						Archived
 					</Link>
+					{role === "owner" && (
+						<Link
+							href={urlFor("tenant.design_lab.history", params)}
+							className="-my-3 ml-auto flex min-h-11 items-center px-1 text-sm"
+						>
+							History
+						</Link>
+					)}
 				</nav>
 				{projects.length === 0 ? (
 					<p className="text-sm text-muted-foreground">

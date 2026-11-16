@@ -752,6 +752,9 @@ router
 					.get("/", [controllers.DesignLab, "index"])
 					.as("tenant.design_lab.index");
 				router
+					.get("history", [controllers.DesignLab, "history"])
+					.as("tenant.design_lab.history");
+				router
 					.post("/", [controllers.DesignLab, "store"])
 					.as("tenant.design_lab.store");
 				router

@@ -2,9 +2,15 @@ import { randomUUID } from "node:crypto";
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
+import { DateTime } from "luxon";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import ClientService from "#modules/clients/services/client_service";
+import {
+	monthOf,
+	pageNumber,
+	parseHistoryFilters,
+} from "#modules/design_lab/history";
 import type DesignAsset from "#modules/design_lab/models/design_asset";
 import type DesignGeneration from "#modules/design_lab/models/design_generation";
 import type DesignProject from "#modules/design_lab/models/design_project";
@@ -18,9 +24,14 @@ import {
 import {
 	canRetry,
 	FAILURE_MESSAGES,
+	type FailureCode,
 	isFinal,
 	STATUS_LABELS,
 } from "#modules/design_lab/rules";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
+import DesignHistoryService, {
+	type HistoryEntry,
+} from "#modules/design_lab/services/design_history_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import DesignLabService, {
 	DesignLabRuleError,
@@ -49,9 +60,6 @@ import ImageService, {
 import { formatDay } from "#modules/projects/quotes";
 import type { Member } from "#modules/projects/services/project_service";
 import type Tenant from "#modules/tenancy/models/tenant";
-
-const pageNumber = (value: unknown) =>
-	typeof value === "string" && /^[1-9]\d{0,7}$/.test(value) ? Number(value) : 1;
 
 /** A service refusal as the form's field error (the request still fails and rolls back). */
 async function asFieldErrors<T>(
@@ -96,7 +104,50 @@ export default class DesignLabController {
 		private usage: DesignUsageService,
 		private images: ImageService,
 		private clients: ClientService,
+		private historyService: DesignHistoryService,
 	) {}
+
+	/**
+	 * The owners' generation history (docs/design-lab.md, "History"): every
+	 * attempt in the studio, one row per usage-ledger row, with the month's
+	 * counts as the allowance counts them. Read-only; no costs or prompts.
+	 */
+	async history(ctx: HttpContext) {
+		if (!designLabEnabled()) return ctx.response.notFound();
+		const { tenant } = tenantContext(ctx);
+		const now = DateTime.utc();
+		const filters = parseHistoryFilters(ctx.request.qs(), now);
+		const artists = await this.historyService.artists(tenant, filters.month);
+		if (!artists.some((artist) => artist.id === filters.artist)) {
+			filters.artist = null;
+		}
+		const list = await this.historyService.list(tenant, filters);
+		const counts = await this.historyService.counts(tenant, filters);
+		const current = filters.month === monthOf(now);
+		// The same clock as the month: a request at midnight reads one month.
+		const allowance = current ? await this.usage.allowance(tenant, now) : null;
+		ctx.response.header("Cache-Control", "private, no-store");
+		return ctx.inertia.render("design_lab/history", {
+			rows: await Promise.all(
+				list.entries.map((entry) => this.historyRow(tenant, entry)),
+			),
+			filters: {
+				month: filters.month,
+				artist: filters.artist,
+				status: filters.status,
+			},
+			page: list.page,
+			lastPage: list.lastPage,
+			months: monthsSince(await this.historyService.firstMonth(tenant), now),
+			artists,
+			counts,
+			limit: allowance && filters.artist === null ? allowance.limit : null,
+			studio:
+				allowance && filters.artist !== null
+					? { used: allowance.used, limit: allowance.limit }
+					: null,
+		});
+	}
 
 	async index(ctx: HttpContext) {
 		if (!designLabEnabled()) return ctx.response.notFound();
@@ -398,6 +449,45 @@ export default class DesignLabController {
 		};
 	}
 
+	private async historyRow(
+		tenant: Pick<Tenant, "id" | "timezone">,
+		{ record, status, generation, project, asset, person }: HistoryEntry,
+	) {
+		const code = record.releaseReason as FailureCode | null;
+		const reasons =
+			status === "blocked" && record.attempt === generation.attempt
+				? (generation.providerMeta?.moderationReasons ?? [])
+				: [];
+		const failing = status === "failed" || status === "blocked";
+		return {
+			id: record.id,
+			status,
+			attempt: generation.attempt > 1 ? record.attempt : null,
+			reason:
+				failing && code && Object.hasOwn(FAILURE_MESSAGES, code)
+					? reasons.length > 0
+						? `${FAILURE_MESSAGES[code]} Flagged for: ${reasons.join(", ")}.`
+						: FAILURE_MESSAGES[code]
+					: null,
+			thumbnailUrl: asset
+				? await this.images.urlFor(
+						"design_concept",
+						asset.imageKey,
+						tenant,
+						THUMBNAIL_WIDTH,
+					)
+				: null,
+			person,
+			project: project ? { id: project.id, title: project.title } : null,
+			when: record.reservedAt
+				.setZone(tenant.timezone)
+				.toFormat("d LLL yyyy, HH:mm"),
+			reference: failing
+				? `${generation.id} · attempt ${record.attempt}`
+				: null,
+		};
+	}
+
 	/** "Client name · 3 Nov 2026" for each linked tattoo project the member may open. */
 	private async linkedLabels(
 		tenant: Pick<Tenant, "id" | "timezone">,
@@ -457,4 +547,18 @@ export default class DesignLabController {
 		}
 		return options;
 	}
+}
+
+/** "YYYY-MM" months, newest first, from now back to `first` (at least now's). */
+function monthsSince(first: string | null, now: DateTime): string[] {
+	const months: string[] = [];
+	const last = first ?? monthOf(now);
+	for (
+		let month = now.toUTC().startOf("month");
+		monthOf(month) >= last;
+		month = month.minus({ months: 1 })
+	) {
+		months.push(monthOf(month));
+	}
+	return months;
 }
