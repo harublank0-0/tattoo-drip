@@ -815,6 +815,9 @@ router
 		middleware.dbContext(),
 		middleware.tenant(),
 		middleware.role(),
+		// Studio packages (phase 3): refuses what the package state doesn't
+		// allow, by ROUTE_CAPABILITIES; observe mode only logs.
+		middleware.packages(),
 	]);
 
 /**
