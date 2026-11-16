@@ -129,6 +129,29 @@ export function keyUnder(key: string, from: string, to: string): string {
 	return `tenants/${match[1]}/${to}/${match[3]}`;
 }
 
+type StoredDisk = ReturnType<typeof drive.use>;
+
+/**
+ * Copies one stored file to another disk under `target`, streamed, with its
+ * length. R2 refuses an upload without Content-Length (MissingContentLength),
+ * and a download's stream has no length the S3 client can read, so the
+ * upload would go out chunked: the length is read from the file first. Every
+ * copy between disks goes through here (Fresh ink publishing).
+ */
+export async function copyFile(
+	from: StoredDisk,
+	to: StoredDisk,
+	key: string,
+	target: string,
+	options: { contentType: string; cacheControl: string },
+): Promise<void> {
+	const { contentLength } = await from.getMetaData(key);
+	await to.putStream(target, await from.getStream(key), {
+		...options,
+		contentLength,
+	});
+}
+
 /**
  * Defence in depth for every URL: the key must be one this tenant stored for
  * this purpose (`tenants/<id>/<purpose>/`). A copy's key only adds a suffix
@@ -480,14 +503,10 @@ export default class ImageService {
 			for (const file of files) {
 				const target = keyUnder(file, from, to);
 				written.push(target);
-				await diskFor(to).putStream(
-					target,
-					await diskFor(from).getStream(file),
-					{
-						contentType: file.endsWith(".png") ? "image/png" : "image/jpeg",
-						cacheControl: STORED_CACHE_CONTROL[IMAGE_PURPOSES[to].visibility],
-					},
-				);
+				await copyFile(diskFor(from), diskFor(to), file, target, {
+					contentType: file.endsWith(".png") ? "image/png" : "image/jpeg",
+					cacheControl: STORED_CACHE_CONTROL[IMAGE_PURPOSES[to].visibility],
+				});
 			}
 		} catch (error) {
 			await this.removeAll(to, written);

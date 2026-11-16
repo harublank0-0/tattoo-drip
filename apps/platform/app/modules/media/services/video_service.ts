@@ -13,6 +13,7 @@ import { FSDriver } from "@adonisjs/drive/drivers/fs";
 import drive from "@adonisjs/drive/services/main";
 import { VideoDeleteError } from "#modules/media/errors";
 import ImageService, {
+	copyFile,
 	IMAGE_PURPOSES,
 	keyUnder,
 	PRIVATE_CACHE_CONTROL,
@@ -442,7 +443,7 @@ export default class VideoService {
 				assertVideoKeyOf(tenant, key, from);
 				const target = keyUnder(key, from, to);
 				written.push(target);
-				await diskOf(to).putStream(target, await diskOf(from).getStream(key), {
+				await copyFile(diskOf(from), diskOf(to), key, target, {
 					contentType: "video/mp4",
 					cacheControl: STORED_CACHE_CONTROL[visibilityOf(to)],
 				});
