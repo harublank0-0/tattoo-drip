@@ -14,6 +14,7 @@ import ReviewOperatorService from "#modules/reviews/services/review_operator_ser
 import StudioReviewService from "#modules/reviews/services/studio_review_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { withTransaction } from "#services/db_context";
+import { assertApiError } from "#tests/helpers/api";
 import { testImages } from "#tests/helpers/images";
 import {
 	issueReviewLink,
@@ -23,7 +24,7 @@ import {
 	reviewServices,
 	storedFiles,
 } from "#tests/helpers/reviews";
-import { failDeletes } from "#tests/helpers/storage_failures";
+import { failDeletes, failPuts } from "#tests/helpers/storage_failures";
 import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
 
 /**
@@ -400,6 +401,65 @@ test.group("Fresh ink publishing: storage failures", (group) => {
 			"Unpublished. It's off your page and its public copies are deleted.",
 		);
 		assert.deepEqual(await published(s), []);
+	});
+
+	test("a public copy that can't be made fails the approval: the post stays waiting and nothing is public", async ({
+		client,
+		assert,
+	}) => {
+		const { s, id } = await submitted(client, "pub-fail-copy-2");
+		const broken = failPuts("public", (key) =>
+			key.includes("/fresh_ink_photo/"),
+		);
+		try {
+			const response = await studio(client, s, "approve", id);
+			response.assertStatus(302);
+			response.assertFlashMessage(
+				"error",
+				"Couldn't publish the photos, try again.",
+			);
+		} finally {
+			broken.restore();
+		}
+		const row = await post(s);
+		assert.equal(row.status, "waiting");
+		assert.isNull(row.publishedAt);
+		assert.deepEqual(await published(s), []);
+		// Once storage is back, the same approval goes through.
+		(await studio(client, s, "approve", id)).assertFlashMessage(
+			"success",
+			"Approved. It shows where the client allowed.",
+		);
+		assert.isNotEmpty(await published(s));
+	});
+
+	test("a public copy that can't be made fails the client's consent: 503 publish_failed and nothing they sent is saved", async ({
+		client,
+		assert,
+	}) => {
+		const s = await ready("pub-fail-consent-2");
+		await addPhoto(client, s);
+		(await submit(client, s, { studio: false })).assertStatus(200);
+		(await studio(client, s, "approve", (await post(s)).id)).assertStatus(302);
+		const broken = failPuts("public", (key) =>
+			key.includes("/fresh_ink_photo/"),
+		);
+		try {
+			assertApiError(
+				await submit(client, s, { studio: true }),
+				503,
+				"publish_failed",
+			);
+		} finally {
+			broken.restore();
+		}
+		const row = await post(s);
+		assert.isFalse(row.consentStudioPage);
+		assert.isNull(row.publishedAt);
+		assert.deepEqual(await published(s), []);
+		// Once storage is back, the same submit goes through.
+		(await submit(client, s, { studio: true })).assertStatus(200);
+		assert.isNotEmpty(await published(s));
 	});
 
 	test("the client's delete removes a public copy even when published_at lost track of it", async ({

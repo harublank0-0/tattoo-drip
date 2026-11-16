@@ -35,14 +35,16 @@ const BUCKETS = {
  * (411 `MissingContentLength`), which is what a chunked upload of a stream of
  * unknown length gets: the folder disks the other tests use accept one, so
  * only this can catch it. `refused` lists the keys it refused;
- * `failNextPuts(n)` answers the next n uploads 500 `InternalError`, as R2
- * now and then does. `restore()` puts the folder disks back, and the test
- * must call it (`cleanup`) because the disks are shared by the whole run.
+ * `failNextPuts(n, match?)` answers the next n uploads (of the keys `match`
+ * picks) 500 `InternalError`, as R2 now and then does. `restore()` puts the
+ * folder disks back, and the test must call it (`cleanup`) because the disks
+ * are shared by the whole run.
  */
 export async function useR2StandIn() {
 	const objects = new Map<string, Buffer>();
 	const refused: string[] = [];
 	let failing = 0;
+	let failingKey: (key: string) => boolean = () => true;
 	const server = createServer(async (request, response) => {
 		const path = decodeURIComponent(
 			new URL(request.url ?? "/", "http://stand-in").pathname.slice(1),
@@ -65,7 +67,7 @@ export async function useR2StandIn() {
 					"You must provide the Content-Length HTTP header.",
 				);
 			}
-			if (failing > 0) {
+			if (failing > 0 && failingKey(path)) {
 				failing -= 1;
 				return xmlError(
 					500,
@@ -110,9 +112,17 @@ export async function useR2StandIn() {
 
 	return {
 		refused,
-		/** Answers the next `count` uploads 500 `InternalError`. */
-		failNextPuts(count: number) {
+		/** Answers the next `count` uploads of the keys `match` picks (every key by default) 500 `InternalError`. */
+		failNextPuts(count: number, match: (key: string) => boolean = () => true) {
 			failing = count;
+			failingKey = match;
+		},
+		/** The keys stored on a disk's bucket. */
+		keys(visibility: "public" | "private") {
+			const prefix = `${BUCKETS[visibility]}/`;
+			return [...objects.keys()]
+				.filter((path) => path.startsWith(prefix))
+				.map((path) => path.slice(prefix.length));
 		},
 		/** Stores a file on a disk's bucket directly, as an earlier upload did. */
 		put(visibility: "public" | "private", key: string, body: Buffer) {

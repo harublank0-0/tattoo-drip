@@ -50,6 +50,7 @@ export const STUDIO_DONE = {
 	unpublished:
 		"Unpublished. It's off your page and its public copies are deleted.",
 	removeFailed: "Couldn't remove the public photos, try again.",
+	publishFailed: "Couldn't publish the photos, try again.",
 	replySaved: "Reply saved.",
 	replyPosted: "Reply posted.",
 	replyDeleted: "Reply deleted.",

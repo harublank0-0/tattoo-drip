@@ -33,6 +33,7 @@ export default class ReviewsRestore extends BaseCommand {
 		}
 		const { default: ReviewOperatorService, ReviewOperatorError } =
 			await import("#modules/reviews/services/review_operator_service");
+		const { ImageCopyError } = await import("#modules/media/errors");
 		const operator = await this.app.container.make(ReviewOperatorService);
 		try {
 			await operator.restore(this.kind as TakedownKind, this.id);
@@ -40,6 +41,13 @@ export default class ReviewsRestore extends BaseCommand {
 				`Takedown lifted. The ${this.kind} follows the client's and the studio's choices again.`,
 			);
 		} catch (error) {
+			if (error instanceof ImageCopyError) {
+				this.logger.error(
+					"Storage couldn't make the post's public copies, so nothing changed. Run it again once storage recovers.",
+				);
+				this.exitCode = 1;
+				return;
+			}
 			if (!(error instanceof ReviewOperatorError)) throw error;
 			this.logger.error(error.message);
 			this.exitCode = 1;

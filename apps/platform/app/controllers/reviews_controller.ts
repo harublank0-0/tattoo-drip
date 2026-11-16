@@ -6,7 +6,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import { knownStyles } from "#modules/artists/styles";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ClientService from "#modules/clients/services/client_service";
-import { ImageDeleteError } from "#modules/media/errors";
+import { ImageCopyError, ImageDeleteError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	THUMBNAIL_WIDTH,
@@ -243,8 +243,8 @@ export default class ReviewsController {
 	 * Runs one write and goes back to the page it came from (the form's
 	 * `back`, checked by reviewsBack): its toast, or the refusal's words. A
 	 * refusal happens before anything is written; a public copy that can't
-	 * be deleted leaves the post as it was. Validation errors and 404s are
-	 * thrown as usual.
+	 * be deleted or made leaves the post as it was. Validation errors and
+	 * 404s are thrown as usual.
 	 */
 	private async act(ctx: HttpContext, work: () => Promise<string>) {
 		const { tenant } = tenantContext(ctx);
@@ -256,6 +256,8 @@ export default class ReviewsController {
 				ctx.session.flash("error", STUDIO_RULE_MESSAGES[error.reason]);
 			} else if (error instanceof ImageDeleteError) {
 				ctx.session.flash("error", STUDIO_DONE.removeFailed);
+			} else if (error instanceof ImageCopyError) {
+				ctx.session.flash("error", STUDIO_DONE.publishFailed);
 			} else {
 				throw error;
 			}

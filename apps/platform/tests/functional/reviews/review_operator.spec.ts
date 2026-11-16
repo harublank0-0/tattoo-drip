@@ -7,8 +7,8 @@ import ClientPost from "#modules/reviews/models/client_post";
 import ClientReview from "#modules/reviews/models/client_review";
 import { TAKEDOWN_SENTENCES } from "#modules/reviews/rules";
 import ReviewOperatorService from "#modules/reviews/services/review_operator_service";
-import { reviewRequest } from "#tests/helpers/reviews";
-import { failDeletes } from "#tests/helpers/storage_failures";
+import { reviewRequest, storeSeededPhotos } from "#tests/helpers/reviews";
+import { failDeletes, failPuts } from "#tests/helpers/storage_failures";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
 // No #commands alias exists, so the commands are imported by path.
 import ReviewsDismiss from "../../../commands/reviews_dismiss.js";
@@ -213,6 +213,33 @@ test.group("reviews operator commands", (group) => {
 		(
 			await exec(ReviewsTakedown, ["post", a.approvedPost.id, "--reason=other"])
 		).assertSucceeded();
+	});
+
+	test("a post's restore while storage can't make its public copies fails and changes nothing", async ({
+		assert,
+	}) => {
+		const { a } = await twoStudios();
+		const id = a.freshInkPost.id;
+		await storeSeededPhotos(a.tenant, id);
+		(
+			await exec(ReviewsTakedown, ["post", id, "--reason=other"])
+		).assertSucceeded();
+		const broken = failPuts("public", (key) =>
+			key.includes("/fresh_ink_photo/"),
+		);
+		try {
+			const run = await exec(ReviewsRestore, ["post", id]);
+			run.assertFailed();
+			run.assertLogMatches(
+				/couldn't make the post's public copies.*Run it again once storage recovers/,
+			);
+		} finally {
+			broken.restore();
+		}
+		const post = await inTenant(a.tenant, () => ClientPost.findOrFail(id));
+		assert.isNotNull(post.takenDownAt);
+		assert.isNull(post.publishedAt);
+		(await exec(ReviewsRestore, ["post", id])).assertSucceeded();
 	});
 
 	test("reviews:reports lists the open reports, printed safely; reviews:dismiss closes one and keeps the review up", async ({

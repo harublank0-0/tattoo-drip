@@ -1131,8 +1131,10 @@ export interface paths {
          *     the studio declined or unpublished, can't be changed; its consents,
          *     its name and its delete still work), `taken_down` (409: a new review
          *     after TattooDrip took the last one down), `post_needs_photo` (409: a
-         *     video can't lead), `challenge_failed` (403) and
-         *     `challenge_unavailable` (503).
+         *     video can't lead), `challenge_failed` (403),
+         *     `challenge_unavailable` (503) and `publish_failed` (503: a consent
+         *     that shows an approved post needs its public copies made, and storage
+         *     couldn't make them, so nothing sent was saved; try again).
          */
         put: operations["submitReviewPage"];
         post?: never;
@@ -1445,8 +1447,8 @@ export interface components {
                  *     `challenge_failed` (403) and `challenge_unavailable` (503),
                  *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
                  *     (409, `submitDepositProof`); `review_locked`, `post_full`,
-                 *     `post_needs_photo`, `taken_down`, `post_limit` (409) and
-                 *     `remove_failed` (503), the
+                 *     `post_needs_photo`, `taken_down`, `post_limit` (409),
+                 *     `remove_failed` and `publish_failed` (503), the
                  *     review page's (and `challenge_failed`,
                  *     `challenge_unavailable` on `submitReviewPage`). Treat an
                  *     unknown code by its HTTP status.
@@ -4500,7 +4502,7 @@ export interface operations {
             };
             422: components["responses"]["ValidationError"];
             429: components["responses"]["RateLimited"];
-            /** @description The bot challenge could not be checked (`challenge_unavailable`), or the API is busy (`service_busy`). */
+            /** @description The bot challenge could not be checked (`challenge_unavailable`), storage couldn't make the post's public copies (`publish_failed`; nothing was saved, try again), or the API is busy (`service_busy`). */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -4,7 +4,11 @@ import app from "@adonisjs/core/services/app";
 import { urlFor } from "@adonisjs/core/services/url_builder";
 import { DateTime } from "luxon";
 import { publicTenantContext } from "#middleware/public_tenant_middleware";
-import { ImageDeleteError, InvalidImageError } from "#modules/media/errors";
+import {
+	ImageCopyError,
+	ImageDeleteError,
+	InvalidImageError,
+} from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import VideoService from "#modules/media/services/video_service";
 import { storefrontTemplate } from "#modules/payments/deposit_links";
@@ -310,6 +314,7 @@ function toApiError(error: unknown) {
 	}
 	if (error instanceof ImageDeleteError)
 		return ApiException.of("remove_failed");
+	if (error instanceof ImageCopyError) return ApiException.of("publish_failed");
 	if (error instanceof ReviewInputError) {
 		return ApiException.of("validation_failed", {
 			[error.field]: [error.message],

@@ -132,6 +132,8 @@ export const copy = {
 		network: "It wasn't saved. Check your connection and try again.",
 		failed: "Something went wrong. Try again.",
 		removeFailed: "We couldn't remove it just now. Try again.",
+		publishFailed:
+			"We couldn't share your photos just now, so this wasn't saved. Try again.",
 		photo: {
 			unsupported: "Use a JPEG, PNG or WebP photo.",
 			heic: "This phone photo couldn't be opened here. Take a screenshot of it, or save it as a JPEG.",

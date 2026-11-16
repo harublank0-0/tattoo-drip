@@ -1,7 +1,7 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import type { DateTime } from "luxon";
-import { ImageDeleteError } from "#modules/media/errors";
+import { ImageCopyError, ImageDeleteError } from "#modules/media/errors";
 import {
 	reportReasonLabel,
 	TAKEDOWN_REASON_OPTIONS,
@@ -109,6 +109,11 @@ export default class AdminReviewsController {
 				ctx.session.flash(
 					"error",
 					"Storage couldn't delete the post's public copies, so nothing changed. Try again once storage recovers.",
+				);
+			} else if (error instanceof ImageCopyError) {
+				ctx.session.flash(
+					"error",
+					"Storage couldn't make the post's public copies, so nothing changed. Try again once storage recovers.",
 				);
 			} else if (error instanceof ReviewOperatorError) {
 				ctx.session.flash("error", error.message);

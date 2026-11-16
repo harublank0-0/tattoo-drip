@@ -11,7 +11,7 @@ import app from "@adonisjs/core/services/app";
 import logger from "@adonisjs/core/services/logger";
 import { FSDriver } from "@adonisjs/drive/drivers/fs";
 import drive from "@adonisjs/drive/services/main";
-import { VideoDeleteError } from "#modules/media/errors";
+import { ImageCopyError, VideoDeleteError } from "#modules/media/errors";
 import ImageService, {
 	IMAGE_PURPOSES,
 	keyUnder,
@@ -426,7 +426,8 @@ export default class VideoService {
 	 * Copies a ready video's renditions and its poster (with the poster's
 	 * copies) from `from`'s disk to `to`'s, under the same names in `to`'s
 	 * folder (`keyUnder`): a Fresh ink video published. Returns the new keys.
-	 * A failure removes what it wrote and throws.
+	 * A storage failure removes what it wrote, is logged and throws
+	 * ImageCopyError, as ImageService.copyTo does for the poster.
 	 */
 	async copyTo(
 		tenant: TenantRef,
@@ -435,11 +436,11 @@ export default class VideoService {
 		from: VideoPurpose,
 		to: VideoPurpose,
 	): Promise<{ posterKey: string; keys: string[] }> {
+		for (const key of keys) assertVideoKeyOf(tenant, key, from);
 		const written: string[] = [];
 		let poster: string | null = null;
 		try {
 			for (const key of keys) {
-				assertVideoKeyOf(tenant, key, from);
 				const target = keyUnder(key, from, to);
 				written.push(target);
 				await copyStreamed(diskOf(from), diskOf(to), key, target, {
@@ -450,7 +451,13 @@ export default class VideoService {
 			poster = await this.images.copyTo(from, to, posterKey, tenant);
 		} catch (error) {
 			await this.removeFiles(poster, written, to);
-			throw error;
+			// The poster's own failure was logged and wrapped by ImageService.
+			if (error instanceof ImageCopyError) throw error;
+			logger.error(
+				{ err: error, tenantId: tenant.id, purpose: to, keys },
+				"a stored video could not be copied to another disk",
+			);
+			throw new ImageCopyError(to, { cause: error });
 		}
 		return {
 			posterKey: poster,
