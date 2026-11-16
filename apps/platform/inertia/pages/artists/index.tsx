@@ -158,6 +158,8 @@ function ArtistCard({
 	fallback: RefObject<HTMLElement | null>;
 }) {
 	const params = { tenant: tenantSlug, id: artist.id };
+	// Archived cards sit under their section's h2 (studio packages).
+	const Heading = artist.archived ? "h3" : "h2";
 	return (
 		<li className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
 			<div className="relative aspect-[4/3] bg-muted">
@@ -185,7 +187,7 @@ function ArtistCard({
 			</div>
 			<div className="flex flex-1 flex-col gap-3 p-4">
 				<div className="flex flex-col gap-0.5">
-					<h2 className="text-base leading-snug font-semibold wrap-anywhere">
+					<Heading className="text-base leading-snug font-semibold wrap-anywhere">
 						<Link
 							route="tenant.artists.edit"
 							routeParams={params}
@@ -193,7 +195,7 @@ function ArtistCard({
 						>
 							{artist.name}
 						</Link>
-					</h2>
+					</Heading>
 					<p className="text-sm text-muted-foreground">
 						{artist.styleNames.length > 0
 							? artist.styleNames.join(", ")
@@ -208,14 +210,16 @@ function ArtistCard({
 						text={artist.visible ? "On your page" : "Hidden from your page"}
 					/>
 					<Status
-						on={artist.visible && artist.acceptingInquiries}
+						on={!artist.archived && artist.visible && artist.acceptingInquiries}
 						icon={Inbox}
 						text={
-							!artist.acceptingInquiries
-								? "Not taking requests"
-								: artist.visible
-									? "Taking requests"
-									: "Taking requests once on your page"
+							artist.archived
+								? "Archived: takes no new work"
+								: !artist.acceptingInquiries
+									? "Not taking requests"
+									: artist.visible
+										? "Taking requests"
+										: "Taking requests once on your page"
 						}
 					/>
 					<Status

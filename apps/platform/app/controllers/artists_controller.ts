@@ -387,7 +387,14 @@ export default class ArtistsController {
 	async restore(ctx: HttpContext) {
 		const { tenant } = tenantContext(ctx);
 		const artist = await this.artists.findFor(tenant, ctx.params.id);
-		if (artist.archivedAt && !(await this.passesGate(ctx, tenant))) {
+		// A stale tab: nothing to restore.
+		if (!artist.archivedAt) {
+			ctx.session.flash("success", `"${artist.name}" is already active.`);
+			return ctx.response
+				.redirect()
+				.toRoute("tenant.artists", { tenant: tenant.slug });
+		}
+		if (!(await this.passesGate(ctx, tenant))) {
 			return ctx.response
 				.redirect()
 				.toRoute("tenant.artists", { tenant: tenant.slug });

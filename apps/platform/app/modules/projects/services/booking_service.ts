@@ -73,6 +73,19 @@ export default class BookingService {
 	}
 
 	/**
+	 * Whether `member` could book but every artist open to them is archived
+	 * (studio packages, phase 2): the booking page says so instead of "add
+	 * an artist" or "not linked".
+	 */
+	async onlyArchived(
+		tenant: Pick<Tenant, "id">,
+		member: Member,
+	): Promise<boolean> {
+		const all = this.bookableFrom(await this.artists.list(tenant), member);
+		return all.length > 0 && all.every(({ archivedAt }) => archivedAt !== null);
+	}
+
+	/**
 	 * The artists `member` may schedule on `project`: bookableArtists, plus
 	 * the project's own artist when archived (studio packages, phase 2: an
 	 * archived artist finishes their own projects).

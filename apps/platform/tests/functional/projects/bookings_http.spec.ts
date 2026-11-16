@@ -151,6 +151,31 @@ test.group("Booking page", (group) => {
 		assert.isNull(await lookup("   "));
 	});
 
+	test("only archived artists: the page says so, to the owner and to the archived artist", async ({
+		client,
+		assert,
+	}) => {
+		const { owner, tenant } = await studioWithOwner();
+		const { user, profile } = await linkedArtist(tenant);
+		await inTenant(tenant, () =>
+			profile.merge({ archivedAt: DateTime.now(), visible: false }).save(),
+		);
+
+		for (const actor of [owner, user]) {
+			const props = (await client.get(newUrl()).withInertia().loginAs(actor))
+				.inertiaProps;
+			assert.deepEqual(props.artists, []);
+			assert.isTrue(props.archivedOnly);
+		}
+		const fresh = (
+			await client
+				.get(newUrl())
+				.withInertia()
+				.loginAs(await artistIn(tenant, "new@example.com"))
+		).inertiaProps;
+		assert.isFalse(fresh.archivedOnly);
+	});
+
 	test("an artist gets only their own profile; without one, none", async ({
 		client,
 		assert,

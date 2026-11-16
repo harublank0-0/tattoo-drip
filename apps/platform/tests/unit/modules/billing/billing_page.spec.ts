@@ -58,9 +58,10 @@ test.group("Billing page props", () => {
 			artistUsageText({ active: 1, limit: null }),
 			"1 active artist",
 		);
+		// Over the limit (a studio from before packages, or observe mode).
 		assert.equal(
-			artistUsageText({ active: 2, limit: 1 }),
-			"2 of 1 active artist",
+			artistUsageText({ active: 3, limit: 1 }),
+			"3 active artists, 1 included",
 		);
 	});
 });

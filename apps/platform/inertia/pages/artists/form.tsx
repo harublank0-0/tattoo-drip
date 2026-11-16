@@ -566,7 +566,9 @@ function ArtistFields({
 					<FieldLabel htmlFor="visible">Show on the public page</FieldLabel>
 					<FieldDescription>
 						{artist?.archived
-							? "Archived artists stay hidden. Restore them from the Artists page, then show them here."
+							? owner
+								? "Archived artists stay hidden. Restore them from the Artists page, then show them here."
+								: "Your profile is archived: it stays hidden and takes no new work. Ask the studio's owner to restore it."
 							: "Uncheck to hide this artist everywhere clients can see."}
 					</FieldDescription>
 					{errors.visible && <FieldError>{errors.visible}</FieldError>}

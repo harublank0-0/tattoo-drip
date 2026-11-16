@@ -25,7 +25,8 @@ export default class SetupService {
 
 	async checklist(tenant: Tenant): Promise<SetupChecklist> {
 		const [artists, depositMethods, hasInquiry] = await Promise.all([
-			this.artists.list(tenant),
+			// Active artists only: an archived one takes no work (studio packages).
+			this.artists.listAssignable(tenant),
 			this.paymentMethods.listForDepositPage(tenant),
 			this.inquiries.hasAny(tenant),
 		]);

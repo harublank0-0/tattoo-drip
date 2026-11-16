@@ -93,6 +93,10 @@ export type ArtistUsage = { active: number; limit: number | null };
  * packages, phase 2). Archived artists don't count; hidden ones do.
  */
 export function artistUsageText({ active, limit }: ArtistUsage): string {
+	if (limit !== null && active > limit) {
+		// Over the limit: a studio from before packages, or observe mode.
+		return `${active} active artists, ${limit} included`;
+	}
 	if (limit !== null) {
 		return `${active} of ${limit} active artist${limit === 1 ? "" : "s"}`;
 	}
