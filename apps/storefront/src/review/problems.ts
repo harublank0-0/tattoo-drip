@@ -86,6 +86,8 @@ export function writeOutcome(error: unknown): WriteOutcome {
 			return { kind: "notice", message: copy.errors.challengeDown };
 		case "remove_failed":
 			return { kind: "notice", message: copy.errors.removeFailed };
+		case "publish_failed":
+			return { kind: "notice", message: copy.errors.publishFailed };
 		case "rate_limited":
 			return {
 				kind: "notice",

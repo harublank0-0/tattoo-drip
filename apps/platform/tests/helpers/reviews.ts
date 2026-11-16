@@ -14,6 +14,7 @@ import ImageService, {
 	type ImagePurpose,
 } from "#modules/media/services/image_service";
 import VideoService from "#modules/media/services/video_service";
+import { variantsOfKey } from "#modules/media/variants";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 import type { ProjectStatus } from "#modules/projects/models/tattoo_project";
 import { clientVideoUploadToken } from "#modules/reviews/client_video_uploads";
@@ -380,6 +381,26 @@ export function reviewRows(tenant: TenantRef) {
 			row.serialize(),
 		),
 	}));
+}
+
+/**
+ * Stores a small file under each photo key of a seeded post, the image and
+ * the copies its key names: `seedShownPost` names keys without storing
+ * files, so publishing it (a restore) would have nothing to copy.
+ */
+export async function storeSeededPhotos(tenant: TenantRef, postId: string) {
+	const media = await inTenant(tenant, () =>
+		ClientPostMedia.query().where("post_id", postId),
+	);
+	for (const { kind, imageKey } of media) {
+		if (kind !== "photo" || !imageKey) continue;
+		for (const key of [
+			imageKey,
+			...variantsOfKey(imageKey).map((copy) => copy.key),
+		]) {
+			await drive.use("private").put(key, Buffer.from("photo"));
+		}
+	}
 }
 
 /** The files a studio has under a purpose's folder, on that purpose's disk (client media are private). */

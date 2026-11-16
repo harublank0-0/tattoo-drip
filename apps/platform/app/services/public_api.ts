@@ -79,6 +79,7 @@ export type ApiErrorCode =
 	| "post_full"
 	| "post_needs_photo"
 	| "remove_failed"
+	| "publish_failed"
 	| "taken_down"
 	| "post_limit";
 
@@ -229,6 +230,14 @@ export const API_ERRORS: Record<ApiErrorCode, ErrorKind> = {
 		status: 503,
 		code: "remove_failed",
 		message: "We couldn't remove it just now. Try again.",
+	},
+	// A post's public copies couldn't be made: nothing the client sent was
+	// saved, the client tries again.
+	publish_failed: {
+		status: 503,
+		code: "publish_failed",
+		message:
+			"We couldn't share your photos just now, so this wasn't saved. Try again.",
 	},
 	// A new review or post after TattooDrip took the last one down (finding 1).
 	taken_down: {

@@ -5,7 +5,8 @@ import ClientPost from "#modules/reviews/models/client_post";
 import ClientReview from "#modules/reviews/models/client_review";
 import { adminUser } from "#tests/helpers/admin";
 import { send } from "#tests/helpers/discover";
-import { failDeletes } from "#tests/helpers/storage_failures";
+import { storeSeededPhotos } from "#tests/helpers/reviews";
+import { failDeletes, failPuts } from "#tests/helpers/storage_failures";
 import { inTenant, type Studio, twoStudios } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
@@ -273,6 +274,47 @@ test.group("Admin reviews", (group) => {
 			"Storage couldn't delete the post's public copies, so nothing changed. Try again once storage recovers.",
 		);
 		const post = await postOf(a);
+		assert.isNull(post.takenDownAt);
+		assert.isNotNull(post.publishedAt);
+	});
+
+	test("lifting a post takedown while storage can't make its public copies says so and changes nothing", async ({
+		client,
+		assert,
+	}) => {
+		const { a } = await twoStudios();
+		const admin = await adminUser();
+		await storeSeededPhotos(a.tenant, a.freshInkPost.id);
+		const base = `/admin/posts/${a.freshInkPost.id}`;
+		(
+			await send(client, admin, "post", `${base}/takedown`, {
+				reason: "other",
+			})
+		).assertStatus(302);
+		const broken = failPuts("public", (key) =>
+			key.includes("/fresh_ink_photo/"),
+		);
+		let response: Awaited<ReturnType<typeof send>>;
+		try {
+			response = await send(client, admin, "post", `${base}/restore`);
+		} finally {
+			broken.restore();
+		}
+		response.assertStatus(302);
+		response.assertFlashMessage(
+			"error",
+			"Storage couldn't make the post's public copies, so nothing changed. Try again once storage recovers.",
+		);
+		let post = await postOf(a);
+		assert.isNotNull(post.takenDownAt);
+		assert.isNull(post.publishedAt);
+
+		// Once storage is back, the same restore goes through.
+		(await send(client, admin, "post", `${base}/restore`)).assertFlashMessage(
+			"success",
+			"Takedown lifted. The post follows the client's and the studio's choices again.",
+		);
+		post = await postOf(a);
 		assert.isNull(post.takenDownAt);
 		assert.isNotNull(post.publishedAt);
 	});

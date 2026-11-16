@@ -45,3 +45,15 @@ test("the API's field errors land on the form's fields", () => {
 	});
 	assert.equal(writeOutcome(error(403, "challenge_failed")).kind, "notice");
 });
+
+test("storage that couldn't publish or remove a photo is a notice to try again, saying nothing changed", () => {
+	assert.deepEqual(writeOutcome(error(503, "publish_failed")), {
+		kind: "notice",
+		message: copy.errors.publishFailed,
+	});
+	assert.match(copy.errors.publishFailed ?? "", /wasn't saved/);
+	assert.deepEqual(writeOutcome(error(503, "remove_failed")), {
+		kind: "notice",
+		message: copy.errors.removeFailed,
+	});
+});

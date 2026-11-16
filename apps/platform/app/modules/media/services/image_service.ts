@@ -3,7 +3,7 @@ import { readFile, rm } from "node:fs/promises";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import logger from "@adonisjs/core/services/logger";
 import drive from "@adonisjs/drive/services/main";
-import { ImageDeleteError } from "#modules/media/errors";
+import { ImageCopyError, ImageDeleteError } from "#modules/media/errors";
 import {
 	imageSize,
 	logoTile,
@@ -463,9 +463,9 @@ export default class ImageService {
 	 * Copies a stored image and the copies its key names from `from`'s disk
 	 * to `to`'s, under the same names in `to`'s folder (`keyUnder`), and
 	 * returns the new key: a Fresh ink photo published (private to public).
-	 * The same access rule as `url()`. A failure removes what it wrote and
-	 * throws. Writing a file that is already there replaces it, so a retry
-	 * is safe.
+	 * The same access rule as `url()`. A storage failure removes what it
+	 * wrote, is logged and throws ImageCopyError. Writing a file that is
+	 * already there replaces it, so a retry is safe.
 	 */
 	async copyTo(
 		from: ImagePurpose,
@@ -473,12 +473,15 @@ export default class ImageService {
 		key: string,
 		tenant: Pick<Tenant, "id">,
 	): Promise<string> {
+		// A wrong key is a caller bug, thrown as it is: only storage failures
+		// below become ImageCopyError.
 		assertKeyOf(from, key, tenant);
-		const files = [key, ...variantsOfKey(key).map((copy) => copy.key)];
+		const files = [key, ...variantsOfKey(key).map((copy) => copy.key)].map(
+			(file) => ({ file, target: keyUnder(file, from, to) }),
+		);
 		const written: string[] = [];
 		try {
-			for (const file of files) {
-				const target = keyUnder(file, from, to);
+			for (const { file, target } of files) {
 				written.push(target);
 				// Copied whole, never streamed: R2 refuses an upload without
 				// Content-Length (MissingContentLength), which a download's stream
@@ -491,7 +494,11 @@ export default class ImageService {
 			}
 		} catch (error) {
 			await this.removeAll(to, written);
-			throw error;
+			logger.error(
+				{ err: error, tenantId: tenant.id, purpose: to, key },
+				"a stored image could not be copied to another disk",
+			);
+			throw new ImageCopyError(to, { cause: error });
 		}
 		return keyUnder(key, from, to);
 	}

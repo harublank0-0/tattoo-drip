@@ -32,6 +32,22 @@ export class ImageDeleteError extends Error {
 }
 
 /**
+ * A stored file could not be copied to another disk (Fresh ink publishing):
+ * what the copy wrote was removed, so nothing changed, and the caller says
+ * so, as for ImageDeleteError. Why is logged where it failed and kept as the
+ * cause. The message is for developers; each page words its own.
+ */
+export class ImageCopyError extends Error {
+	constructor(
+		readonly purpose: string,
+		options?: ErrorOptions,
+	) {
+		super(`A file could not be copied to ${purpose}`, options);
+		this.name = "ImageCopyError";
+	}
+}
+
+/**
  * Some of a video's files could not be deleted (video angles): like
  * ImageDeleteError, the video is still reachable, so the caller must not
  * report it as removed. `failed` lists the keys left.

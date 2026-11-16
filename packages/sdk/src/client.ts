@@ -368,7 +368,9 @@ export function createTattooClient(options: TattooClientOptions) {
 			 * Writes the review, the post or both, with the shown name and the
 			 * consents. Fails with `validation_failed` (fields such as
 			 * `review.body`, `post.styles`), `review_locked`, `post_needs_photo`,
-			 * `challenge_failed` (get a new token), `challenge_unavailable` or
+			 * `challenge_failed` (get a new token), `challenge_unavailable`,
+			 * `publish_failed` or `remove_failed` (storage couldn't make or
+			 * delete the post's public copies; nothing was saved) or
 			 * `rate_limited`. Never retried.
 			 */
 			submit: (
