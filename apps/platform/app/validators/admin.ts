@@ -1,4 +1,5 @@
 import vine from "@vinejs/vine";
+import { PACKAGE_KEYS } from "#modules/packages/packages";
 import {
 	MAX_TAKEDOWN_NOTE_LENGTH,
 	TAKEDOWN_REASONS,
@@ -31,6 +32,19 @@ export const takedownValidator = vine.create({
 		.use(maxCodePoints({ max: MAX_TAKEDOWN_NOTE_LENGTH }))
 		.optional()
 		.transform((value) => value || null),
+});
+
+/**
+ * A pilot grant from the studio's admin page: the package, the day it ends
+ * (00:00 UTC; an impossible day is refused by the controller) and the note.
+ */
+export const pilotGrantValidator = vine.create({
+	package: vine.enum(PACKAGE_KEYS),
+	until: vine
+		.string()
+		.trim()
+		.regex(/^\d{4}-\d{2}-\d{2}$/),
+	note: vine.string().trim().minLength(1).maxLength(500),
 });
 
 /** The address of the account to confirm; the service canonicalises it. */

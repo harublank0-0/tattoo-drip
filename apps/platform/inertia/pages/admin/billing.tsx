@@ -1,4 +1,4 @@
-import { router } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { useState } from "react";
 import { urlFor } from "~/client";
 import AdminNav from "~/components/admin_nav";
@@ -16,6 +16,7 @@ type Props = {
 	totals: { paidThisMonth: string; paidAllTime: string; outstanding: string };
 	studios: {
 		tenantId: string;
+		slug: string;
 		name: string;
 		planName: string | null;
 		statusText: string;
@@ -86,7 +87,12 @@ export default function AdminBilling({
 								className="flex flex-wrap justify-between gap-2 py-3 text-sm"
 							>
 								<span>
-									<span className="block font-medium">{studio.name}</span>
+									<Link
+										href={urlFor("admin.studios.show", { slug: studio.slug })}
+										className="block font-medium underline-offset-4 hover:underline"
+									>
+										{studio.name}
+									</Link>
 									<span className="block text-muted-foreground">
 										{studio.planName ?? "No plan"} · {studio.statusText}
 									</span>

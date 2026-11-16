@@ -941,6 +941,14 @@ router
 				"restorePhoto",
 			])
 			.as("admin.studios.photos.restore");
+		// Pilot grants (studio packages, ruling 7): the same service as
+		// `packages:pilot`, plus ending a running grant early.
+		router
+			.post("studios/:slug/pilot", [controllers.AdminStudios, "grantPilot"])
+			.as("admin.studios.pilot.grant");
+		router
+			.post("studios/:slug/pilot/end", [controllers.AdminStudios, "endPilot"])
+			.as("admin.studios.pilot.end");
 		router
 			.get("reports", [controllers.AdminReviews, "reports"])
 			.as("admin.reports");

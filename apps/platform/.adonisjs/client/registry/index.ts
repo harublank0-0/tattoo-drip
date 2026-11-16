@@ -1104,6 +1104,18 @@ const routes = {
     tokens: [{"old":"/admin/studios/:slug/photos/:photo/restore","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":1,"val":"slug","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":0,"val":"photos","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":1,"val":"photo","end":""},{"old":"/admin/studios/:slug/photos/:photo/restore","type":0,"val":"restore","end":""}],
     types: placeholder as Registry['admin.studios.photos.restore']['types'],
   },
+  'admin.studios.pilot.grant': {
+    methods: ["POST"],
+    pattern: '/admin/studios/:slug/pilot',
+    tokens: [{"old":"/admin/studios/:slug/pilot","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug/pilot","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug/pilot","type":1,"val":"slug","end":""},{"old":"/admin/studios/:slug/pilot","type":0,"val":"pilot","end":""}],
+    types: placeholder as Registry['admin.studios.pilot.grant']['types'],
+  },
+  'admin.studios.pilot.end': {
+    methods: ["POST"],
+    pattern: '/admin/studios/:slug/pilot/end',
+    tokens: [{"old":"/admin/studios/:slug/pilot/end","type":0,"val":"admin","end":""},{"old":"/admin/studios/:slug/pilot/end","type":0,"val":"studios","end":""},{"old":"/admin/studios/:slug/pilot/end","type":1,"val":"slug","end":""},{"old":"/admin/studios/:slug/pilot/end","type":0,"val":"pilot","end":""},{"old":"/admin/studios/:slug/pilot/end","type":0,"val":"end","end":""}],
+    types: placeholder as Registry['admin.studios.pilot.end']['types'],
+  },
   'admin.reports': {
     methods: ["GET","HEAD"],
     pattern: '/admin/reports',

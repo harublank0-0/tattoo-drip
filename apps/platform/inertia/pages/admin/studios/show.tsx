@@ -1,5 +1,6 @@
 import { Form } from "@adonisjs/inertia/react";
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
+import { useRef } from "react";
 import { urlFor } from "~/client";
 import {
 	KeepItUp,
@@ -8,6 +9,7 @@ import {
 	ReviewTakedownForm,
 } from "~/components/admin_moderation";
 import AdminNav from "~/components/admin_nav";
+import InlineConfirm from "~/components/inline_confirm";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
@@ -28,8 +30,29 @@ type Item = {
 	takedown: (Takedown & { reasonLabel: string }) | null;
 };
 
+/** One pilot grant as the Package section lists it (dates in UTC). */
+type GrantRow = {
+	packageName: string;
+	untilText: string;
+	/** When an ended grant stopped; null while it runs. */
+	endedText: string | null;
+	note: string;
+	grantedBy: string | null;
+	grantedText: string;
+};
+
 type Props = {
 	studio: { slug: string; name: string };
+	pilot: {
+		/** The package and its state, in the Billing page's words. */
+		stateText: string;
+		running: GrantRow | null;
+		/** Ended grants, newest first. */
+		past: GrantRow[];
+		packages: { value: string; label: string }[];
+		/** The running grant's package, which a new grant starts on; null when none runs. */
+		defaultPackage: string | null;
+	};
 	discover: {
 		statusLabel: string;
 		optedIn: boolean;
@@ -71,6 +94,7 @@ type Props = {
  */
 export default function AdminStudio({
 	studio,
+	pilot,
 	discover,
 	photos,
 	takenDown,
@@ -80,12 +104,62 @@ export default function AdminStudio({
 	reports,
 	takedownReasons,
 }: Props) {
+	const heading = useRef<HTMLHeadingElement>(null);
 	return (
 		<Page
 			title={studio.name}
+			titleRef={heading}
 			description={studio.slug}
 			actions={<AdminNav current="studios" />}
 		>
+			<Section title="Package">
+				<p className="text-sm">
+					<Badge variant="outline">{pilot.stateText}</Badge>
+				</p>
+				{pilot.running ? (
+					<div className="flex flex-col gap-2 text-sm">
+						<GrantLine grant={pilot.running} />
+						{/* Ending can pause an unpaid pilot once limits are on: ask in the page first. */}
+						<InlineConfirm
+							label="End grant now"
+							variant="outline"
+							question="End this pilot grant now? The studio's package then follows its payments, and an unpaid studio is paused once limits are switched on."
+							confirmLabel="End grant"
+							keepLabel="Keep the grant"
+							fallback={heading}
+							onConfirm={(finished) =>
+								router.post(
+									urlFor("admin.studios.pilot.end", { slug: studio.slug }),
+									{},
+									{ preserveScroll: true, onFinish: finished },
+								)
+							}
+						/>
+					</div>
+				) : (
+					<p className="text-sm text-muted-foreground">
+						No pilot grant running.
+					</p>
+				)}
+				<PilotGrantForm
+					slug={studio.slug}
+					packages={pilot.packages}
+					defaultPackage={pilot.defaultPackage}
+				/>
+				{pilot.past.length > 0 && (
+					<div className="flex flex-col gap-2">
+						<h3 className="text-sm font-medium">Past grants</h3>
+						<ul className="divide-y text-sm">
+							{pilot.past.map((grant) => (
+								<li key={grant.grantedText} className="py-2">
+									<GrantLine grant={grant} />
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+			</Section>
+
 			<Section title="Discover listing">
 				<p className="flex flex-wrap items-center gap-2 text-sm">
 					<Badge variant="outline">{discover.statusLabel}</Badge>
@@ -203,6 +277,114 @@ export default function AdminStudio({
 				)}
 			</Section>
 		</Page>
+	);
+}
+
+/** A grant's package, end, note and who gave it; the note is plain text. */
+function GrantLine({ grant }: { grant: GrantRow }) {
+	return (
+		<span className="flex flex-col gap-1">
+			<span className="font-medium">
+				{grant.endedText
+					? `${grant.packageName}, ended ${grant.endedText}`
+					: `${grant.packageName} until ${grant.untilText} (00:00 UTC)`}
+			</span>
+			<span>{grant.note}</span>
+			<span className="text-muted-foreground">
+				Granted {grant.grantedBy ? `by ${grant.grantedBy} ` : ""}on{" "}
+				{grant.grantedText}
+			</span>
+		</span>
+	);
+}
+
+/** Gives the studio a pilot grant; a running one ends when this starts. */
+function PilotGrantForm({
+	slug,
+	packages,
+	defaultPackage,
+}: {
+	slug: string;
+	packages: { value: string; label: string }[];
+	/** The running grant's package; none makes the admin choose. */
+	defaultPackage: string | null;
+}) {
+	return (
+		<Form
+			errorBag="pilot"
+			route="admin.studios.pilot.grant"
+			routeParams={{ slug }}
+			className="flex flex-col gap-3"
+		>
+			{({ errors, processing }) => (
+				<>
+					<h3 className="text-sm font-medium">Give a pilot grant</h3>
+					<label
+						htmlFor="pilot-package"
+						className="flex flex-col gap-2 text-sm font-medium"
+					>
+						Package
+						<select
+							id="pilot-package"
+							name="package"
+							required
+							defaultValue={defaultPackage ?? ""}
+							className="min-h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm lg:min-h-9"
+							aria-invalid={!!errors.package}
+						>
+							<option value="" disabled>
+								Choose a package
+							</option>
+							{packages.map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
+						</select>
+					</label>
+					{errors.package && (
+						<p className="text-sm text-destructive">{errors.package}</p>
+					)}
+					<label
+						htmlFor="pilot-until"
+						className="flex flex-col gap-2 text-sm font-medium"
+					>
+						Until (ends at 00:00 UTC that day)
+						<Input
+							id="pilot-until"
+							type="date"
+							name="until"
+							required
+							className="h-11"
+							aria-invalid={!!errors.until}
+						/>
+					</label>
+					{errors.until && (
+						<p className="text-sm text-destructive">{errors.until}</p>
+					)}
+					<label
+						htmlFor="pilot-note"
+						className="flex flex-col gap-2 text-sm font-medium"
+					>
+						Note (kept for operators)
+						<Input
+							id="pilot-note"
+							name="note"
+							required
+							maxLength={500}
+							className="h-11"
+							aria-invalid={!!errors.note}
+						/>
+					</label>
+					{errors.note && (
+						<p className="text-sm text-destructive">{errors.note}</p>
+					)}
+					<Button type="submit" className="h-11" disabled={processing}>
+						{processing ? "Saving…" : "Grant"}
+					</Button>
+				</>
+			)}
+		</Form>
 	);
 }
 

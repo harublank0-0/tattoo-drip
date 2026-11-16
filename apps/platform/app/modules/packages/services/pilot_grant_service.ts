@@ -50,12 +50,7 @@ export default class PilotGrantService {
 		if (input.endsAt <= now) {
 			throw new PilotGrantError("The grant must end after now.");
 		}
-		const { rows } = await dbClient().rawQuery(
-			"select public.tenant_for_slug(?) as id",
-			[slug],
-		);
-		const tenantId: string | null = rows[0]?.id ?? null;
-		if (!tenantId) throw new PilotGrantError(`No studio uses "${slug}".`);
+		const tenantId = await this.tenantIdFor(slug);
 		const bundleKey = PACKAGES[input.package].defaultBundleKey;
 		const bundleId = (await bundleIdsByKey([bundleKey])).get(
 			bundleKey,
@@ -73,6 +68,41 @@ export default class PilotGrantService {
 			}
 			throw error;
 		}
+	}
+
+	/**
+	 * Ends the running grant of the studio using `slug` at `now` (a pilot that
+	 * starts paying early): from then on its package follows its payments, as
+	 * the entitlement rules give it. Refused when no grant runs.
+	 */
+	async end(slug: string, now: DateTime = DateTime.utc()): Promise<PilotGrant> {
+		const tenantId = await this.tenantIdFor(slug);
+		return withDbContext({ tenantId }, async (trx) => {
+			const at = now.toUTC().toISO() as string;
+			const { rows } = await trx.rawQuery(
+				`update pilot_grants set ends_at = ?
+				 where tenant_id = ? and starts_at <= ? and ends_at > ?
+				 returning id`,
+				[at, tenantId, at, at],
+			);
+			const grantId: string | undefined = rows[0]?.id;
+			if (!grantId) {
+				throw new PilotGrantError("This studio has no running grant.");
+			}
+			logger.info({ tenantId, grantId }, "Pilot grant ended");
+			return PilotGrant.findOrFail(grantId, { client: trx });
+		});
+	}
+
+	/** The studio using `slug` (current or old), the one cross-studio step. */
+	private async tenantIdFor(slug: string): Promise<string> {
+		const { rows } = await dbClient().rawQuery(
+			"select public.tenant_for_slug(?) as id",
+			[slug],
+		);
+		const tenantId: string | null = rows[0]?.id ?? null;
+		if (!tenantId) throw new PilotGrantError(`No studio uses "${slug}".`);
+		return tenantId;
 	}
 
 	private write(

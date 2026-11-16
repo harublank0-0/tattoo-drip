@@ -2203,6 +2203,30 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['restorePhoto']>>>
     }
   }
+  'admin.studios.pilot.grant': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/pilot'
+    types: {
+      body: ExtractBody<InferInput<(typeof import('#validators/admin').pilotGrantValidator)>>
+      paramsTuple: [ParamValue]
+      params: { slug: ParamValue }
+      query: ExtractQuery<InferInput<(typeof import('#validators/admin').pilotGrantValidator)>>
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['grantPilot']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['grantPilot']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'admin.studios.pilot.end': {
+    methods: ["POST"]
+    pattern: '/admin/studios/:slug/pilot/end'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue]
+      params: { slug: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['endPilot']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/admin_studios_controller').default['endPilot']>>>
+    }
+  }
   'admin.reports': {
     methods: ["GET","HEAD"]
     pattern: '/admin/reports'
