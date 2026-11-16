@@ -124,7 +124,8 @@ export default class DesignLabController {
 		const list = await this.historyService.list(tenant, filters);
 		const counts = await this.historyService.counts(tenant, filters);
 		const current = filters.month === monthOf(now);
-		const allowance = current ? await this.usage.allowance(tenant) : null;
+		// The same clock as the month: a request at midnight reads one month.
+		const allowance = current ? await this.usage.allowance(tenant, now) : null;
 		ctx.response.header("Cache-Control", "private, no-store");
 		return ctx.inertia.render("design_lab/history", {
 			rows: await Promise.all(
@@ -463,7 +464,7 @@ export default class DesignLabController {
 			status,
 			attempt: generation.attempt > 1 ? record.attempt : null,
 			reason:
-				failing && code && code in FAILURE_MESSAGES
+				failing && code && Object.hasOwn(FAILURE_MESSAGES, code)
 					? reasons.length > 0
 						? `${FAILURE_MESSAGES[code]} Flagged for: ${reasons.join(", ")}.`
 						: FAILURE_MESSAGES[code]

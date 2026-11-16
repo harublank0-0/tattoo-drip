@@ -67,9 +67,10 @@ export default function DesignLabHistory({
 }) {
 	const { slug } = useTenant();
 	const base = urlFor("tenant.design_lab.history", { tenant: slug });
-	const currentMonth = months[0] ?? filters.month;
+	// Paging links always name the month, so a tab left open across a
+	// month's end keeps paging the month it shows.
 	const pageHref = (next: number) =>
-		`${base}${historyQuery(filters, next, currentMonth)}`;
+		`${base}${historyQuery(filters, next, "")}`;
 
 	return (
 		<Page

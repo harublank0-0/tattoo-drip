@@ -13,7 +13,7 @@ import DesignAsset from "#modules/design_lab/models/design_asset";
 import DesignGeneration from "#modules/design_lab/models/design_generation";
 import DesignProject from "#modules/design_lab/models/design_project";
 import DesignUsageRecord from "#modules/design_lab/models/design_usage_record";
-import { MODERATION_CODES } from "#modules/design_lab/rules";
+import { MODERATION_CODES, type UsageStatus } from "#modules/design_lab/rules";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenantMembership from "#modules/tenancy/models/tenant_membership";
 
@@ -124,7 +124,7 @@ export default class DesignHistoryService {
 			.groupBy("status", "release_reason")
 			.select("status", "release_reason")
 			.sum("units as total_units")) as unknown as {
-			status: string;
+			status: UsageStatus;
 			releaseReason: string | null;
 			$extras: { total_units: string | number };
 		}[];
@@ -164,6 +164,7 @@ export default class DesignHistoryService {
 	async firstMonth(tenant: TenantRef): Promise<string | null> {
 		const first = await DesignUsageRecord.query()
 			.where("tenant_id", tenant.id)
+			.select("reserved_at")
 			.orderBy("reserved_at", "asc")
 			.first();
 		return first ? monthOf(first.reservedAt) : null;
@@ -193,7 +194,11 @@ export default class DesignHistoryService {
 		const wanted = [...new Set(ids.filter((id): id is string => id !== null))];
 		if (wanted.length === 0) return () => personLabel(null, false);
 		const users = new Map(
-			(await User.query().whereIn("id", wanted)).map((user) => [user.id, user]),
+			(
+				await User.query()
+					.select("id", "full_name", "email")
+					.whereIn("id", wanted)
+			).map((user) => [user.id, user]),
 		);
 		const live = new Set(
 			(

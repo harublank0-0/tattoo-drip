@@ -120,7 +120,8 @@ test.group("Design Lab history service", (group) => {
 			userId: artist.id,
 			status: "released",
 			releaseReason: "content_moderated",
-			reservedAt: DateTime.now().plus({ hours: 1 }),
+			// The newest row, still inside this UTC month whatever the hour.
+			reservedAt: DateTime.utc().endOf("month"),
 		});
 		const history = await service();
 		const page = await inTenant(tenant, () => history.list(tenant, filters()));
@@ -149,7 +150,8 @@ test.group("Design Lab history service", (group) => {
 			userId: artist.id,
 			status: "released",
 			releaseReason: "timed_out",
-			reservedAt: DateTime.now().minus({ minutes: 5 }),
+			// Older than attempt 2, still inside this UTC month.
+			reservedAt: DateTime.utc().startOf("month"),
 		});
 		await attempt(tenant, {
 			generationId: g.id,
@@ -273,6 +275,42 @@ test.group("Design Lab history service", (group) => {
 		assert.deepEqual(counts, { used: 1, inProgress: 0, failed: 0, blocked: 0 });
 	});
 
+	test("each status filter keeps only its ledger rows, and blocked counts", async ({
+		assert,
+	}) => {
+		const { tenant, artist, designProject } = await labStudio("hist-status");
+		const blocked = await generation(tenant, designProject.id, artist.id, {
+			status: "moderated",
+		});
+		await attempt(tenant, {
+			generationId: blocked.id,
+			userId: artist.id,
+			status: "released",
+			releaseReason: "request_moderated",
+		});
+		const pending = await generation(tenant, designProject.id, artist.id, {
+			status: "queued",
+		});
+		await attempt(tenant, {
+			generationId: pending.id,
+			userId: artist.id,
+			status: "reserved",
+		});
+		const history = await service();
+		const only = async (status: HistoryFilters["status"]) =>
+			(
+				await inTenant(tenant, () => history.list(tenant, filters({ status })))
+			).entries.map((entry) => [entry.status, entry.record.status]);
+		assert.deepEqual(await only("done"), [["done", "settled"]]);
+		assert.deepEqual(await only("in_progress"), [["in_progress", "reserved"]]);
+		assert.deepEqual(await only("blocked"), [["blocked", "released"]]);
+		assert.deepEqual(await only("failed"), [["failed", "released"]]);
+		const counts = await inTenant(tenant, () =>
+			history.counts(tenant, { month: thisMonth(), artist: null }),
+		);
+		assert.deepEqual(counts, { used: 1, inProgress: 1, failed: 1, blocked: 1 });
+	});
+
 	test("pages 25 at a time", async ({ assert }) => {
 		const { tenant, artist, designProject } = await labStudio("hist-pages");
 		for (let i = 0; i < 28; i++) {
@@ -357,6 +395,12 @@ test.group("Design Lab history service", (group) => {
 		assert.equal(labelOf(nameless.id), "Former member");
 		assert.equal(labelOf(returning.id), "Ana Back");
 		assert.equal(labelOf(null), "Deleted account");
+		// Former members' and deleted accounts' attempts still count: the
+		// seed's two plus the three settled here.
+		const counts = await inTenant(tenant, () =>
+			history.counts(tenant, { month: thisMonth(), artist: null }),
+		);
+		assert.equal(counts.used + counts.failed, 5);
 		const artists = await inTenant(tenant, () =>
 			history.artists(tenant, thisMonth()),
 		);

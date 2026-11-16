@@ -1,5 +1,10 @@
 import { DateTime } from "luxon";
-import { type FailureCode, MODERATION_CODES } from "#modules/design_lab/rules";
+import {
+	type FailureCode,
+	MODERATION_CODES,
+	type UsageStatus,
+} from "#modules/design_lab/rules";
+import { monthStart } from "#modules/design_lab/services/design_usage_service";
 
 /**
  * The owners' generation history (docs/design-lab.md, "History"): one row
@@ -60,21 +65,32 @@ export function parseHistoryFilters(
 
 /** The month's first instant and the next month's, UTC. */
 export function monthRange(month: string): { start: DateTime; end: DateTime } {
-	const start = DateTime.fromISO(`${month}-01`, { zone: "utc" });
+	// The allowance's own boundary (monthStart), so the two can't drift.
+	const start = monthStart(DateTime.fromISO(`${month}-01`, { zone: "utc" }));
 	return { start, end: start.plus({ months: 1 }) };
 }
 
 /** A ledger row's status, as the history words it. */
 export function historyStatus(
-	status: string,
+	status: UsageStatus,
 	releaseReason: string | null,
 ): HistoryStatus {
-	if (status === "settled") return "done";
-	if (status === "reserved") return "in_progress";
-	return releaseReason !== null &&
-		MODERATION_CODES.includes(releaseReason as FailureCode)
-		? "blocked"
-		: "failed";
+	switch (status) {
+		case "settled":
+			return "done";
+		case "reserved":
+			return "in_progress";
+		case "released":
+			return releaseReason !== null &&
+				MODERATION_CODES.includes(releaseReason as FailureCode)
+				? "blocked"
+				: "failed";
+		default: {
+			// A new ledger status must be placed here, not read as a failure.
+			const unknown: never = status;
+			throw new Error(`Unknown usage status: ${unknown}`);
+		}
+	}
 }
 
 /**
