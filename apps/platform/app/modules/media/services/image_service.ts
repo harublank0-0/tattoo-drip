@@ -480,14 +480,14 @@ export default class ImageService {
 			for (const file of files) {
 				const target = keyUnder(file, from, to);
 				written.push(target);
-				await diskFor(to).putStream(
-					target,
-					await diskFor(from).getStream(file),
-					{
-						contentType: file.endsWith(".png") ? "image/png" : "image/jpeg",
-						cacheControl: STORED_CACHE_CONTROL[IMAGE_PURPOSES[to].visibility],
-					},
-				);
+				// Copied whole, never streamed: R2 refuses an upload without
+				// Content-Length (MissingContentLength), which a download's stream
+				// can't give, and the S3 client retries a byte upload but never a
+				// stream. A stored image is a few MB at most.
+				await diskFor(to).put(target, await diskFor(from).getBytes(file), {
+					contentType: file.endsWith(".png") ? "image/png" : "image/jpeg",
+					cacheControl: STORED_CACHE_CONTROL[IMAGE_PURPOSES[to].visibility],
+				});
 			}
 		} catch (error) {
 			await this.removeAll(to, written);

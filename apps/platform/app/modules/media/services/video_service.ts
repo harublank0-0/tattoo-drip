@@ -442,7 +442,7 @@ export default class VideoService {
 				assertVideoKeyOf(tenant, key, from);
 				const target = keyUnder(key, from, to);
 				written.push(target);
-				await diskOf(to).putStream(target, await diskOf(from).getStream(key), {
+				await copyStreamed(diskOf(from), diskOf(to), key, target, {
 					contentType: "video/mp4",
 					cacheControl: STORED_CACHE_CONTROL[visibilityOf(to)],
 				});
@@ -503,6 +503,28 @@ function visibilityOf(purpose: VideoPurpose): "public" | "private" {
 
 function diskOf(purpose: VideoPurpose) {
 	return drive.use(visibilityOf(purpose));
+}
+
+/**
+ * Copies one stored file to another disk under `target`, streamed, with its
+ * length. R2 refuses an upload without Content-Length (MissingContentLength),
+ * and a download's stream has no length the S3 client can read, so the
+ * length is read from the file first. A rendition is too large to hold
+ * whole, so it stays a stream, which the S3 client never retries (an image is
+ * copied whole instead, ImageService.copyTo).
+ */
+async function copyStreamed(
+	from: ReturnType<typeof diskOf>,
+	to: ReturnType<typeof diskOf>,
+	key: string,
+	target: string,
+	options: { contentType: string; cacheControl: string },
+): Promise<void> {
+	const { contentLength } = await from.getMetaData(key);
+	await to.putStream(target, await from.getStream(key), {
+		...options,
+		contentLength,
+	});
 }
 
 /** How long a private rendition's signed URL works, as a private image's. */
