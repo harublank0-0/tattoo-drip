@@ -30,12 +30,47 @@ export default class PackageMiddleware {
 		} catch (error) {
 			if (!(error instanceof PackageRuleError)) throw error;
 			ctx.session.flash("error", error.message);
-			return membership.role === "owner"
-				? ctx.response
-						.redirect()
-						.toRoute("tenant.settings.billing", { tenant: tenant.slug })
-				: ctx.response.redirect().back();
+			if (membership.role === "owner") {
+				return ctx.response
+					.redirect()
+					.toRoute("tenant.settings.billing", { tenant: tenant.slug });
+			}
+			// Never the refused request's own query string (redirects forward it).
+			return ctx.response
+				.redirect()
+				.withQs(false)
+				.toPath(
+					backWithin(
+						ctx.request.header("referer"),
+						`/t/${tenant.slug}`,
+						ctx.request.url(),
+					),
+				);
 		}
 		return next();
 	}
+}
+
+/**
+ * Where a refused member who can't open Billing goes: the page they came
+ * from, when it is in this studio and isn't the refused route itself (a
+ * stale booking page's own lookup form would otherwise loop), else the
+ * studio's home, which shows the flash. Only the referer's path is used, so
+ * this never redirects off the site.
+ */
+function backWithin(
+	referer: string | undefined,
+	studio: string,
+	refusedPath: string,
+): string {
+	if (!referer) return studio;
+	let path: string;
+	try {
+		const url = new URL(referer, "http://referer.invalid");
+		if (url.pathname === refusedPath) return studio;
+		path = `${url.pathname}${url.search}`;
+	} catch {
+		return studio;
+	}
+	return path === studio || path.startsWith(`${studio}/`) ? path : studio;
 }

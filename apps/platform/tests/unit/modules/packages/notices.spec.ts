@@ -4,7 +4,7 @@ import {
 	type Entitlement,
 	resolveEntitlement,
 } from "#modules/packages/entitlement";
-import { dueNotice } from "#modules/packages/notices";
+import { dueNotice, sweepMoment } from "#modules/packages/notices";
 
 /**
  * Package notices (studio packages, phase 3; spec, Notices): each falls in
@@ -124,6 +124,24 @@ test.group("Packages: notices", () => {
 		assert.deepEqual(
 			sweeps(entitlement("paused", null), "2026-12-01", "2026-12-31"),
 			[],
+		);
+	});
+
+	test("a late or retried sweep uses the day's nominal moment, so windows still tile", ({
+		assert,
+	}) => {
+		assert.equal(
+			sweepMoment(at("2026-11-28T09:00:00Z")).toISO(),
+			at("2026-11-28T03:17:00Z").toISO(),
+		);
+		assert.equal(
+			sweepMoment(at("2026-11-28T03:17:00Z")).toISO(),
+			at("2026-11-28T03:17:00Z").toISO(),
+		);
+		// Before the day's moment: yesterday's sweep.
+		assert.equal(
+			sweepMoment(at("2026-11-28T02:00:00Z")).toISO(),
+			at("2026-11-27T03:17:00Z").toISO(),
 		);
 	});
 });

@@ -4,6 +4,7 @@ import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import PackageNoticeJob from "#modules/packages/jobs/package_notice_job";
 import SweepPackageNoticesJob from "#modules/packages/jobs/sweep_package_notices_job";
+import { sweepMoment } from "#modules/packages/notices";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { dbClient } from "#services/db_context";
 import { captureLogs } from "#tests/helpers/logs";
@@ -26,9 +27,12 @@ const context = (name: string) => ({
 });
 
 /** Runs the notice job for `tenant` the way the worker does, without the queue. */
-async function runNoticeJob(tenant: Tenant) {
+async function runNoticeJob(tenant: Tenant, at = sweepMoment(DateTime.utc())) {
 	const job = new PackageNoticeJob();
-	job.$hydrate({ tenantId: tenant.id }, context("PackageNoticeJob"));
+	job.$hydrate(
+		{ tenantId: tenant.id, at: at.toUTC().toISO() as string },
+		context("PackageNoticeJob"),
+	);
 	await job.execute();
 }
 
@@ -54,10 +58,11 @@ test.group("Packages: notices", (group) => {
 		assert,
 	}) => {
 		const ending = await studioWithOwner("notice-ending", "Ending");
-		// The trial ends in 2.5 days: its 3-day notice fell half a day ago.
+		// The trial ends 2.5 days after today's sweep: its 3-day notice fell
+		// half a day before it.
 		await createdAt(
 			ending.tenant,
-			DateTime.utc().minus({ days: 11, hours: 12 }),
+			sweepMoment(DateTime.utc()).minus({ days: 11, hours: 12 }),
 		);
 		const fresh = await studioWithOwner("notice-fresh", "Fresh");
 
@@ -76,6 +81,29 @@ test.group("Packages: notices", (group) => {
 			notice: "trial_ends_in_3_days",
 			state: "trial",
 		});
+	});
+
+	test("the notice job judges at the sweep's moment, not when it happens to run", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("notice-moment", "Moment");
+		// The trial ends at 2026-12-01T00:00Z.
+		await createdAt(tenant, DateTime.fromISO("2026-11-17T00:00:00Z"));
+
+		const logs = captureLogs();
+		try {
+			await runNoticeJob(
+				tenant,
+				DateTime.fromISO("2026-11-28T03:17:00Z", { zone: "utc" }),
+			);
+		} finally {
+			logs.restore();
+		}
+
+		assert.deepEqual(
+			noticesIn(logs).map(({ notice }) => notice),
+			["trial_ends_in_3_days"],
+		);
 	});
 
 	test("the sweep queues one notice job per live studio", async ({
@@ -101,8 +129,14 @@ test.group("Packages: notices", (group) => {
 			.getPushedJobs()
 			.map(({ job }) => job)
 			.filter(({ name }) => name === PackageNoticeJob.name)
-			.map(({ payload }) => (payload as { tenantId: string }).tenantId)
-			.filter((id) => ours.has(id));
-		assert.sameMembers(queued, [a.tenant.id, b.tenant.id]);
+			.map(({ payload }) => payload as { tenantId: string; at: string })
+			.filter(({ tenantId }) => ours.has(tenantId));
+		assert.sameMembers(
+			queued.map(({ tenantId }) => tenantId),
+			[a.tenant.id, b.tenant.id],
+		);
+		// Every job of one sweep judges at the same nominal moment.
+		const moment = sweepMoment(DateTime.utc()).toUTC().toISO();
+		assert.deepEqual([...new Set(queued.map(({ at }) => at))], [moment]);
 	});
 });

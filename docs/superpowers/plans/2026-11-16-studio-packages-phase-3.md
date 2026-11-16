@@ -36,7 +36,7 @@
 - **Checks sit at the route, not in the services.** The spec calls service checks authoritative, but here:
   - every way to start new client work is a dashboard route (the public intake makes inquiries, not projects);
   - the guard test keeps every route classified;
-  - a check inside `InquiryService`, `BookingService` or `DesignLabService` would close a DI cycle through `EntitlementService` → `TenancyService`.
+  - each of those paths has one caller, a dashboard route under the middleware, and a second check would log twice in observe mode. (An earlier draft cited a DI cycle; the final review traced none for these services.)
 
   A non-HTTP entry for new work must call `PackageGate.checkCapability` itself.
 - **Commands** run from `apps/platform`. `node ace codegen` after route or controller changes.

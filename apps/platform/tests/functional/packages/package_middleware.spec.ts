@@ -165,6 +165,28 @@ test.group("Packages: refusing new client work while paused", (group) => {
 		response.assertFlashMessage("error", PAUSED_NEW_WORK);
 	});
 
+	test("an artist refused on the refused page itself, or with no referer, goes to the studio's home, never in a loop", async ({
+		client,
+	}) => {
+		env.set("PACKAGE_ENFORCEMENT", "enforce");
+		const { tenant } = await studio("mw-artist-loop");
+		const member = await artistIn(tenant, "artist@mw-artist-loop.example");
+		const booking = `/t/${tenant.slug}/projects/new`;
+
+		// A stale booking page: its own lookup form sends it here again.
+		const stale = await client
+			.get(`${booking}?phone=9800000000`)
+			.header("referer", `http://localhost${booking}`)
+			.loginAs(member)
+			.redirects(0);
+		stale.assertHeader("location", `/t/${tenant.slug}`);
+		stale.assertFlashMessage("error", PAUSED_NEW_WORK);
+
+		// A bookmark: no referer at all.
+		const bookmarked = await client.get(booking).loginAs(member).redirects(0);
+		bookmarked.assertHeader("location", `/t/${tenant.slug}`);
+	});
+
 	test("in observe mode nothing is refused; the rule is logged with its route", async ({
 		client,
 		assert,
