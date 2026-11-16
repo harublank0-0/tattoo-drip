@@ -33,6 +33,12 @@
   - when grace starts, and 1 day before it ends;
   - a pilot's: 3 days before its transition date.
   - In observe mode they are only logged: `"Package notice would be sent"`. Sending (alert, email, banner) comes with enforcement (phase 4).
+- **Checks sit at the route, not in the services.** The spec calls service checks authoritative, but here:
+  - every way to start new client work is a dashboard route (the public intake makes inquiries, not projects);
+  - the guard test keeps every route classified;
+  - a check inside `InquiryService`, `BookingService` or `DesignLabService` would close a DI cycle through `EntitlementService` → `TenancyService`.
+
+  A non-HTTP entry for new work must call `PackageGate.checkCapability` itself.
 - **Commands** run from `apps/platform`. `node ace codegen` after route or controller changes.
 
 ## Review Focus
@@ -97,7 +103,7 @@
     - no project exists for the inquiry;
     - `GET /t/:slug/projects/new` redirects the same way.
   - `test("in enforce mode a paused studio's existing work goes on")`: on a paused studio's existing booked project, scheduling a session and adding a desk payment, through the project spec helpers' routes, both succeed (302 to the project, not to Billing).
-  - `test("in enforce mode Design Lab generation is refused while paused")`: `POST …/design-lab/:id/generate` gives the `paused_design_lab` flash, and no generation row exists.
+  - `test("in enforce mode Design Lab generation is refused while paused")`: `POST …/design-lab/:id/generations` (`tenant.design_lab.generate`) gives the `paused_design_lab` flash, and no generation row exists.
   - `test("an artist member of a paused studio goes back, not to Billing")`: the request is sent with a `referer` header; the redirect `location` equals that referer.
   - `test("in observe mode nothing is refused; the rule is logged with its route")`: with the variable unset, accepting the inquiry makes the project, and `captureLogs().everything()` holds an entry whose fields include `rule: "paused_new_work"` and `route: "tenant.inbox.accept"` with the message `"Package rule would refuse"`.
   - `test("a pilot or trial studio in enforce mode is never refused")`:
