@@ -24,13 +24,13 @@ export const PACKAGES: Record<PackageKey, PackageDefinition> = {
 		name: "Solo",
 		line: "One artist, with help running the business.",
 		artistLimit: 1,
-		defaultBundleKey: "solo-v1",
+		defaultBundleKey: "solo-v2",
 	},
 	studio: {
 		name: "Studio",
 		line: "Multiple artists working together.",
 		artistLimit: null,
-		defaultBundleKey: "studio-v1",
+		defaultBundleKey: "studio-v2",
 	},
 };
 

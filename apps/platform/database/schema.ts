@@ -2089,6 +2089,45 @@ export class StaffAlertSchema extends BaseModel {
 	declare userId: string;
 }
 
+export class StoredFileSchema extends BaseModel {
+	static $columns = [
+		"bytes",
+		"createdAt",
+		"expiresAt",
+		"id",
+		"key",
+		"purpose",
+		"reservedAt",
+		"status",
+		"storedAt",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = StoredFileSchema.$columns;
+	@column()
+	declare bytes: bigint | number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare expiresAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare key: string;
+	@column()
+	declare purpose: string;
+	@column.dateTime()
+	declare reservedAt: DateTime | null;
+	@column()
+	declare status: string;
+	@column.dateTime()
+	declare storedAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime;
+}
+
 export class StudioClosureSchema extends BaseModel {
 	static $columns = [
 		"createdAt",

@@ -45,6 +45,7 @@ const EXPECTED_POLICIES: Record<string, string[]> = {
 	],
 	billing_access_periods: ["tenant_isolation:ALL"],
 	pilot_grants: ["tenant_isolation:ALL"],
+	stored_files: ["tenant_isolation:ALL"],
 	billing_customers: ["tenant_isolation:ALL"],
 	billing_events: ["tenant_isolation:ALL"],
 	billing_invoices: ["tenant_isolation:ALL"],

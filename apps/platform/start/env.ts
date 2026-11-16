@@ -150,6 +150,12 @@ const env = await Env.create(new URL("../", import.meta.url), {
 		"observe",
 		"enforce",
 	] as const),
+	// Storage limits (docs/superpowers/specs/2026-11-16-storage-meter-design.md):
+	// a switch of their own; observe (the default) logs what would be refused.
+	STORAGE_ENFORCEMENT: Env.schema.enum.optional([
+		"observe",
+		"enforce",
+	] as const),
 
 	DESIGN_LAB_PROVIDER: checkDesignLabProvider,
 	BFL_API_KEY: checkBflKey,
