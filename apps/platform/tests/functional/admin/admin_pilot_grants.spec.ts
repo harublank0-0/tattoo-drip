@@ -6,9 +6,11 @@ import PilotGrantService from "#modules/packages/services/pilot_grant_service";
 import { formatDay } from "#modules/projects/quotes";
 import type Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
+import env from "#start/env";
 import { adminUser } from "#tests/helpers/admin";
+import { seedDesignLab } from "#tests/helpers/design_lab";
 import { send } from "#tests/helpers/discover";
-import { inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
 import { assertValidationError } from "#tests/helpers/validation";
 
 /**
@@ -76,6 +78,38 @@ test.group("Admin pilot grants", (group) => {
 		);
 		// Extending a Studio pilot starts on Studio, never quietly on Solo.
 		assert.equal(pilot.defaultPackage, "studio");
+	});
+
+	test("the Package section shows the studio's Design Lab images this month", async ({
+		client,
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("pg-images", "PG Images");
+		const artist = await artistIn(tenant, "artist@pg-images.example");
+		// One settled image this month.
+		await seedDesignLab(tenant, artist);
+		const admin = await adminUser();
+		const imagesText = async () => {
+			const page = await client
+				.get(`/admin/studios/${tenant.slug}`)
+				.loginAs(admin)
+				.withInertia();
+			// biome-ignore lint/suspicious/noExplicitAny: the page's props, read as the page reads them
+			return (page.inertiaProps as any).pilot.imagesText;
+		};
+		try {
+			// Observe mode: the setting is in force; the package's number differs.
+			env.set("DESIGN_LAB_MONTHLY_LIMIT", 10);
+			assert.equal(
+				await imagesText(),
+				"Design Lab images this month: 1 of 10 (package: 40 a month once limits are on)",
+			);
+			env.set("DESIGN_LAB_MONTHLY_LIMIT", 40);
+			assert.equal(await imagesText(), "Design Lab images this month: 1 of 40");
+		} finally {
+			env.set("DESIGN_LAB_MONTHLY_LIMIT", 40);
+			delete process.env.DESIGN_LAB_MONTHLY_LIMIT;
+		}
 	});
 
 	test("with no grant running, the form starts on no package", async ({

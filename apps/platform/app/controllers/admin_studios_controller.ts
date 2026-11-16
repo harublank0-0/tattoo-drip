@@ -2,6 +2,8 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@adonisjs/core/http";
 import { DateTime } from "luxon";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import DesignUsageService from "#modules/design_lab/services/design_usage_service";
 import { STATUS_WORDS } from "#modules/discovery/publication";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import PublicationService, {
@@ -97,6 +99,25 @@ const grantRow = (grant: PilotGrant, now: DateTime) => ({
 	grantedText: at(grant.startsAt),
 });
 
+/**
+ * The studio's Design Lab use this month against the limit in force (the
+ * image meter), with the package's own number while observe mode keeps the
+ * platform setting in force and the two differ.
+ */
+const imagesText = (allowance: {
+	used: number;
+	reserved: number;
+	limit: number;
+	packageLimit: number | null;
+}) =>
+	`Design Lab images this month: ${allowance.used + allowance.reserved} of ${allowance.limit}${
+		packageEnforcement() === "observe" &&
+		allowance.packageLimit !== null &&
+		allowance.packageLimit !== allowance.limit
+			? ` (package: ${allowance.packageLimit} a month once limits are on)`
+			: ""
+	}`;
+
 /** Dates on admin pages are UTC. */
 const at = (value: DateTime) =>
 	value.toUTC().toFormat("yyyy-MM-dd HH:mm 'UTC'");
@@ -143,6 +164,7 @@ export default class AdminStudiosController {
 		private images: ImageService,
 		private pilots: PilotGrantService,
 		private entitlements: EntitlementService,
+		private designUsage: DesignUsageService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -327,6 +349,7 @@ export default class AdminStudiosController {
 				// A new grant starts on the running one's package (extending a
 				// Studio pilot never quietly makes it Solo), else on none.
 				defaultPackage: running?.package ?? null,
+				imagesText: imagesText(await this.designUsage.allowance(tenant, now)),
 			};
 		});
 	}

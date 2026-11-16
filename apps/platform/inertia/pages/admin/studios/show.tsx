@@ -52,6 +52,8 @@ type Props = {
 		packages: { value: string; label: string }[];
 		/** The running grant's package, which a new grant starts on; null when none runs. */
 		defaultPackage: string | null;
+		/** Design Lab images this month against the limit in force. */
+		imagesText: string;
 	};
 	discover: {
 		statusLabel: string;
@@ -116,6 +118,7 @@ export default function AdminStudio({
 				<p className="text-sm">
 					<Badge variant="outline">{pilot.stateText}</Badge>
 				</p>
+				<p className="text-sm text-muted-foreground">{pilot.imagesText}</p>
 				{pilot.running ? (
 					<div className="flex flex-col gap-2 text-sm">
 						<GrantLine grant={pilot.running} />
