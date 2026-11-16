@@ -98,6 +98,8 @@ const SIGNED_IN = [
 	"POST /admin/studios/:slug/discover/restore",
 	"POST /admin/studios/:slug/photos/:photo/suspend",
 	"POST /admin/studios/:slug/photos/:photo/restore",
+	"POST /admin/studios/:slug/pilot",
+	"POST /admin/studios/:slug/pilot/end",
 	"GET /admin/reports",
 	"POST /admin/reviews/:id/takedown",
 	"POST /admin/reviews/:id/restore",
