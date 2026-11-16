@@ -327,6 +327,10 @@ export interface ApiDefinition {
         suspend: typeof routes['admin.studios.photos.suspend']
         restore: typeof routes['admin.studios.photos.restore']
       }
+      pilot: {
+        grant: typeof routes['admin.studios.pilot.grant']
+        end: typeof routes['admin.studios.pilot.end']
+      }
     }
     reports: typeof routes['admin.reports']
     reviews: {

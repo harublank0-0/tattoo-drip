@@ -187,6 +187,8 @@ export type ScannedRoutes = {
     'admin.studios.discover.restore': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
     'admin.studios.photos.suspend': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
     'admin.studios.photos.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
+    'admin.studios.pilot.grant': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.pilot.end': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
     'admin.reports': { paramsTuple?: []; params?: {} }
     'admin.reviews.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.reviews.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
@@ -522,6 +524,8 @@ export type ScannedRoutes = {
     'admin.studios.discover.restore': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
     'admin.studios.photos.suspend': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
     'admin.studios.photos.restore': { paramsTuple: [ParamValue,ParamValue]; params: {'slug': ParamValue,'photo': ParamValue} }
+    'admin.studios.pilot.grant': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
+    'admin.studios.pilot.end': { paramsTuple: [ParamValue]; params: {'slug': ParamValue} }
     'admin.reviews.takedown': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.reviews.restore': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }
     'admin.reviews.dismiss': { paramsTuple: [ParamValue]; params: {'id': ParamValue} }

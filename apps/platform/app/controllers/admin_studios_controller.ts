@@ -1,7 +1,7 @@
 import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@adonisjs/core/http";
-import type { DateTime } from "luxon";
+import { DateTime } from "luxon";
 import { STATUS_WORDS } from "#modules/discovery/publication";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import PublicationService, {
@@ -12,6 +12,17 @@ import ImageService, {
 	THUMBNAIL_WIDTH,
 } from "#modules/media/services/image_service";
 import { VIDEO_PURPOSE } from "#modules/media/services/video_service";
+import { entitlementText } from "#modules/packages/entitlement";
+import type PilotGrant from "#modules/packages/models/pilot_grant";
+import { PACKAGE_KEYS, PACKAGES } from "#modules/packages/packages";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import EntitlementService from "#modules/packages/services/entitlement_service";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import PilotGrantService, {
+	PilotGrantError,
+} from "#modules/packages/services/pilot_grant_service";
+import { packageEnforcement } from "#modules/packages/settings";
+import { formatDay } from "#modules/projects/quotes";
 import {
 	reportReasonLabel,
 	TAKEDOWN_KIND_LABELS,
@@ -26,7 +37,10 @@ import Tenant from "#modules/tenancy/models/tenant";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withDbContext } from "#services/db_context";
 import { forEachLiveStudio } from "#services/live_studios";
-import { discoverReasonValidator } from "#validators/admin";
+import {
+	discoverReasonValidator,
+	pilotGrantValidator,
+} from "#validators/admin";
 
 /** Live items the studio page lists; `?more=1` raises it. */
 export const LIVE_ITEMS = 20;
@@ -53,6 +67,29 @@ export function liveWindow<T>(
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Who a grant from the admin pages is recorded as: the admin's account name,
+ * else their email, within the service's 100 characters.
+ */
+export function operatorName(user: {
+	fullName: string | null;
+	email: string;
+}): string {
+	return (user.fullName?.trim() || user.email).slice(0, 100);
+}
+
+/** A day on admin pages, as the Billing page writes it (UTC). */
+const dayText = (value: DateTime) =>
+	formatDay(value.toUTC().toISODate() as string);
+
+const grantRow = (grant: PilotGrant) => ({
+	packageName: PACKAGES[grant.package].name,
+	untilText: dayText(grant.endsAt),
+	note: grant.note,
+	grantedBy: grant.grantedBy,
+	grantedText: at(grant.startsAt),
+});
 
 /** Dates on admin pages are UTC. */
 const at = (value: DateTime) =>
@@ -98,6 +135,8 @@ export default class AdminStudiosController {
 		private reviews: ReviewOperatorService,
 		private tenancy: TenancyService,
 		private images: ImageService,
+		private pilots: PilotGrantService,
+		private entitlements: EntitlementService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -150,6 +189,7 @@ export default class AdminStudiosController {
 		);
 		return ctx.inertia.render("admin/studios/show", {
 			studio: { slug: tenant.slug, name: tenant.name },
+			pilot: await this.pilotProps(tenant),
 			discover: {
 				statusLabel: STATUS_WORDS[status.status].label,
 				optedIn: status.optedIn,
@@ -224,6 +264,76 @@ export default class AdminStudiosController {
 			await this.publication.restorePhoto(slug, photoId);
 			return this.liftedMessage(slug);
 		});
+	}
+
+	/** Gives the studio a pilot grant from its admin page (the same service as `packages:pilot`). */
+	async grantPilot(ctx: HttpContext) {
+		const input = await ctx.request.validateUsing(pilotGrantValidator);
+		return this.pilotAction(ctx, async (slug) => {
+			const endsAt = DateTime.fromISO(input.until, { zone: "utc" });
+			if (!endsAt.isValid) {
+				throw new PilotGrantError("Give an until date as YYYY-MM-DD.");
+			}
+			const grant = await this.pilots.grant(slug, {
+				package: input.package,
+				endsAt,
+				note: input.note,
+				grantedBy: operatorName(ctx.auth.getUserOrFail()),
+			});
+			const studio = await withDbContext({ tenantId: grant.tenantId }, () =>
+				Tenant.findOrFail(grant.tenantId),
+			);
+			return `${studio.name} is a ${PACKAGES[input.package].name} pilot until ${dayText(endsAt)}.`;
+		});
+	}
+
+	/** Ends the studio's running pilot grant now. */
+	async endPilot(ctx: HttpContext) {
+		return this.pilotAction(ctx, async (slug) => {
+			await this.pilots.end(slug);
+			return "The pilot grant has ended. The studio's package now follows its payments.";
+		});
+	}
+
+	/** The Package section: the studio's state in the Billing page's words, its running and past grants. */
+	private pilotProps(tenant: Tenant) {
+		return withDbContext({ tenantId: tenant.id }, async () => {
+			const now = DateTime.utc();
+			const grants = await this.pilots.forTenant(tenant);
+			const running = grants.find(
+				(grant) => grant.startsAt <= now && grant.endsAt > now,
+			);
+			return {
+				stateText: entitlementText(
+					await this.entitlements.forLoaded(tenant, now),
+					dayText,
+					packageEnforcement() === "enforce",
+				),
+				running: running ? grantRow(running) : null,
+				past: grants
+					.filter((grant) => grant.endsAt <= now)
+					.reverse()
+					.map(grantRow),
+				packages: PACKAGE_KEYS.map((key) => ({
+					value: key,
+					label: PACKAGES[key].name,
+				})),
+			};
+		});
+	}
+
+	/** Runs a pilot grant action; the service's refusals become an error flash. */
+	private async pilotAction(
+		ctx: HttpContext,
+		run: (slug: string) => Promise<string>,
+	) {
+		try {
+			ctx.session.flash("success", await run(ctx.params.slug as string));
+		} catch (error) {
+			if (!(error instanceof PilotGrantError)) throw error;
+			ctx.session.flash("error", error.message);
+		}
+		return ctx.response.redirect().back();
 	}
 
 	private async liftedMessage(slug: string) {

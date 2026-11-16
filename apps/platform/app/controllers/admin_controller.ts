@@ -81,6 +81,8 @@ export default class AdminController {
 		);
 		const studios: {
 			tenantId: string;
+			/** Links the row to the studio's admin page (its pilot grants). */
+			slug: string;
 			name: string;
 			planName: string | null;
 			statusText: string;
@@ -121,6 +123,7 @@ export default class AdminController {
 				const entitlement = await this.entitlements.forLoaded(tenant);
 				studios.push({
 					tenantId,
+					slug: tenant.slug,
 					name: tenant.name,
 					planName: subscription?.planId
 						? (plans.get(subscription.planId)?.name ?? null)
