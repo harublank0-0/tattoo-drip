@@ -5,6 +5,7 @@ import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import ClientService from "#modules/clients/services/client_service";
+import { pageNumber } from "#modules/design_lab/history";
 import type DesignAsset from "#modules/design_lab/models/design_asset";
 import type DesignGeneration from "#modules/design_lab/models/design_generation";
 import type DesignProject from "#modules/design_lab/models/design_project";
@@ -49,9 +50,6 @@ import ImageService, {
 import { formatDay } from "#modules/projects/quotes";
 import type { Member } from "#modules/projects/services/project_service";
 import type Tenant from "#modules/tenancy/models/tenant";
-
-const pageNumber = (value: unknown) =>
-	typeof value === "string" && /^[1-9]\d{0,7}$/.test(value) ? Number(value) : 1;
 
 /** A service refusal as the form's field error (the request still fails and rolls back). */
 async function asFieldErrors<T>(
