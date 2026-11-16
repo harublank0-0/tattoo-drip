@@ -1,7 +1,9 @@
+import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import AllowanceBundle from "#modules/packages/models/allowance_bundle";
+import EntitlementService from "#modules/packages/services/entitlement_service";
 import PilotGrantService, {
 	PilotGrantError,
 } from "#modules/packages/services/pilot_grant_service";
@@ -166,5 +168,64 @@ test.group("Packages: pilot grants", (group) => {
 			"This grant would overlap another of this studio's grants. Check its grants and run it again.",
 		);
 		assert.lengthOf(await inTenant(tenant, () => pilots.forTenant(tenant)), 1);
+	});
+
+	test("ending the running grant sets its end to now; the studio's later state follows the entitlement rules", async ({
+		assert,
+	}) => {
+		const { tenant } = await studioWithOwner("pilot-end", "Pilot End");
+		const now = DateTime.utc().startOf("second");
+		await pilots.grant(
+			"pilot-end",
+			{
+				package: "studio",
+				endsAt: now.plus({ months: 2 }),
+				note: "Design partner",
+				grantedBy: "Ops",
+			},
+			now,
+		);
+		const endAt = now.plus({ minutes: 5 });
+
+		const ended = await pilots.end("pilot-end", endAt);
+
+		assert.equal(ended.endsAt.toMillis(), endAt.toMillis());
+		const grants = await inTenant(tenant, () => pilots.forTenant(tenant));
+		assert.lengthOf(grants, 1);
+		assert.equal(grants[0].endsAt.toMillis(), endAt.toMillis());
+		const entitlements = await app.container.make(EntitlementService);
+		const after = await inTenant(tenant, () =>
+			entitlements.forLoaded(tenant, now.plus({ minutes: 6 })),
+		);
+		// Never paid and made today: a trial, no longer a pilot.
+		assert.equal(after.state, "trial");
+	});
+
+	test("ending with no running grant is refused in words", async ({
+		assert,
+	}) => {
+		const now = DateTime.utc().startOf("second");
+		await studioWithOwner("pilot-none", "Pilot None");
+		await studioWithOwner("pilot-over", "Pilot Over");
+		// A grant that ran last week and has ended.
+		await pilots.grant(
+			"pilot-over",
+			{
+				package: "solo",
+				endsAt: now.minus({ days: 1 }),
+				note: "Over",
+				grantedBy: "Ops",
+			},
+			now.minus({ days: 10 }),
+		);
+
+		for (const slug of ["pilot-none", "pilot-over"]) {
+			const error = await pilots.end(slug, now).catch((caught) => caught);
+			assert.instanceOf(error, PilotGrantError);
+			assert.equal(error.message, "This studio has no running grant.");
+		}
+		const unknown = await pilots.end("nope", now).catch((caught) => caught);
+		assert.instanceOf(unknown, PilotGrantError);
+		assert.equal(unknown.message, 'No studio uses "nope".');
 	});
 });
