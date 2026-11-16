@@ -34,13 +34,15 @@ const BUCKETS = {
  * objects held in memory. Like R2, it refuses a PUT without Content-Length
  * (411 `MissingContentLength`), which is what a chunked upload of a stream of
  * unknown length gets: the folder disks the other tests use accept one, so
- * only this can catch it. `refused` lists the keys it refused. `restore()`
- * puts the folder disks back, and the test must call it (`cleanup`) because
- * the disks are shared by the whole run.
+ * only this can catch it. `refused` lists the keys it refused;
+ * `failNextPuts(n)` answers the next n uploads 500 `InternalError`, as R2
+ * now and then does. `restore()` puts the folder disks back, and the test
+ * must call it (`cleanup`) because the disks are shared by the whole run.
  */
 export async function useR2StandIn() {
 	const objects = new Map<string, Buffer>();
 	const refused: string[] = [];
+	let failing = 0;
 	const server = createServer(async (request, response) => {
 		const path = decodeURIComponent(
 			new URL(request.url ?? "/", "http://stand-in").pathname.slice(1),
@@ -61,6 +63,14 @@ export async function useR2StandIn() {
 					411,
 					"MissingContentLength",
 					"You must provide the Content-Length HTTP header.",
+				);
+			}
+			if (failing > 0) {
+				failing -= 1;
+				return xmlError(
+					500,
+					"InternalError",
+					"We encountered an internal error. Please try again.",
 				);
 			}
 			objects.set(path, Buffer.concat(chunks));
@@ -100,6 +110,10 @@ export async function useR2StandIn() {
 
 	return {
 		refused,
+		/** Answers the next `count` uploads 500 `InternalError`. */
+		failNextPuts(count: number) {
+			failing = count;
+		},
 		/** Stores a file on a disk's bucket directly, as an earlier upload did. */
 		put(visibility: "public" | "private", key: string, body: Buffer) {
 			objects.set(`${BUCKETS[visibility]}/${key}`, body);
