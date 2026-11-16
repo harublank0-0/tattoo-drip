@@ -270,6 +270,7 @@ export interface ApiDefinition {
     }
     designLab: {
       index: typeof routes['tenant.design_lab.index']
+      history: typeof routes['tenant.design_lab.history']
       store: typeof routes['tenant.design_lab.store']
       show: typeof routes['tenant.design_lab.show']
       update: typeof routes['tenant.design_lab.update']

@@ -90,3 +90,74 @@ export const REVIEW_STATE_LABELS: Record<string, string> = {
 	decided: "Concept chosen",
 	archived: "Archived",
 };
+
+/** The owners' history (docs/design-lab.md, "History"): one row per attempt. */
+export type HistoryStatus = "done" | "in_progress" | "failed" | "blocked";
+
+export type HistoryCounts = {
+	used: number;
+	inProgress: number;
+	failed: number;
+	blocked: number;
+};
+
+export const HISTORY_STATUS_LABELS: Record<HistoryStatus, string> = {
+	done: "Done",
+	in_progress: "In progress",
+	failed: "Failed",
+	blocked: "Blocked",
+};
+
+/** The history badge's look. */
+export function historyVariant(
+	status: HistoryStatus,
+): "default" | "secondary" | "destructive" {
+	if (status === "done") return "default";
+	if (status === "in_progress") return "secondary";
+	return "destructive";
+}
+
+/** "23 of 40 used · 1 in progress · 3 failed · 1 blocked" (no limit: "23 used · …"). */
+export function historyCountsText(
+	counts: HistoryCounts,
+	limit: number | null,
+): string {
+	const used =
+		limit === null ? `${counts.used} used` : `${counts.used} of ${limit} used`;
+	return `${used} · ${counts.inProgress} in progress · ${counts.failed} failed · ${counts.blocked} blocked`;
+}
+
+/** The history's query string: only what differs from the defaults. */
+export function historyQuery(
+	filters: { month: string; artist: string | null; status: string | null },
+	page: number,
+	currentMonth: string,
+): string {
+	const query = new URLSearchParams();
+	if (filters.month !== currentMonth) query.set("month", filters.month);
+	if (filters.artist) query.set("artist", filters.artist);
+	if (filters.status) query.set("status", filters.status);
+	if (page > 1) query.set("page", String(page));
+	const text = query.toString();
+	return text ? `?${text}` : "";
+}
+
+/** "November 2026" for "2026-11". */
+export function monthLabel(month: string): string {
+	const [year, number] = month.split("-").map(Number);
+	const names = [
+		"January",
+		"February",
+		"March",
+		"April",
+		"May",
+		"June",
+		"July",
+		"August",
+		"September",
+		"October",
+		"November",
+		"December",
+	];
+	return `${names[number - 1] ?? month} ${year}`;
+}

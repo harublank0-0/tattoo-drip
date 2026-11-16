@@ -38,6 +38,8 @@ export const TENANT_ROUTE_ROLES = {
 	// AI Design Lab (docs/design-lab.md): every member; DesignLabService
 	// gives an artist only the design projects they started.
 	"tenant.design_lab.index": MEMBERS,
+	// Owners keep an eye on the studio's usage and failures (docs/design-lab.md, "History").
+	"tenant.design_lab.history": OWNERS,
 	"tenant.design_lab.store": MEMBERS,
 	"tenant.design_lab.show": MEMBERS,
 	"tenant.design_lab.update": MEMBERS,
