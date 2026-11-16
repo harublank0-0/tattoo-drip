@@ -34,7 +34,12 @@ Success: a studio sees its usage and what counts toward it before it nears the l
    - deleting a Design Lab project, which is new: it deletes its concept images, where today projects can only be archived
    - a soft delete of an artist or a payment method, which stops their files counting at once
    
-   Inquiry reference images and payment proofs stay undeletable: they're the studio's record of client work and payments. They count, and the breakdown says why they can't be removed. A bundle with no storage number (`storage_megabytes` null) is unmetered, except the v1 bundles, which read their package's launch default (see Existing subscriptions and grants).
+   - deleting an inquiry or project reference photo, or a payment's deposit screenshot: owners only, after an in-page confirm that says the file is the studio's record and can't be brought back. The product owner added this on 2026-11-16: these files are best kept, but a studio that wants to remove them may.
+     - The payment itself stays, with its amount, date and verification. Only its proof is cleared (`payments_guard` allows clearing the proof columns), and the payment shows "Screenshot removed by the studio".
+     - A reference photo's row is soft-deleted and its file deleted.
+     - Nothing is removed automatically, and there's no retention rule yet.
+
+   The breakdown says these files are kept by default and how to remove one. A bundle with no storage number (`storage_megabytes` null) is unmetered, except the v1 bundles, which read their package's launch default (see Existing subscriptions and grants).
 
 ## Design
 
@@ -115,7 +120,7 @@ Studio to Solo takes effect at renewal (packages ruling 11). Before the owner co
 ## Rollout
 
 1. **Measure:** the ledger, the hooks recording stored sizes, `storage:reconcile` with the backfill, and the Billing section and upload lines in observe mode. Nothing is blocked.
-2. **Enforce:** reservations on every path, the refusals, the client inquiry fallback (contract, SDK, storefront), deleting a Design Lab project, and the dashboard warning.
+2. **Enforce:** reservations on every path, the refusals, the client inquiry fallback (contract, SDK, storefront), deleting a Design Lab project, deleting client files (owners), and the dashboard warning.
 3. **The 95% email.**
 4. **The downgrade preview,** with phase 4.
 
@@ -125,7 +130,8 @@ Before switching `STORAGE_ENFORCEMENT=enforce`:
 
 ## Goals, non-goals, anti-goals
 
-- **Non-goals:** automatic overage charges, buying extra storage, a separate file manager page, per-member quotas, and counting size copies, staging or public copies.
+- **Non-goals:** automatic overage charges, a separate file manager page, per-member quotas, and counting size copies, staging or public copies.
+- **Later:** buying extra storage. The product owner raised it on 2026-11-16. It needs a price and a one-off PayBridgeNP charge, like the packages spec's extra credits. Also later: a retention rule for old client files.
 - **Anti-goals:**
   - a client's deposit or review refused because storage is full
   - an existing file hidden or deleted

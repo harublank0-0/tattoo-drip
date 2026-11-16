@@ -161,7 +161,7 @@
 - **Billing page prop `storageDetail`** (owners): the shared prop's fields, plus `categories: { key: "portfolio" | "clients" | "design_lab"; label: string; sizeText: string; href: string; note: string | null }[]`.
   - Labels: "Portfolio and studio page", "Clients and projects", "Design Lab".
   - The hrefs point at the portfolio, projects and Design Lab routes.
-  - The `clients` note reads `"Inquiry photos and deposit screenshots stay with their records and can't be removed."`.
+  - The `clients` note reads `"Inquiry photos and deposit screenshots are kept with their records."`. Step 2 adds the owner's delete, and the note then says how to remove one.
 - **Admin Package section:** `pilot.storageText`, `Storage: ${usedText} of ${limitText ?? "unmetered"}`.
 - **`StorageLine`** renders `Storage: 1.2 GB of 5 GB used`, or `… used (limits aren't applied yet)` when not enforced. It renders nothing when the prop is null or the limit is null.
 - **The Billing section "Storage"** shows the same line, a bar (`role="progressbar"` with `aria-valuenow`), the categories with links, and the observe note.
