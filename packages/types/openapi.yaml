@@ -2987,7 +2987,7 @@ components:
         (`listReviews`). Every property is always there. All text is plain
         text: render it as text, never as markup, and keep its line breaks.
         Never the client's full name, phone, email or any id of theirs.
-      required: [id, rating, body, shownName, date, artist, reply]
+      required: [id, rating, body, shownName, date, artist, reply, freshInk]
       additionalProperties: false
       properties:
         id:
@@ -3042,6 +3042,33 @@ components:
                   format: date
                   description: The day the studio last wrote it, in the studio's timezone.
             - type: "null"
+        freshInk:
+          description: |
+            The client's Fresh ink post of the same project, exactly as
+            `listFreshInk` shows it (its own `review` is null: it sits in this
+            review), while that post is on the studio's page (approved,
+            published, allowed there, not taken down) and the page shows its
+            Fresh ink section; null otherwise. Show its photos with the review
+            and open them in the Fresh ink viewer. Never a project's or a
+            client's id.
+          oneOf:
+            - $ref: "#/components/schemas/FreshInkPost"
+            - type: "null"
+
+    LinkedReview:
+      type: object
+      description: |
+        The client's review of the project a Fresh ink post shows
+        (`FreshInkPost.review`): the same id, stars, words and day as its
+        `StudioReview`, without the reply (it stays with the review) or the
+        name and artist (the post shows them). Plain text, line breaks kept.
+      required: [id, rating, body, date]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid, description: "The review's own id, as in `listReviews`." }
+        rating: { type: integer, minimum: 1, maximum: 5, description: Whole stars. Say it in words too. }
+        body: { type: string, minLength: 20, maxLength: 2000, description: The client's own words. }
+        date: { type: string, format: date, description: "The day the client wrote it, in the studio's timezone." }
 
     ReviewRating:
       type: object
@@ -3071,7 +3098,7 @@ components:
         has them. Every property is always there. All text is plain text:
         render it as text, never as markup. Never the client's full name,
         phone, email or any id of theirs.
-      required: [id, url, width, height, alt, variants, angles, shownName, caption, styles, placement, artist, date]
+      required: [id, url, width, height, alt, variants, angles, shownName, caption, styles, placement, artist, date, review]
       additionalProperties: false
       properties:
         id:
@@ -3134,6 +3161,17 @@ components:
           type: [string, "null"]
           maxLength: 120
           description: Where it is on the body, in the client's words, or null.
+        review:
+          description: |
+            The client's review of the same project, while it shows in
+            `listReviews` (allowed on the studio's page, not taken down, not
+            deleted) and the page shows its Reviews section; null otherwise,
+            and null in a post embedded in its own review
+            (`StudioReview.freshInk`). Show the stars and the words in the
+            post's viewer. Never a project's or a client's id.
+          oneOf:
+            - $ref: "#/components/schemas/LinkedReview"
+            - type: "null"
         artist:
           description: |
             The artist who made the tattoo, while the studio shows that

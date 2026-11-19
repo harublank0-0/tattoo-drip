@@ -1,14 +1,16 @@
 import type { ListFreshInkQuery } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
-import { studioCopy } from "./copy.ts";
-import { type GalleryPhotoView, tattooEntry } from "./gallery.ts";
 import {
 	type DayView,
 	dayView,
+	excerptOf,
 	readArtistTag,
 	readShownName,
-} from "./reviews.ts";
-import { cleanLine, cleanText } from "./text.ts";
+	readText,
+} from "./client-words.ts";
+import { studioCopy } from "./copy.ts";
+import { type GalleryPhotoView, tattooEntry } from "./gallery.ts";
+import { cleanLine } from "./text.ts";
 
 /**
  * Fresh ink on the studio's own page (Reviews and Fresh ink, slice 3):
@@ -33,9 +35,14 @@ const MAX_CAPTION = 280;
 const MAX_PLACEMENT = 120;
 /** The ids of Fresh ink's viewers and tiles. */
 export const FRESH_INK_PREFIX = "fresh-ink";
+/** The ids of a review's linked Fresh ink viewer: its own, so a post in the grid and in a review never share one. */
+export const REVIEW_INK_PREFIX = "review-ink";
 
 /** A cursor as the API writes it: base64url, at most 200 characters. */
 const CURSOR = /^[A-Za-z0-9_-]{1,200}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** A linked review's text at most, in characters (the contract's). */
+const MAX_REVIEW_BODY = 2000;
 
 /** One post: a gallery tattoo (its main photo, angles, artist, styles) and what the client wrote. */
 export interface FreshInkPostView extends GalleryPhotoView {
@@ -57,6 +64,22 @@ export interface FreshInkPostView extends GalleryPhotoView {
 	/** Where it is on the body, in the client's words, one line, or null. */
 	readonly placement: string | null;
 	/** The day it was published (the latest publication, for any surface). */
+	readonly date: DayView | null;
+	/** The client's review of the same project, while the page shows it too. */
+	readonly review: LinkedReviewView | null;
+}
+
+/** A post's linked review, as its viewer shows it. */
+export interface LinkedReviewView {
+	readonly id: string;
+	/** Whole stars, 1 to 5. */
+	readonly rating: number;
+	/** "4 out of 5". */
+	readonly ratingText: string;
+	/** The client's words, plain text with its line breaks. */
+	readonly body: string;
+	/** Its start with "…", or null when the whole text is short. */
+	readonly excerpt: string | null;
 	readonly date: DayView | null;
 }
 
@@ -102,36 +125,16 @@ export function freshInkView(
 	for (const item of Array.isArray(data)
 		? data.slice(0, MAX_FRESH_INK_PAGE)
 		: []) {
-		const name = readShownName(own(item, "shownName"));
-		if (name === null) continue;
-		const entry = tattooEntry(
+		const post = readFreshInkPost(
 			item,
 			imageOrigin,
 			first + posts.length + 1,
 			FRESH_INK_PREFIX,
 		);
-		if (entry === null || entry.id === null) continue;
-		if (posts.some((post) => post.id === entry.id)) continue;
-		const artist = readArtistTag(own(item, "artist"));
-		const named = artist
-			? fill(studioCopy.freshInk.alt, { name, artist: artist.name })
-			: fill(studioCopy.freshInk.altNoArtist, { name });
-		const postCaption = readText(own(item, "caption"), MAX_CAPTION);
-		posts.push({
-			...entry,
-			// No page of its own: the viewer is the way in.
-			href: null,
-			artist,
-			// The client's words say what it is; nothing is claimed for them.
-			healed: false,
-			alt: entry.caption || entry.angles.length > 0 ? entry.alt : named,
-			title: entry.caption ?? cleanLine(postCaption) ?? named,
-			name,
-			shownBy: fill(studioCopy.freshInk.shownBy, { name }),
-			postCaption,
-			placement: readLine(own(item, "placement"), MAX_PLACEMENT),
-			date: dayView(own(item, "date")),
-		});
+		if (post === null || posts.some((shown) => shown.id === post.id)) {
+			continue;
+		}
+		posts.push(post);
 	}
 	const cursor = own(page, "nextCursor");
 	return {
@@ -141,9 +144,71 @@ export function freshInkView(
 	};
 }
 
-function readText(value: unknown, max: number): string | null {
-	const text = typeof value === "string" ? cleanText(value) : null;
-	return text && Array.from(text).length <= max ? text : null;
+/**
+ * One post the API sent, as the page shows it: a gallery tattoo (its main
+ * photo on the image origin, its angles) with the client's words and its
+ * linked review, its viewer's ids from `prefix` and `n`; null when it
+ * doesn't read cleanly (no shown name, no id, a photo off the origin).
+ * `freshInkView`'s entries, and a review's linked Fresh ink
+ * (`REVIEW_INK_PREFIX`).
+ */
+export function readFreshInkPost(
+	item: unknown,
+	imageOrigin: string | null,
+	n: number,
+	prefix: string,
+): FreshInkPostView | null {
+	const name = readShownName(own(item, "shownName"));
+	if (name === null) return null;
+	const entry = tattooEntry(item, imageOrigin, n, prefix);
+	if (entry === null || entry.id === null) return null;
+	const artist = readArtistTag(own(item, "artist"));
+	const named = artist
+		? fill(studioCopy.freshInk.alt, { name, artist: artist.name })
+		: fill(studioCopy.freshInk.altNoArtist, { name });
+	const postCaption = readText(own(item, "caption"), MAX_CAPTION);
+	return {
+		...entry,
+		// No page of its own: the viewer is the way in.
+		href: null,
+		artist,
+		// The client's words say what it is; nothing is claimed for them.
+		healed: false,
+		alt: entry.caption || entry.angles.length > 0 ? entry.alt : named,
+		title: entry.caption ?? cleanLine(postCaption) ?? named,
+		name,
+		shownBy: fill(studioCopy.freshInk.shownBy, { name }),
+		postCaption,
+		placement: readLine(own(item, "placement"), MAX_PLACEMENT),
+		date: dayView(own(item, "date")),
+		review: readLinkedReview(own(item, "review")),
+	};
+}
+
+/** A post's linked review: a UUID, whole stars 1 to 5, a text of up to 2,000 characters; else null. */
+function readLinkedReview(value: unknown): LinkedReviewView | null {
+	const id = own(value, "id");
+	const rating = own(value, "rating");
+	const body = readText(own(value, "body"), MAX_REVIEW_BODY);
+	if (
+		typeof id !== "string" ||
+		!UUID.test(id) ||
+		typeof rating !== "number" ||
+		!Number.isInteger(rating) ||
+		rating < 1 ||
+		rating > 5 ||
+		body === null
+	) {
+		return null;
+	}
+	return {
+		id,
+		rating,
+		ratingText: fill(studioCopy.reviews.stars, { n: rating }),
+		body,
+		excerpt: excerptOf(body),
+		date: dayView(own(value, "date")),
+	};
 }
 
 function readLine(value: unknown, max: number): string | null {

@@ -931,3 +931,13 @@
 	justify-items: center;
 	text-align: center;
 }
+
+/* A review's Fresh ink strip (2026-11-19): centred under the centred card, brass frames. */
+.atl-reviews .client-review-photos {
+	justify-self: center;
+}
+.atl-reviews .client-review-thumb,
+.atl-client-body .client-review-thumb {
+	border: 1px solid var(--atl-brass);
+	border-radius: 0;
+}

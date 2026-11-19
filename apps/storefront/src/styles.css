@@ -463,6 +463,27 @@
   }
   .fresh-ink-intro, .client-page-intro { margin-block-end: 1.5rem; color: var(--ink-muted); }
   .fresh-ink-caption { color: var(--ink); }
+  /*
+   * A review and its client's Fresh ink, linked (2026-11-19 design): on a
+   * review card, one button holding up to three square thumbnails (a "+N"
+   * scrim on the third when more follow) that opens the post's viewer; in the
+   * viewer, the review under a rule, its start and "Read the review" (a
+   * disclosure; the start hides once it opens). Each theme adjusts the
+   * thumbnails' frame in its own stylesheet; the stars keep the accent.
+   */
+  .client-review-photos { display: flex; flex-wrap: wrap; gap: 0.375rem; justify-self: start; margin: 0.25rem 0 0; padding: 0; border: 0; border-radius: var(--radius); background: none; color: inherit; cursor: pointer; }
+  .client-review-photos:focus-visible { outline: 2px solid var(--stencil); outline-offset: 3px; }
+  .client-review-thumb { position: relative; display: block; inline-size: 5.5rem; block-size: 5.5rem; overflow: hidden; border: 1.5px solid var(--line-strong); border-radius: calc(var(--radius) * 0.75); background: var(--stencil-wash); }
+  .client-review-photos:hover .client-review-thumb { border-color: var(--stencil); }
+  /* The post's viewer is a child of the review card: it keeps the viewer's own alignment where a theme centres the card (Atelier). */
+  .client-review .work-dialog { text-align: start; }
+  .client-review-thumb-img { display: block; inline-size: 100%; block-size: 100%; object-fit: cover; }
+  .client-review-more { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--ink) 60%, transparent); color: var(--paper); font-size: 1.125rem; font-weight: 700; }
+  .fresh-ink-review { display: grid; gap: 0.375rem; justify-items: center; margin-block-start: 0.75rem; padding-block-start: 0.75rem; border-block-start: 1px solid var(--line-strong); }
+  .fresh-ink-review-by { margin: 0; color: var(--ink-muted); font-size: 0.9375rem; overflow-wrap: anywhere; }
+  .fresh-ink-review-excerpt, .fresh-ink-review-body { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+  .fresh-ink-review-more summary { display: flex; align-items: center; justify-content: center; min-block-size: 2.75rem; color: var(--stencil); font-weight: 600; cursor: pointer; }
+  .fresh-ink-review:has(.fresh-ink-review-more[open]) .fresh-ink-review-excerpt { display: none; }
   .client-page-title { margin-block-end: 0.75rem; }
   .flash-design { display: grid; gap: 1.5rem; align-items: start; }
   .flash-design-picture { display: block; inline-size: 100%; max-inline-size: 36rem; block-size: auto; aspect-ratio: 1; object-fit: contain; background: var(--stencil-wash); }

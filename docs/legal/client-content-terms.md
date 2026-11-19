@@ -33,6 +33,8 @@ These terms cover what a client posts through a studio's review link on TattooDr
 
 3.4 Fresh ink shows only after the studio approves it. A review shows as soon as you submit it, where you allowed.
 
+3.5 Where your review and your Fresh ink of the same tattoo are both shown on a page, they may be shown together: your review with your Fresh ink photos, and your Fresh ink with your review.
+
 ## 4. Your name
 
 4.1 Public surfaces show the name you choose (1 to 40 characters). It starts as your first name and the first letter of your last name; you may change it to anything that is your own name, including your full name if you type it yourself. We never show your phone number or email, and we never show your full name unless you type it.

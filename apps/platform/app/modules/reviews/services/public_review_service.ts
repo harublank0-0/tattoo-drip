@@ -18,6 +18,7 @@ import {
 	PUBLIC_PHOTO_PURPOSE,
 	PUBLIC_VIDEO_PURPOSE,
 } from "#modules/reviews/services/post_publication_service";
+import { sectionsOf } from "#modules/storefront/look";
 import type {
 	ShownAngle,
 	ShownWorkPhoto,
@@ -45,6 +46,16 @@ export type ShownStudioReview = {
 	date: string;
 	artist: ShownArtistTag | null;
 	reply: { body: string; date: string } | null;
+	/** The client's Fresh ink of the same project, while it shows on the page too (its `review` null). */
+	freshInk: ShownFreshInkPost | null;
+};
+
+/** A post's linked review (openapi.yaml, LinkedReview): its id, stars, words and day. */
+export type ShownLinkedReview = {
+	id: string;
+	rating: number;
+	body: string;
+	date: string;
 };
 
 /** The studio's average and count (openapi.yaml, ReviewRating). */
@@ -68,6 +79,8 @@ export type ShownFreshInkPost = ShownWorkPhoto & {
 	artist: ShownArtistTag | null;
 	/** The day it was published (`published_at`: the latest publication, for any surface), in its timezone (YYYY-MM-DD). */
 	date: string;
+	/** The client's review of the same project, while it shows on the page too. */
+	review: ShownLinkedReview | null;
 };
 
 /** A page of Fresh ink before formatting (openapi.yaml, listFreshInk). */
@@ -117,8 +130,9 @@ export default class PublicReviewService {
 	/**
 	 * A page of the shown reviews, newest first (`created_at desc, id desc`,
 	 * never "best first"), and the studio's average and count from all of
-	 * them, only from MIN_RATED_REVIEWS (ruling 10). Three queries: the
-	 * visible artists, the page and the rating.
+	 * them, only from MIN_RATED_REVIEWS (ruling 10). Three queries (the
+	 * visible artists, the page and the rating), and two more while the
+	 * page shows Fresh ink: each review's linked post and its media.
 	 */
 	async reviews(
 		tenant: Tenant,
@@ -131,6 +145,7 @@ export default class PublicReviewService {
 		const page = shownReviews(tenant)
 			.select(
 				"id",
+				"project_id",
 				"rating",
 				"body",
 				"shown_name",
@@ -161,8 +176,18 @@ export default class PublicReviewService {
 			)
 			.first();
 		const count = Number(totals?.$extras.total ?? 0);
+		// The linked posts: only while the page shows its Fresh ink.
+		const posts = shows(tenant, "fresh_ink")
+			? await this.postsOfProjects(
+					tenant,
+					kept.map((row) => row.projectId),
+					tags,
+				)
+			: new Map<string, ShownFreshInkPost>();
 		return {
-			reviews: kept.map((row) => shownReview(tenant, row, tags)),
+			reviews: kept.map((row) =>
+				shownReview(tenant, row, tags, posts.get(row.projectId) ?? null),
+			),
 			nextCursor:
 				rows.length > query.limit
 					? encodeWorkCursor({
@@ -181,7 +206,8 @@ export default class PublicReviewService {
 	 * A page of the shown Fresh ink posts, newest published first
 	 * (`published_at desc, id desc`), each with its public copies in order
 	 * (the lead, always a photo, then its other photos and ready videos).
-	 * Three queries: the visible artists, the page and its media. A post
+	 * Three queries (the visible artists, the page and its media), and one
+	 * more while the page shows Reviews: each post's linked review. A post
 	 * whose lead has no public photo is left out (never shown half made); the
 	 * cursor still moves past it.
 	 */
@@ -193,23 +219,9 @@ export default class PublicReviewService {
 			return { posts: [], nextCursor: null };
 		}
 		const tags = await this.artistTags(tenant);
-		const page = ClientPost.query()
-			.select(
-				"id",
-				"artist_id",
-				"shown_name",
-				"caption",
-				"styles",
-				"placement",
-				"published_at",
-			)
-			.select(dbClient().raw(cursorAt("published_at")))
-			.where("tenant_id", tenant.id)
-			.where("status", "approved")
-			.whereNotNull("submitted_at")
-			.whereNotNull("published_at")
-			.where("consent_studio_page", true)
-			.whereNull("taken_down_at");
+		const page = shownPosts(tenant)
+			.select(...POST_COLUMNS)
+			.select(dbClient().raw(cursorAt("published_at")));
 		if (query.cursor) {
 			page.whereRaw("(published_at, id) < (?::timestamptz, ?::uuid)", [
 				query.cursor.at,
@@ -222,29 +234,20 @@ export default class PublicReviewService {
 			.limit(query.limit + 1);
 		const kept = rows.slice(0, query.limit);
 		const last = kept[query.limit - 1];
-		const media =
-			kept.length === 0
-				? []
-				: await ClientPostMedia.query()
-						.where("tenant_id", tenant.id)
-						.whereIn(
-							"post_id",
-							kept.map((post) => post.id),
-						)
-						.orderBy("position", "asc");
-		const byPost = new Map<string, ClientPostMedia[]>();
-		for (const item of media) {
-			byPost.set(item.postId, [...(byPost.get(item.postId) ?? []), item]);
-		}
+		const built = await this.withMedia(tenant, kept, tags);
+		// The linked reviews: only while the page shows its Reviews.
+		const reviews = shows(tenant, "reviews")
+			? await linkedReviews(
+					tenant,
+					kept.map((post) => post.projectId),
+				)
+			: new Map<string, ShownLinkedReview>();
 		const posts: ShownFreshInkPost[] = [];
 		for (const post of kept) {
-			const shown = await this.shownPost(
-				tenant,
-				post,
-				byPost.get(post.id) ?? [],
-				tags,
-			);
-			if (shown) posts.push(shown);
+			const shown = built.get(post.id);
+			if (shown) {
+				posts.push({ ...shown, review: reviews.get(post.projectId) ?? null });
+			}
 		}
 		return {
 			posts,
@@ -256,6 +259,63 @@ export default class PublicReviewService {
 						})
 					: null,
 		};
+	}
+
+	/**
+	 * The shown posts of these projects, built as `freshInk()` builds them
+	 * (their `review` null), by project: a review's linked Fresh ink. Two
+	 * queries (the posts, their media); none for no projects.
+	 */
+	private async postsOfProjects(
+		tenant: Tenant,
+		projectIds: string[],
+		tags: Map<string, ShownArtistTag>,
+	): Promise<Map<string, ShownFreshInkPost>> {
+		if (projectIds.length === 0) return new Map();
+		const rows = await shownPosts(tenant)
+			.select(...POST_COLUMNS)
+			.whereIn("project_id", projectIds);
+		const built = await this.withMedia(tenant, rows, tags);
+		const byProject = new Map<string, ShownFreshInkPost>();
+		for (const row of rows) {
+			const shown = built.get(row.id);
+			if (shown) byProject.set(row.projectId, shown);
+		}
+		return byProject;
+	}
+
+	/**
+	 * These posts with their media (one query), each built by `shownPost`,
+	 * by post id; a post whose lead has no public photo is left out.
+	 */
+	private async withMedia(
+		tenant: Tenant,
+		rows: ClientPost[],
+		tags: Map<string, ShownArtistTag>,
+	): Promise<Map<string, ShownFreshInkPost>> {
+		if (rows.length === 0) return new Map();
+		const media = await ClientPostMedia.query()
+			.where("tenant_id", tenant.id)
+			.whereIn(
+				"post_id",
+				rows.map((post) => post.id),
+			)
+			.orderBy("position", "asc");
+		const byPost = new Map<string, ClientPostMedia[]>();
+		for (const item of media) {
+			byPost.set(item.postId, [...(byPost.get(item.postId) ?? []), item]);
+		}
+		const built = new Map<string, ShownFreshInkPost>();
+		for (const post of rows) {
+			const shown = await this.shownPost(
+				tenant,
+				post,
+				byPost.get(post.id) ?? [],
+				tags,
+			);
+			if (shown) built.set(post.id, shown);
+		}
+		return built;
 	}
 
 	/** The visible artists' tags by id: the artists the gallery shows (a closed one too). */
@@ -307,6 +367,7 @@ export default class PublicReviewService {
 			placement: post.placement,
 			artist: tags.get(post.artistId) ?? null,
 			date: dayOf(post.publishedAt as DateTime, tenant.timezone),
+			review: null,
 		};
 	}
 
@@ -388,6 +449,62 @@ export default class PublicReviewService {
 	}
 }
 
+/** A post's columns the public reads build it from. */
+const POST_COLUMNS = [
+	"id",
+	"project_id",
+	"artist_id",
+	"shown_name",
+	"caption",
+	"styles",
+	"placement",
+	"published_at",
+] as const;
+
+/** Whether the studio's page shows this section (Page look). */
+function shows(tenant: Tenant, section: "reviews" | "fresh_ink"): boolean {
+	return sectionsOf(tenant.storefrontSections).includes(section);
+}
+
+/**
+ * The posts the studio's page shows (rulings 7, 8 and 12): approved,
+ * submitted, published (`published_at`: its public copies exist), allowed on
+ * the studio's page and not taken down; the model's soft-delete scope
+ * leaves out the deleted ones. Whether its lead has a public photo is
+ * `shownPost`'s.
+ */
+function shownPosts(tenant: Pick<Tenant, "id">) {
+	return ClientPost.query()
+		.where("tenant_id", tenant.id)
+		.where("status", "approved")
+		.whereNotNull("submitted_at")
+		.whereNotNull("published_at")
+		.where("consent_studio_page", true)
+		.whereNull("taken_down_at");
+}
+
+/** The shown reviews of these projects, as a post's linked review, by project. One query. */
+async function linkedReviews(
+	tenant: Tenant,
+	projectIds: string[],
+): Promise<Map<string, ShownLinkedReview>> {
+	if (projectIds.length === 0) return new Map();
+	const rows = await shownReviews(tenant)
+		.select("id", "project_id", "rating", "body", "created_at")
+		.whereIn("project_id", projectIds);
+	return new Map(
+		rows.map((row) => [
+			row.projectId,
+			{
+				id: row.id,
+				rating: row.rating as number,
+				body: row.body,
+				date: dayOf(row.createdAt, tenant.timezone),
+			},
+		]),
+	);
+}
+
 /**
  * The reviews the studio's page shows: allowed there by the client, not
  * taken down; the model's soft-delete scope leaves out the client's deleted
@@ -405,6 +522,7 @@ function shownReview(
 	tenant: Tenant,
 	row: ClientReview,
 	tags: Map<string, ShownArtistTag>,
+	freshInk: ShownFreshInkPost | null,
 ): ShownStudioReview {
 	const reply =
 		row.reply !== null && row.repliedAt !== null && !row.replyTakenDownAt
@@ -418,6 +536,7 @@ function shownReview(
 		date: dayOf(row.createdAt, tenant.timezone),
 		artist: tags.get(row.artistId) ?? null,
 		reply,
+		freshInk,
 	};
 }
 

@@ -17,7 +17,10 @@ jobs:
   ci:
     name: Check, typecheck, build, test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The tests take about 10 minutes, and installing ffmpeg from Ubuntu's
+    # mirror has taken 8 to 17 on its own (2026-11-19): 35 leaves room for a
+    # slow mirror without hiding a hung run for long.
+    timeout-minutes: 35
 
     services:
       postgres:

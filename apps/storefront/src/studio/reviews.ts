@@ -1,8 +1,26 @@
 import type { ListReviewsQuery } from "@tattoo-drip/sdk";
 import { fill } from "../intake/template.ts";
+import {
+	type DayView,
+	dayView,
+	readArtistTag,
+	readShownName,
+	readText,
+} from "./client-words.ts";
 import { studioCopy } from "./copy.ts";
-import { cleanLine, cleanText } from "./text.ts";
-import { ARTIST_SLUG } from "./view-model.ts";
+import {
+	type FreshInkPostView,
+	REVIEW_INK_PREFIX,
+	readFreshInkPost,
+} from "./fresh-ink.ts";
+
+// The readers both lists share live in client-words.ts; re-exported for their importers.
+export {
+	type DayView,
+	dayView,
+	readArtistTag,
+	readShownName,
+} from "./client-words.ts";
 
 /**
  * Client reviews on the studio's own page (Reviews and Fresh ink, slice 3):
@@ -27,18 +45,10 @@ export const MIN_RATED_REVIEWS = 3;
 /** A review's text, a reply's and a shown name at most, in characters (the contract's). */
 const MAX_BODY = 2000;
 const MAX_REPLY = 1000;
-const MAX_NAME = 40;
 
 /** A cursor as the API writes it: base64url, at most 200 characters. */
 const CURSOR = /^[A-Za-z0-9_-]{1,200}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-/** A day the API sent ("2026-10-01"), as the page says it ("October 2026") and as `<time dateTime>` takes it. */
-export interface DayView {
-	readonly text: string;
-	readonly dateTime: string;
-}
 
 /** One review as the page shows it. */
 export interface ReviewView {
@@ -59,6 +69,8 @@ export interface ReviewView {
 		readonly body: string;
 		readonly date: DayView | null;
 	} | null;
+	/** The client's Fresh ink of the same project, while the page shows it too (its viewer's ids `review-ink-…`). */
+	readonly freshInk: FreshInkPostView | null;
 }
 
 /** The studio's average from 3 reviews: "4.7 from 12 reviews". */
@@ -99,57 +111,25 @@ function own(value: unknown, key: string): unknown {
 		: undefined;
 }
 
-const MONTH_YEAR = new Intl.DateTimeFormat("en-GB", {
-	month: "long",
-	year: "numeric",
-	timeZone: "UTC",
-});
-
 /**
- * A day the API sent, as the page says it: "October 2026" (the month is
- * enough for a review and keeps server and browser the same: it is read in
- * UTC), or null for anything that is not a real YYYY-MM-DD day.
+ * A review's linked Fresh ink: its viewer's ids from the review's position
+ * (unique on the page), but its bar's words its own: "Photo 1", not the
+ * review's number.
  */
-export function dayView(value: unknown): DayView | null {
-	if (typeof value !== "string") return null;
-	const match = DAY.exec(value);
-	if (!match) return null;
-	const date = new Date(`${value}T00:00:00Z`);
-	if (
-		Number.isNaN(date.getTime()) ||
-		date.toISOString().slice(0, 10) !== value
-	) {
-		return null;
-	}
-	return { text: MONTH_YEAR.format(date), dateTime: value };
-}
-
-/** A visible artist's tag ({ slug, name }), with their page; null for anything else. */
-export function readArtistTag(
+function linkedPost(
 	value: unknown,
-): { readonly name: string; readonly href: string } | null {
-	const slug = own(value, "slug");
-	if (typeof slug !== "string" || !ARTIST_SLUG.test(slug)) return null;
-	const name = own(value, "name");
-	return {
-		name: (typeof name === "string" ? cleanLine(name) : null) ?? slug,
-		href: `/artists/${slug}`,
-	};
+	imageOrigin: string | null,
+	n: number,
+): FreshInkPostView | null {
+	const post = readFreshInkPost(value, imageOrigin, n, REVIEW_INK_PREFIX);
+	return post && { ...post, label: fill(studioCopy.work.photoN, { n: 1 }) };
 }
 
-/** A shown name: one line, 1 to 40 characters, else null (the item is dropped). */
-export function readShownName(value: unknown): string | null {
-	const line = typeof value === "string" ? cleanLine(value) : null;
-	return line && Array.from(line).length <= MAX_NAME ? line : null;
-}
-
-/** Plain text up to `max` characters, its line breaks kept, else null. */
-function readText(value: unknown, max: number): string | null {
-	const text = typeof value === "string" ? cleanText(value) : null;
-	return text && Array.from(text).length <= max ? text : null;
-}
-
-function readReview(item: unknown): ReviewView | null {
+function readReview(
+	item: unknown,
+	imageOrigin: string | null,
+	n: number,
+): ReviewView | null {
 	const id = own(item, "id");
 	const rating = own(item, "rating");
 	const body = readText(own(item, "body"), MAX_BODY);
@@ -180,6 +160,7 @@ function readReview(item: unknown): ReviewView | null {
 			replyBody === null
 				? null
 				: { body: replyBody, date: dayView(own(reply, "date")) },
+		freshInk: linkedPost(own(item, "freshInk"), imageOrigin, n),
 	};
 }
 
@@ -216,12 +197,15 @@ function readRating(value: unknown): RatingView | null {
  * (anything else is dropped), each id once. Anything that is not a page is
  * no reviews. Pure.
  */
-export function reviewsView(page: unknown): ReviewsView {
+export function reviewsView(
+	page: unknown,
+	imageOrigin: string | null = null,
+): ReviewsView {
 	if (typeof page !== "object" || page === null) return EMPTY_REVIEWS;
 	const data = own(page, "data");
 	const seen = new Set<string>();
 	const reviews = (Array.isArray(data) ? data.slice(0, MAX_REVIEWS_PAGE) : [])
-		.map(readReview)
+		.map((item, index) => readReview(item, imageOrigin, index + 1))
 		.filter((review): review is ReviewView => {
 			if (review === null || seen.has(review.id)) return false;
 			seen.add(review.id);
