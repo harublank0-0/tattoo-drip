@@ -2,10 +2,11 @@ import { inject } from "@adonisjs/core";
 import { DateTime } from "luxon";
 import type { ImagePurpose } from "#modules/media/services/image_service";
 import AllowanceBundle from "#modules/packages/models/allowance_bundle";
-import { PACKAGES } from "#modules/packages/packages";
+import { PACKAGES, type PackageKey } from "#modules/packages/packages";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import EntitlementService from "#modules/packages/services/entitlement_service";
 import {
+	formatBytes,
 	STORAGE_CATEGORIES,
 	STORAGE_CATEGORY,
 	type StorageCategory,
@@ -17,6 +18,14 @@ import { dbClient } from "#services/db_context";
 type TenantRef = Pick<Tenant, "id">;
 
 const MB = 1048576;
+
+/** A Studio studio's storage as it would be on Solo (`downgradePreview`). */
+export type DowngradePreview = {
+	usedText: string;
+	soloText: string;
+	/** How far over Solo's allowance; null when it fits. */
+	overText: string | null;
+};
 
 export type StorageUsage = {
 	/** Stored files a live record holds, plus unexpired reservations. */
@@ -77,6 +86,34 @@ export default class StorageMeterService {
 		const megabytes = studio?.storageMegabytes ?? null;
 		const offered = megabytes === null ? null : megabytes * MB;
 		return offered !== null && offered > limitBytes ? offered : null;
+	}
+
+	/**
+	 * The downgrade preview (step 4): a Studio studio's usage (`usage`, as
+	 * Billing read it) against Solo's allowance, and how far over it is;
+	 * null for a studio already on Solo or when Solo's bundle isn't metered.
+	 * Phase 4's downgrade screen shows it before the owner confirms; nothing
+	 * is deleted at renewal, uploads just pause while it's over.
+	 */
+	async downgradePreview(
+		usage: StorageUsage,
+		current: PackageKey,
+	): Promise<DowngradePreview | null> {
+		if (current !== "studio") return null;
+		const solo = await AllowanceBundle.findBy(
+			"key",
+			PACKAGES.solo.defaultBundleKey,
+		);
+		if (!solo || solo.storageMegabytes === null) return null;
+		const soloBytes = solo.storageMegabytes * MB;
+		return {
+			usedText: formatBytes(usage.usedBytes),
+			soloText: formatBytes(soloBytes),
+			overText:
+				usage.usedBytes > soloBytes
+					? formatBytes(usage.usedBytes - soloBytes)
+					: null,
+		};
 	}
 
 	/** The studio's usage now, by category, with its allowance. */

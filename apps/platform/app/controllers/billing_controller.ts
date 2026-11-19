@@ -42,21 +42,27 @@ export default class BillingController {
 			? await BillingPlan.query().whereIn("id", ids)
 			: [];
 		const usage = await usageForRequest(ctx, () => this.storage.usage(tenant));
+		const entitlement = await this.entitlements.for(tenant);
 		return ctx.inertia.render("settings/billing", {
 			...billingPage(
 				overview,
 				new Map(plans.map((plan) => [plan.id, plan])),
 				tenant.timezone,
-				await this.entitlements.for(tenant),
+				entitlement,
 				await this.packages.artistUsage(tenant),
 			),
-			// The storage meter: the line, and what each category holds.
+			// The storage meter: the line, what each category holds, and for a
+			// Studio studio how it would be on Solo.
 			storageDetail: {
 				...storageLine(usage),
 				categories: STORAGE_CATEGORIES.map((key) => ({
 					key,
 					sizeText: formatBytes(usage.byCategory[key]),
 				})),
+				downgrade: await this.storage.downgradePreview(
+					usage,
+					entitlement.package,
+				),
 			},
 		});
 	}

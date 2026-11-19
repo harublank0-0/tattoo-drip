@@ -3,6 +3,8 @@ import { Link, router } from "@inertiajs/react";
 import { CreditCard } from "lucide-react";
 import { useState } from "react";
 import { urlFor } from "~/client";
+import DowngradeStoragePreview from "~/components/downgrade_storage_preview";
+import type { DowngradePreview } from "~/components/downgrade_storage_text";
 import Section from "~/components/section";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -76,6 +78,8 @@ type StorageDetail = {
 		key: "portfolio" | "clients" | "design_lab";
 		sizeText: string;
 	}[];
+	/** A Studio studio's storage on Solo; null otherwise. */
+	downgrade: DowngradePreview | null;
 };
 
 const selectClass =
@@ -480,6 +484,9 @@ function StorageSection({
 					);
 				})}
 			</ul>
+			{detail.downgrade && (
+				<DowngradeStoragePreview preview={detail.downgrade} />
+			)}
 			{!detail.enforced && (
 				<p className="text-sm text-muted-foreground">
 					Storage limits aren't applied yet.
