@@ -10,6 +10,7 @@ import { bellKinds } from "#modules/notifications/alerts";
 import AlertService from "#modules/notifications/services/alert_service";
 import WaitingService from "#modules/projects/services/waiting_service";
 import StudioReviewService from "#modules/reviews/services/studio_review_service";
+import { rearmWhenFreed } from "#modules/storage/alert";
 import { storageLine, usageForRequest } from "#modules/storage/display";
 import StorageMeterService from "#modules/storage/services/storage_meter_service";
 import { storageEnforcement } from "#modules/storage/settings";
@@ -135,14 +136,16 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 				STORAGE_PAGES.has(ctx.route?.name ?? ""))
 				? await ensureDbContext(
 						{ userId: auth.user.id, tenantId: tenant.id },
-						async () =>
-							storageLine(
-								await usageForRequest(ctx, async () =>
-									(await ctx.containerResolver.make(StorageMeterService)).usage(
-										tenant,
-									),
+						async () => {
+							const usage = await usageForRequest(ctx, async () =>
+								(await ctx.containerResolver.make(StorageMeterService)).usage(
+									tenant,
 								),
-							),
+							);
+							// Space freed by any delete rearms the 95% email.
+							await rearmWhenFreed(tenant, usage);
+							return storageLine(usage);
+						},
 					)
 				: null;
 

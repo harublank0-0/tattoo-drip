@@ -21,7 +21,6 @@ const MB = 1048576;
 
 /** A Studio studio's storage as it would be on Solo (`downgradePreview`). */
 export type DowngradePreview = {
-	usedText: string;
 	soloText: string;
 	/** How far over Solo's allowance; null when it fits. */
 	overText: string | null;
@@ -107,11 +106,11 @@ export default class StorageMeterService {
 		if (!solo || solo.storageMegabytes === null) return null;
 		const soloBytes = solo.storageMegabytes * MB;
 		return {
-			usedText: formatBytes(usage.usedBytes),
 			soloText: formatBytes(soloBytes),
+			// At least 1 KB, so a few bytes over never reads "0 KB".
 			overText:
 				usage.usedBytes > soloBytes
-					? formatBytes(usage.usedBytes - soloBytes)
+					? formatBytes(Math.max(1024, usage.usedBytes - soloBytes))
 					: null,
 		};
 	}

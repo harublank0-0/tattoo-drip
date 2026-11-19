@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
+import queue from "@adonisjs/queue/services/main";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import { StorageFullError } from "#modules/media/errors";
@@ -247,7 +248,13 @@ test.group("Storage: reservations", (group) => {
  * transaction; its studio is committed and forgotten again.
  */
 test.group("Storage: concurrent reservations", (group) => {
+	// Near the limit the reservations queue the 95% alert: faked, so no job
+	// row is committed outside the global transaction.
+	group.each.setup(() => {
+		queue.fake();
+	});
 	group.each.teardown(async () => {
+		queue.restore();
 		unsetStorageEnforcement();
 		await forgetStudio("res-race");
 	});

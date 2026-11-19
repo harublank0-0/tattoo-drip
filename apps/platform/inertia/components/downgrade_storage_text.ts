@@ -1,6 +1,5 @@
 /** A Studio studio's storage as it would be on Solo (StorageMeterService.downgradePreview). */
 export type DowngradePreview = {
-	usedText: string;
 	soloText: string;
 	/** How far over Solo's allowance; null when it fits. */
 	overText: string | null;
@@ -8,12 +7,19 @@ export type DowngradePreview = {
 
 /**
  * The downgrade preview's sentence (the storage meter, step 4): whether the
- * studio's files fit Solo's allowance, and if not, that nothing is deleted
- * and new uploads pause until there's room.
+ * studio's files fit Solo's allowance, and if not, how far over, that
+ * nothing is deleted, and that new uploads pause until there's room (once
+ * storage limits apply, before `enforced`).
  */
-export function downgradeStorageText(preview: DowngradePreview): string {
-	const on = `On Solo (${preview.soloText}), your ${preview.usedText}`;
-	return preview.overText === null
-		? `${on} fits.`
-		: `${on} is ${preview.overText} over. Nothing is deleted: your files stay, and new uploads pause until there's room.`;
+export function downgradeStorageText(
+	preview: DowngradePreview,
+	enforced: boolean,
+): string {
+	if (preview.overText === null) {
+		return `On Solo, everything you keep fits in its ${preview.soloText}.`;
+	}
+	const pause = enforced
+		? "new uploads pause until there's room"
+		: "once storage limits apply, new uploads pause until there's room";
+	return `On Solo, your files would be ${preview.overText} over its ${preview.soloText}. Nothing is deleted: your files stay, and ${pause}.`;
 }

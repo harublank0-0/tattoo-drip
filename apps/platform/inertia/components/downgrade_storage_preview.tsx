@@ -10,12 +10,15 @@ import {
  */
 export default function DowngradeStoragePreview({
 	preview,
+	enforced,
 }: {
 	preview: DowngradePreview;
+	/** STORAGE_ENFORCEMENT is on: a full studio's uploads are refused. */
+	enforced: boolean;
 }) {
 	return (
 		<p className="text-sm text-muted-foreground">
-			{downgradeStorageText(preview)}
+			{downgradeStorageText(preview, enforced)}
 		</p>
 	);
 }

@@ -4,6 +4,7 @@ import logger from "@adonisjs/core/services/logger";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { StorageFullError } from "#modules/media/errors";
 import type { ImagePurpose } from "#modules/media/services/image_service";
+import { ALERT_AT, REARM_BELOW } from "#modules/storage/alert";
 import {
 	ALWAYS_ACCEPTED,
 	formatBytes,
@@ -149,15 +150,25 @@ async function decide(
 	const limit = usage.limitBytes;
 	const fits = limit === null || usage.usedBytes + bytes <= limit;
 	if (limit !== null) {
-		await noticeCrossing(trx, {
-			tenantId,
-			limit,
-			before: usage.usedBytes,
-			// A refused upload adds nothing (with enforcement on).
-			after: usage.usedBytes + (fits || !enforced ? bytes : 0),
-			alerted: studio.storage_alerted_at !== null,
-			enforced,
-		});
+		// In a savepoint: the alert's bookkeeping never fails the upload.
+		try {
+			await trx.transaction((savepoint) =>
+				noticeCrossing(savepoint, {
+					tenantId,
+					limit,
+					before: usage.usedBytes,
+					// A refused upload adds nothing (with enforcement on).
+					after: usage.usedBytes + (fits || !enforced ? bytes : 0),
+					alerted: studio.storage_alerted_at !== null,
+					enforced,
+				}),
+			);
+		} catch (error) {
+			logger.error(
+				{ err: error, tenantId },
+				"the storage alert could not be noted",
+			);
+		}
 	}
 	if (limit !== null && !fits) {
 		const remaining = Math.max(0, limit - usage.usedBytes);
@@ -200,11 +211,6 @@ async function decide(
 	}
 	return { kind: "reserved", keys: items.map((item) => item.key) };
 }
-
-/** The share of the allowance at which the owners are emailed (the storage meter). */
-const ALERT_AT = 0.95;
-/** Under this share the alert rearms: a later crossing emails again. */
-const REARM_BELOW = 0.9;
 
 /**
  * The 95% email, noticed (step 3 of the storage meter), in the

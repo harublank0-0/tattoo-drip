@@ -25,15 +25,18 @@ test.group("Storage: the downgrade preview", (group) => {
 	}) => {
 		const meter = await app.container.make(StorageMeterService);
 		assert.deepEqual(await meter.downgradePreview(usage(3 * GB), "studio"), {
-			usedText: "3 GB",
 			soloText: "5 GB",
 			overText: null,
 		});
 		assert.deepEqual(await meter.downgradePreview(usage(7.5 * GB), "studio"), {
-			usedText: "7.5 GB",
 			soloText: "5 GB",
 			overText: "2.5 GB",
 		});
+		// A few bytes over still reads as over, never "0 KB".
+		assert.deepEqual(
+			await meter.downgradePreview(usage(5 * GB + 10), "studio"),
+			{ soloText: "5 GB", overText: "1 KB" },
+		);
 	});
 
 	test("a Solo studio has nothing to preview", async ({ assert }) => {

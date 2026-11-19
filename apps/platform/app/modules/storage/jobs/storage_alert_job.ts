@@ -2,6 +2,7 @@ import app from "@adonisjs/core/services/app";
 import logger from "@adonisjs/core/services/logger";
 import { dashboardUrl } from "#modules/notifications/alerts";
 import StorageNearlyFullMail from "#modules/notifications/emails/storage_nearly_full_mail";
+import { ALERT_AT } from "#modules/storage/alert";
 import { storageLine } from "#modules/storage/display";
 import StorageMeterService from "#modules/storage/services/storage_meter_service";
 import { storageEnforcement } from "#modules/storage/settings";
@@ -12,9 +13,6 @@ import TenantJob from "#services/tenant_job";
 import env from "#start/env";
 
 type Payload = { tenantId: string };
-
-/** The share of the allowance the email is about (reservations.ts notices it). */
-const ALERT_AT = 0.95;
 
 /**
  * The storage meter's 95% email (step 3): queued by an upload's reservation
@@ -31,6 +29,10 @@ export default class StorageAlertJob extends TenantJob<Payload> {
 		const { tenantId } = this.payload;
 		if (storageEnforcement() !== "enforce") return;
 		const tenant = { id: tenantId };
+		// A studio removed since the upload has nobody to tell.
+		if (!(await (await app.container.make(TenancyService)).find(tenantId))) {
+			return;
+		}
 		const usage = await (await app.container.make(StorageMeterService)).usage(
 			tenant,
 		);
@@ -41,6 +43,7 @@ export default class StorageAlertJob extends TenantJob<Payload> {
 			const claimed = await trx
 				.from("tenants")
 				.where("id", tenantId)
+				.whereNull("deleted_at")
 				.whereNull("storage_alerted_at")
 				.update({ storage_alerted_at: new Date() })
 				.returning(["name", "slug"]);
@@ -54,11 +57,14 @@ export default class StorageAlertJob extends TenantJob<Payload> {
 				return;
 			}
 			const line = storageLine(usage);
+			// Rounded down, so 99.6% never reads as 100%.
+			const percent = Math.floor((usedBytes / limitBytes) * 100);
+			const full = usedBytes >= limitBytes;
 			const owners = (
 				await (await app.container.make(TenancyService)).members(tenant)
 			).filter((member) => member.role === "owner");
 			logger.info(
-				{ tenantId, percent: line.percent, owners: owners.length },
+				{ tenantId, percent, owners: owners.length },
 				"Storage nearly full: owners emailed.",
 			);
 			for (const owner of owners) {
@@ -67,7 +73,8 @@ export default class StorageAlertJob extends TenantJob<Payload> {
 						to: owner.email,
 						recipientName: owner.fullName,
 						studioName: studio.name,
-						percent: line.percent ?? 95,
+						percent,
+						full,
 						limitText: line.limitText ?? "",
 						url: dashboardUrl(
 							env.get("APP_URL"),

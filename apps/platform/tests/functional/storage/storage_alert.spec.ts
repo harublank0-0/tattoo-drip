@@ -207,6 +207,7 @@ test.group("Storage: the 95% email", (group) => {
 			recipientName: null,
 			studioName: "Black Needle",
 			percent: 96,
+			full: false,
 			limitText: "5 GB",
 			url: "https://app.example/t/black-needle/settings/billing",
 		});
@@ -223,6 +224,61 @@ test.group("Storage: the 95% email", (group) => {
 		mail.message.assertTextIncludes(
 			"See storage: https://app.example/t/black-needle/settings/billing",
 		);
+	});
+
+	test("a full studio's email says it's full, not nearly", async ({
+		assert,
+	}) => {
+		const fake = queue.fake();
+		enforceStorage(true);
+		const s = await smallStudio("mail-full", mb(1.125));
+
+		await runAlertJob(s.tenant);
+
+		const [mail] = mails(fake);
+		assert.equal(
+			mail.mailMessage.message.subject,
+			"Studio mail-full's storage is full",
+		);
+		assert.include(mail.mailMessage.views.html?.data, {
+			full: true,
+			percent: 112,
+		});
+	});
+
+	test("a job for a studio removed meanwhile does nothing", async ({
+		assert,
+	}) => {
+		const fake = queue.fake();
+		enforceStorage(true);
+		const s = await smallStudio("mail-gone", mb(0.97));
+		await inTenant(s.tenant, () =>
+			Tenant.query()
+				.where("id", s.tenant.id)
+				.update({ deleted_at: new Date() }),
+		);
+
+		await runAlertJob(s.tenant);
+
+		assert.lengthOf(mails(fake), 0);
+	});
+
+	test("once usage is under 90%, any page a member opens rearms the alert", async ({
+		client,
+		assert,
+	}) => {
+		enforceStorage(true);
+		const s = await smallStudio("mail-rearm", mb(0.5));
+		await setMarker(s.tenant);
+
+		(
+			await client
+				.get(`/t/${s.tenant.slug}/projects`)
+				.loginAs(s.owner)
+				.withInertia()
+		).assertStatus(200);
+
+		assert.isNull(await markerOf(s.tenant));
 	});
 
 	test("a job that finds usage back under 95% sends nothing and leaves the marker unset", async ({

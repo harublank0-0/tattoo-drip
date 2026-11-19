@@ -485,7 +485,10 @@ function StorageSection({
 				})}
 			</ul>
 			{detail.downgrade && (
-				<DowngradeStoragePreview preview={detail.downgrade} />
+				<DowngradeStoragePreview
+					preview={detail.downgrade}
+					enforced={detail.enforced}
+				/>
 			)}
 			{!detail.enforced && (
 				<p className="text-sm text-muted-foreground">

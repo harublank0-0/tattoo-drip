@@ -5,8 +5,10 @@ export type StorageNearlyFullMailData = {
 	to: string;
 	recipientName: string | null;
 	studioName: string;
-	/** Whole percent of the allowance used. */
+	/** Whole percent of the allowance used, rounded down. */
 	percent: number;
+	/** Nothing is left: uploads are paused now. */
+	full: boolean;
 	/** The allowance, as people read it: "5 GB". */
 	limitText: string;
 	/** Settings, Billing on the dashboard, where storage is broken down. */
@@ -21,7 +23,7 @@ export type StorageNearlyFullMailData = {
 export default class StorageNearlyFullMail extends BaseMail {
 	constructor(private data: StorageNearlyFullMailData) {
 		super();
-		this.subject = `${data.studioName}'s storage is nearly full`;
+		this.subject = `${data.studioName}'s storage is ${data.full ? "full" : "nearly full"}`;
 	}
 
 	prepare() {
