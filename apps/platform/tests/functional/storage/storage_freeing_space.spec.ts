@@ -218,6 +218,17 @@ test.group("Storage: freeing space", (group) => {
 		const payment = await reload(verified.id);
 		assert.equal(payment.status, "verified");
 		assert.isNull(payment.proofImageKey);
+		assert.isNotNull(payment.proofRemovedAt);
 		assert.isBelow((await usageOf(tenant)).byCategory.clients, before);
+		// The marker is set once, only with the proof's removal.
+		await assert.rejects(
+			() =>
+				inTenant(tenant, () =>
+					Payment.query()
+						.where("id", verified.id)
+						.update({ proof_removed_at: null }),
+				),
+			/proof_removed_at is set only when the proof is removed/,
+		);
 	});
 });

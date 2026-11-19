@@ -1212,6 +1212,8 @@ export default class WorkPhotoService {
 					}),
 					trx,
 				);
+				// The upload waits for the worker: its storage is held longer.
+				afterCommit(() => this.videos.holdForProcessing(tenant, upload.key));
 				return video;
 			});
 		} catch (error) {

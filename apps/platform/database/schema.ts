@@ -1668,6 +1668,7 @@ export class PaymentSchema extends BaseModel {
 		"proofImageHeight",
 		"proofImageKey",
 		"proofImageWidth",
+		"proofRemovedAt",
 		"status",
 		"tenantId",
 		"updatedAt",
@@ -1699,6 +1700,8 @@ export class PaymentSchema extends BaseModel {
 	declare proofImageKey: string | null;
 	@column()
 	declare proofImageWidth: number | null;
+	@column.dateTime()
+	declare proofRemovedAt: DateTime | null;
 	@column()
 	declare status: string;
 	@column()

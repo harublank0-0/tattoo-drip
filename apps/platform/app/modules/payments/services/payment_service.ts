@@ -159,7 +159,8 @@ export default class PaymentService {
 	/**
 	 * Deletes a decided payment's deposit screenshot, owners only (the
 	 * storage meter: it frees its space). The payment stays as it was; only
-	 * its proof is cleared, which payments_guard allows. A payment still
+	 * its proof is cleared and `proof_removed_at` set, which payments_guard
+	 * allows once. A payment still
 	 * waiting for a decision keeps it (`proof_waiting`). The file goes first
 	 * (ImageDeleteError when it can't, and nothing changes). False when there
 	 * was no screenshot.
@@ -184,6 +185,7 @@ export default class PaymentService {
 				proofImageKey: null,
 				proofImageWidth: null,
 				proofImageHeight: null,
+				proofRemovedAt: DateTime.utc(),
 			});
 			await live.save();
 			return true;

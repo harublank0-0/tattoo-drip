@@ -38,7 +38,11 @@ import {
 	type VideoType,
 } from "#modules/media/video";
 import { recordStoredFile } from "#modules/storage/record_stored_file";
-import { releaseStorage, reserveStorage } from "#modules/storage/reservations";
+import {
+	extendReservation,
+	releaseStorage,
+	reserveStorage,
+} from "#modules/storage/reservations";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { currentClient } from "#services/db_context";
 
@@ -101,8 +105,13 @@ export type ShownVideoSource = {
  * public disk under `work_video`; the poster through ImageService, so it has
  * a photo's copies. The staged object is deleted once processed or refused.
  */
-/** A video's reservation outlasts the signed PUT and the processing that follows. */
-const VIDEO_RESERVATION_MINUTES = 75;
+/**
+ * A video's reservation: from signing, the signed PUT's window and a little
+ * more (an upload that never arrives gives its space back soon); once the
+ * upload is added, long enough for the worker to process it.
+ */
+const VIDEO_SIGN_RESERVATION_MINUTES = 20;
+const VIDEO_PROCESS_RESERVATION_MINUTES = 75;
 
 /** The storage reservation of a staged upload, named after it. */
 const stagedReservationKey = (stagingKey: string) => `reserve:${stagingKey}`;
@@ -137,9 +146,10 @@ export default class VideoService {
 	 * dashboard's own route takes the upload (the caller builds its URL).
 	 * First the studio's storage is reserved for `size` bytes under
 	 * `purpose` (StorageFullError when it doesn't fit, with
-	 * STORAGE_ENFORCEMENT on; a client's Fresh ink video is always taken),
-	 * until `deleteStaged` releases it once the upload is processed, refused
-	 * or given up, or it expires.
+	 * STORAGE_ENFORCEMENT on; a client's Fresh ink video is always taken)
+	 * for the upload's window; `holdForProcessing` extends it once the
+	 * upload is added, and `deleteStaged` releases it once the upload is
+	 * processed, refused or given up. Otherwise it expires.
 	 */
 	async signUpload(
 		tenant: TenantRef,
@@ -153,7 +163,7 @@ export default class VideoService {
 			tenantId: tenant.id,
 			purpose,
 			bytes: size,
-			minutes: VIDEO_RESERVATION_MINUTES,
+			minutes: VIDEO_SIGN_RESERVATION_MINUTES,
 			key: stagedReservationKey(key),
 		});
 		if (this.stagesLocally()) return null;
@@ -229,6 +239,19 @@ export default class VideoService {
 		const disk = drive.use("private");
 		if (!(await disk.exists(key))) return null;
 		return (await disk.getMetaData(key)).contentLength;
+	}
+
+	/**
+	 * Holds an added upload's storage reservation until the worker has
+	 * processed it (`deleteStaged` releases it then). Best effort.
+	 */
+	async holdForProcessing(tenant: TenantRef, key: string): Promise<void> {
+		this.assertStagingKeyOf(tenant, key);
+		await extendReservation(
+			tenant.id,
+			stagedReservationKey(key),
+			VIDEO_PROCESS_RESERVATION_MINUTES,
+		);
 	}
 
 	/**

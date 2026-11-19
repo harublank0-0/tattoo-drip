@@ -1,6 +1,8 @@
+import { Readable } from "node:stream";
 import app from "@adonisjs/core/services/app";
 import testUtils from "@adonisjs/core/services/test_utils";
 import { test } from "@japa/runner";
+import WorkPhotoService from "#modules/artists/services/work_photo_service";
 import DesignGeneration from "#modules/design_lab/models/design_generation";
 import GenerationRunner from "#modules/design_lab/services/generation_runner";
 import {
@@ -73,22 +75,63 @@ test.group("Storage: videos and Design Lab", (group) => {
 		assert.lengthOf(await reservations(s.tenant), 0);
 	});
 
-	test("a signed work video holds its size until its upload is cleaned up", async ({
+	test("a signed work video holds its size for the upload's window, longer once added, until its upload is cleaned up", async ({
 		assert,
 	}) => {
 		const s = await smallStudio("vid-hold", 0);
 		enforceStorage(true);
 		const videos = await app.container.make(VideoService);
+		const photos = await app.container.make(WorkPhotoService);
+		const lead = await inTenant(s.tenant, () =>
+			addWorkPhoto(s.tenant, s.artist),
+		);
 		const key = videos.stagingKey(s.tenant);
+		const size = 300_000;
+		const minutesLeft = async () => {
+			const [row] = await reservations(s.tenant);
+			return row.expiresAt
+				? Math.round(row.expiresAt.diffNow().as("minutes"))
+				: null;
+		};
 
 		await inTenant(s.tenant, () =>
-			videos.signUpload(s.tenant, key, { type: "video/mp4", size: 300_000 }),
+			videos.signUpload(s.tenant, key, { type: "video/mp4", size }),
 		);
-		const held = await reservations(s.tenant);
 		assert.deepEqual(
-			held.map((row) => [row.key, row.bytes, row.purpose]),
-			[[`reserve:${key}`, 300_000, "work_video"]],
+			(await reservations(s.tenant)).map((row) => [
+				row.key,
+				row.bytes,
+				row.purpose,
+			]),
+			[[`reserve:${key}`, size, "work_video"]],
 		);
+		// An upload that never arrives gives its space back soon.
+		assert.equal(await minutesLeft(), 20);
+
+		await videos.writeStaged(
+			s.tenant,
+			key,
+			Readable.from([Buffer.alloc(size)]),
+			size,
+		);
+		await inTenant(s.tenant, () =>
+			photos.addVideo(
+				s.tenant,
+				{ userId: s.owner.id, role: "owner" },
+				s.artist,
+				lead,
+				{
+					tenantId: s.tenant.id,
+					leadId: lead.id,
+					key,
+					type: "video/mp4",
+					size,
+				},
+				null,
+			),
+		);
+		// Added: held while the worker processes it.
+		assert.equal(await minutesLeft(), 75);
 
 		await videos.deleteStaged(s.tenant, key);
 		assert.lengthOf(await reservations(s.tenant), 0);

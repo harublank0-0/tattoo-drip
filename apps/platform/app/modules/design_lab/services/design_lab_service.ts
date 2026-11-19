@@ -357,6 +357,13 @@ export default class DesignLabService {
 		attempt: number,
 	): Promise<boolean> {
 		return withTransaction(async (trx) => {
+			// The studio's Design Lab lock first, as `submit` takes it before
+			// the project (usage.reserve takes it again): the same order, so a
+			// retry and a submit never deadlock.
+			await trx.rawQuery(
+				"select pg_advisory_xact_lock(hashtextextended(?, 0))",
+				[`design_usage:${tenant.id}`],
+			);
 			// The access check first (a 404 for another member's), then the lock.
 			const seen = await DesignGeneration.query()
 				.where("tenant_id", tenant.id)

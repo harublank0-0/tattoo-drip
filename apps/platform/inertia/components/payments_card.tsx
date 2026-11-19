@@ -510,6 +510,9 @@ function PaymentItem({
 			</span>
 			<span className="text-muted-foreground">{row.decisionText}</span>
 			{row.reversalText && <span>{row.reversalText}</span>}
+			{row.proofRemovedText && (
+				<span className="text-muted-foreground">{row.proofRemovedText}</span>
+			)}
 			{row.note && <span className="whitespace-pre-line">{row.note}</span>}
 			{(row.proofUrl || row.canReverse) && (
 				<div className="flex flex-wrap gap-2 pt-1">

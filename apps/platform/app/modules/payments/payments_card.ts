@@ -30,6 +30,8 @@ export type PaymentRowProps = {
 	decisionText: string;
 	note: string | null;
 	reversalText: string | null;
+	/** The studio deleted the deposit screenshot to free storage. */
+	proofRemovedText: string | null;
 	proofUrl: string | null;
 	canReverse: boolean;
 };
@@ -166,6 +168,9 @@ export function paymentsCard({
 			dateText: day(payment.createdAt),
 			decisionText: decisionText(payment, online.has(payment.id), who, day),
 			note: payment.note,
+			proofRemovedText: payment.proofRemovedAt
+				? "Screenshot removed by the studio"
+				: null,
 			reversalText: original
 				? `Reverses the ${formatMoney(Math.abs(original.amount))} ${KIND_WORDS[original.kind]} of ${day(original.createdAt)}`
 				: reversal
@@ -305,8 +310,9 @@ export function paymentsCard({
 }
 
 /**
- * Who decided a payment, and when. A verified payment without a screenshot
- * was entered at the desk: "Recorded by". A row PayBridgeNP made (`online`)
+ * Who decided a payment, and when. A verified payment that never had a
+ * screenshot was entered at the desk: "Recorded by". One whose screenshot
+ * the studio removed was still verified from it. A row PayBridgeNP made (`online`)
  * names no member: it was paid, or refunded, through PayBridgeNP.
  */
 function decisionText(
@@ -324,7 +330,7 @@ function decisionText(
 	}
 	const by = who(payment.verifiedByUserId);
 	if (payment.status === "rejected") return `Rejected by ${by}, ${at}`;
-	return payment.proofImageKey
+	return payment.proofImageKey || payment.proofRemovedAt
 		? `Verified by ${by}, ${at}`
 		: `Recorded by ${by}, ${at}`;
 }

@@ -8,7 +8,10 @@ import ImageService, {
 	type ImagePurpose,
 } from "#modules/media/services/image_service";
 import StoredFile from "#modules/storage/models/stored_file";
-import { reserveStorage } from "#modules/storage/reservations";
+import {
+	reserveStorage,
+	reserveStorageFor,
+} from "#modules/storage/reservations";
 import StorageMeterService from "#modules/storage/services/storage_meter_service";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { testImages } from "#tests/helpers/images";
@@ -134,6 +137,52 @@ test.group("Storage: reservations", (group) => {
 			(await app.container.make(StorageMeterService)).usage(tenant),
 		);
 		assert.equal(usage.usedBytes, 1000);
+	});
+
+	test("a key reserved again is renewed, not a second row", async ({
+		assert,
+	}) => {
+		const s = await smallStudio("res-again", 0);
+		const reserve = (bytes: number) =>
+			inTenant(s.tenant, () =>
+				reserveStorageFor({
+					tenantId: s.tenant.id,
+					purpose: "design_concept",
+					minutes: 60,
+					items: [{ key: "reserve:design:again:2", bytes }],
+				}),
+			);
+		await reserve(1000);
+		await reserve(2000);
+		const held = (await rowsOf(s.tenant)).filter(
+			(row) => row.status === "reserved",
+		);
+		assert.deepEqual(
+			held.map((row) => [row.key, row.bytes]),
+			[["reserve:design:again:2", 2000]],
+		);
+	});
+
+	test("in observe mode a reservation that can't be made doesn't stop the upload; enforced, it does", async ({
+		assert,
+	}) => {
+		const s = await smallStudio("res-broken", 0);
+		const broken = {
+			usage: async () => Promise.reject(new Error("pool busy")),
+		};
+		app.container.swap(StorageMeterService, () => broken as never);
+		try {
+			enforceStorage(false);
+			const stored = await store(s.tenant, "artist_work_photo");
+			assert.include(stored.key, "/artist_work_photo/");
+			enforceStorage(true);
+			await assert.rejects(
+				() => store(s.tenant, "artist_work_photo"),
+				/pool busy/,
+			);
+		} finally {
+			app.container.restore(StorageMeterService);
+		}
 	});
 
 	test("always-accepted purposes are never refused", async ({ assert }) => {
