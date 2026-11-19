@@ -58,6 +58,27 @@ export default class StorageMeterService {
 		return megabytes === null ? null : megabytes * MB;
 	}
 
+	/**
+	 * Studio's allowance in bytes when moving to Studio would give this Solo
+	 * studio more room than `limitBytes`; null otherwise (already on Studio,
+	 * or Studio's bundle unmetered). Only a refusal asks.
+	 */
+	async studioOfferBytes(
+		tenant: TenantRef,
+		limitBytes: number,
+		now: DateTime = DateTime.utc(),
+	): Promise<number | null> {
+		const entitlement = await this.entitlements.for(tenant, now);
+		if (entitlement.package !== "solo") return null;
+		const studio = await AllowanceBundle.findBy(
+			"key",
+			PACKAGES.studio.defaultBundleKey,
+		);
+		const megabytes = studio?.storageMegabytes ?? null;
+		const offered = megabytes === null ? null : megabytes * MB;
+		return offered !== null && offered > limitBytes ? offered : null;
+	}
+
 	/** The studio's usage now, by category, with its allowance. */
 	async usage(
 		tenant: TenantRef,

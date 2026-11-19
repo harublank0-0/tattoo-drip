@@ -32,6 +32,8 @@ type Root = {
 	level: Level;
 	/** True once abortRequestTransaction() rolled the root back. */
 	detached: boolean;
+	/** True when it is a savepoint of a test's global transaction. */
+	nested: boolean;
 };
 
 type Store = {
@@ -116,15 +118,21 @@ async function readSettings(
 async function openRoot<T>(
 	values: DbContextValues,
 	fn: (trx: TransactionClientContract) => Promise<T>,
+	connection?: string,
 ): Promise<T> {
-	const base = db.connection();
+	const base = db.connection(connection);
 	const outer = base.isTransaction ? await readSettings(base) : undefined;
 	const level = new Level();
 	const state: { root?: Root } = {};
 
 	try {
 		const result = await base.transaction(async (trx) => {
-			const root: Root = { trx, level, detached: false };
+			const root: Root = {
+				trx,
+				level,
+				detached: false,
+				nested: outer !== undefined,
+			};
 			state.root = root;
 			await applySettings(trx, values);
 			const store: Store = {
@@ -312,6 +320,30 @@ export async function abortRequestTransaction(): Promise<void> {
  */
 export function afterCommit(fn: Callback): void {
 	activeOrThrow("afterCommit").level.commit.push(fn);
+}
+
+/**
+ * `fn` in a root transaction of its own, outside any transaction the caller
+ * has open: a short write that must commit at once whatever the caller's
+ * transaction does later (a storage reservation, which other uploads must
+ * see while this request is still storing). On the `storage` connection,
+ * whose own small pool the request's connection never waits behind
+ * (config/database.ts).
+ *
+ * Under a test's global transaction it stays on the primary connection,
+ * which alone sees the test's rows: nested under the open transaction
+ * (knex runs sibling savepoints one after another, so a sibling would wait
+ * for the caller's still-open one), else as a root there. Tests that need
+ * it separate run outside the global transaction (tests/helpers/races.ts).
+ */
+export function withSeparateContext<T>(
+	values: DbContextValues,
+	fn: (trx: TransactionClientContract) => Promise<T>,
+): Promise<T> {
+	const open = active();
+	if (open?.root.nested) return withDbContext(values, fn);
+	if (!open && db.connection().isTransaction) return openRoot(values, fn);
+	return storage.exit(() => openRoot(values, fn, "storage"));
 }
 
 /**

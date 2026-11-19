@@ -12,6 +12,7 @@ import WaitingService from "#modules/projects/services/waiting_service";
 import StudioReviewService from "#modules/reviews/services/studio_review_service";
 import { storageLine, usageForRequest } from "#modules/storage/display";
 import StorageMeterService from "#modules/storage/services/storage_meter_service";
+import { storageEnforcement } from "#modules/storage/settings";
 import {
 	INVITATION_LINK_FLASH,
 	INVITATION_LINK_PAGE,
@@ -30,6 +31,16 @@ import UserTransformer from "#transformers/user_transformer";
  * the 180 px icon itself.
  */
 const SHELL_ICON_WIDTH = 56;
+
+/** The pages that show the storage line (the upload pages and Billing). */
+const STORAGE_PAGES = new Set([
+	"tenant.portfolio",
+	"tenant.artists.create",
+	"tenant.artists.edit",
+	"tenant.settings.profile",
+	"tenant.design_lab.show",
+	"tenant.settings.billing",
+]);
 
 export default class InertiaMiddleware extends BaseInertiaMiddleware {
 	async share(ctx: HttpContext) {
@@ -113,9 +124,15 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 				: null;
 
 		// The studio's storage (the storage meter): the line its upload pages
-		// show every member. Null off tenant pages.
+		// show every member, and once STORAGE_ENFORCEMENT is on the warning
+		// every page shows. Read only where it shows (it costs a few queries).
+		// Null off tenant pages and elsewhere.
 		const storage =
-			tenant && membership && auth?.user
+			tenant &&
+			membership &&
+			auth?.user &&
+			(storageEnforcement() === "enforce" ||
+				STORAGE_PAGES.has(ctx.route?.name ?? ""))
 				? await ensureDbContext(
 						{ userId: auth.user.id, tenantId: tenant.id },
 						async () =>

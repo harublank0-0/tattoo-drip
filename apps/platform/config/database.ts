@@ -1,6 +1,6 @@
 import app from "@adonisjs/core/services/app";
 import { defineConfig } from "@adonisjs/lucid";
-import { LIMITER_POOL, pgPoolFor } from "#services/db_pool";
+import { LIMITER_POOL, pgPoolFor, STORAGE_POOL } from "#services/db_pool";
 import env from "#start/env";
 
 const dbConfig = defineConfig({
@@ -59,6 +59,24 @@ const dbConfig = defineConfig({
 				database: env.get("DB_DATABASE"),
 			},
 			pool: { ...LIMITER_POOL },
+		},
+
+		/**
+		 * Storage reservations' own small pool, same app role as `pg`: an
+		 * upload reserves its size while its request holds a `pg` connection
+		 * (withSeparateContext, #modules/storage/reservations), as the limiter
+		 * counts. Connections open on first use.
+		 */
+		storage: {
+			client: "pg",
+			connection: {
+				host: env.get("DB_HOST"),
+				port: env.get("DB_PORT"),
+				user: env.get("DB_USER"),
+				password: env.get("DB_PASSWORD"),
+				database: env.get("DB_DATABASE"),
+			},
+			pool: { ...STORAGE_POOL },
 		},
 
 		/**

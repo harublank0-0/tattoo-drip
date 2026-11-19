@@ -1,0 +1,157 @@
+import { randomUUID } from "node:crypto";
+import app from "@adonisjs/core/services/app";
+import logger from "@adonisjs/core/services/logger";
+import { StorageFullError } from "#modules/media/errors";
+import type { ImagePurpose } from "#modules/media/services/image_service";
+import {
+	ALWAYS_ACCEPTED,
+	formatBytes,
+	STORAGE_CATEGORY,
+} from "#modules/storage/categories";
+import StorageMeterService from "#modules/storage/services/storage_meter_service";
+import { storageEnforcement } from "#modules/storage/settings";
+import { withSeparateContext } from "#services/db_context";
+
+/**
+ * The words of a refusal (spec, What people see): how much space the upload
+ * needs and how much is left, where to free some, and Studio when it would
+ * give room.
+ */
+export function storageFullMessage(
+	requested: number,
+	remaining: number,
+	studioBytes: number | null,
+): string {
+	const offer =
+		studioBytes === null
+			? ""
+			: ` Studio includes ${formatBytes(studioBytes)}: ask TattooDrip to move your studio to Studio.`;
+	return `This upload needs ${formatBytes(requested)}, but your studio has ${formatBytes(remaining)} of storage left. Free up space under Settings, Billing, Storage.${offer}`;
+}
+
+/**
+ * Reserves `bytes` of the studio's storage for an upload about to be stored
+ * (docs/superpowers/specs/2026-11-16-storage-meter-design.md, Reserving).
+ * Returns the reservation's key (`key`, else `reserve:<uuid>`), or null for
+ * an always-accepted or uncounted purpose, which reserves nothing. See
+ * `reserveStorageFor`.
+ */
+export async function reserveStorage(input: {
+	tenantId: string;
+	purpose: ImagePurpose;
+	bytes: number;
+	minutes: number;
+	key?: string;
+}): Promise<string | null> {
+	const [key] = await reserveStorageFor({
+		tenantId: input.tenantId,
+		purpose: input.purpose,
+		minutes: input.minutes,
+		items: [
+			{ key: input.key ?? `reserve:${randomUUID()}`, bytes: input.bytes },
+		],
+	});
+	return key ?? null;
+}
+
+/**
+ * Reserves storage for several files of one purpose at once (a Design Lab
+ * submit's variations), all or none: in a short transaction of its own
+ * (never the request's, which runs on through processing and the upload),
+ * under the studio's advisory lock, so two uploads at once can't both take
+ * the last space. With STORAGE_ENFORCEMENT on, files that don't fit throw
+ * StorageFullError before anything is stored; in observe mode it is logged
+ * and allowed. Each reservation is replaced by its stored row
+ * (`recordStoredFile`), released (`releaseStorage`), or expires after
+ * `minutes`. Returns the keys reserved: none for an always-accepted or
+ * uncounted purpose.
+ */
+export async function reserveStorageFor(input: {
+	tenantId: string;
+	purpose: ImagePurpose;
+	minutes: number;
+	items: readonly { key: string; bytes: number }[];
+}): Promise<string[]> {
+	const { tenantId, purpose, minutes, items } = input;
+	if (
+		items.length === 0 ||
+		STORAGE_CATEGORY[purpose] === null ||
+		ALWAYS_ACCEPTED.has(purpose)
+	) {
+		return [];
+	}
+	const bytes = items.reduce((sum, item) => sum + item.bytes, 0);
+	const meter = await app.container.make(StorageMeterService);
+	return withSeparateContext({ tenantId }, async (trx) => {
+		await trx.rawQuery("select pg_advisory_xact_lock(hashtextextended(?, 0))", [
+			`storage:${tenantId}`,
+		]);
+		const tenant = { id: tenantId };
+		const usage = await meter.usage(tenant);
+		const limit = usage.limitBytes;
+		if (limit !== null && usage.usedBytes + bytes > limit) {
+			const remaining = Math.max(0, limit - usage.usedBytes);
+			if (storageEnforcement() === "enforce") {
+				const studio = await meter.studioOfferBytes(tenant, limit);
+				throw new StorageFullError(
+					bytes,
+					remaining,
+					storageFullMessage(
+						bytes,
+						remaining,
+						studio !== null && usage.usedBytes + bytes <= studio
+							? studio
+							: null,
+					),
+				);
+			}
+			logger.info(
+				{
+					tenantId,
+					rule: "storage_limit",
+					purpose,
+					requested: bytes,
+					usedBytes: usage.usedBytes,
+					limitBytes: limit,
+				},
+				"Package rule would refuse",
+			);
+		}
+		for (const item of items) {
+			await trx.rawQuery(
+				`insert into stored_files (tenant_id, key, purpose, bytes, status, reserved_at, expires_at, created_at, updated_at)
+				 values (?, ?, ?, ?, 'reserved', now(), now() + make_interval(mins => ?), now(), now())`,
+				[tenantId, item.key, purpose, item.bytes, minutes],
+			);
+		}
+		return items.map((item) => item.key);
+	});
+}
+
+/**
+ * Releases reservations at once (the upload failed, was rolled back or was
+ * stored under another key), in a transaction of its own. Best effort: a
+ * failure is logged and the reservation expires on its own.
+ */
+export async function releaseStorage(
+	tenantId: string,
+	keys: string | readonly string[],
+): Promise<void> {
+	const list = typeof keys === "string" ? [keys] : [...keys];
+	if (list.length === 0) return;
+	try {
+		await withSeparateContext({ tenantId }, (trx) =>
+			trx
+				.from("stored_files")
+				.where("tenant_id", tenantId)
+				.whereIn("key", list)
+				.where("status", "reserved")
+				.delete(),
+		);
+	} catch (error) {
+		logger.error(
+			{ err: error, tenantId, keys: list },
+			"a storage reservation could not be released; it expires on its own",
+		);
+	}
+}

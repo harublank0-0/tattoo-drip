@@ -32,6 +32,18 @@ export const STORAGE_CATEGORY: Record<ImagePurpose, StorageCategory | null> = {
 	fresh_ink_video: null,
 };
 
+/**
+ * Uploads a full studio still takes (spec ruling 4, option B): a client's
+ * deposit screenshot and review or Fresh ink photos and videos, and the
+ * studio's payment-method QR codes. They still count.
+ */
+export const ALWAYS_ACCEPTED: ReadonlySet<ImagePurpose> = new Set([
+	"payment_proof",
+	"payment_qr",
+	"client_post_photo",
+	"client_post_video",
+]);
+
 /** The purposes whose files count toward storage. */
 export const COUNTED_PURPOSES = (
 	Object.keys(STORAGE_CATEGORY) as ImagePurpose[]

@@ -6,8 +6,10 @@ import { currentClient, withDbContext } from "#services/db_context";
 
 /**
  * Records a stored file's size (the storage meter, Rollout step 1): one
- * `stored` row per main file, rendition or poster, replacing a reservation
- * of the same key. Purposes that never count (Fresh ink's public copies)
+ * `stored` row per main file, rendition or poster. With `reservationKey`,
+ * the upload's reservation (`reserveStorage`) is replaced by it in the same
+ * savepoint, so a rolled-back request keeps the reservation until
+ * `releaseStorage` or its expiry. Purposes that never count (Fresh ink's public copies)
  * are skipped. It runs in the studio's own context: on the caller's open
  * transaction when that is the studio's, in a savepoint so a failure can't
  * abort it, else in a context of its own. Best effort: a failure is logged,
@@ -19,16 +21,24 @@ export async function recordStoredFile(file: {
 	key: string;
 	purpose: ImagePurpose;
 	bytes: number;
+	reservationKey?: string | null;
 }): Promise<void> {
 	if (STORAGE_CATEGORY[file.purpose] === null) return;
-	const upsert = (client: TransactionClientContract) =>
-		client.rawQuery(
+	const upsert = async (client: TransactionClientContract) => {
+		if (file.reservationKey) {
+			await client.rawQuery(
+				"delete from stored_files where tenant_id = ? and key = ? and status = 'reserved'",
+				[file.tenantId, file.reservationKey],
+			);
+		}
+		await client.rawQuery(
 			`insert into stored_files (tenant_id, key, purpose, bytes, status, stored_at, created_at, updated_at)
 			 values (?, ?, ?, ?, 'stored', now(), now(), now())
 			 on conflict (key) do update set bytes = excluded.bytes, purpose = excluded.purpose,
 			   status = 'stored', stored_at = excluded.stored_at, expires_at = null, updated_at = now()`,
 			[file.tenantId, file.key, file.purpose, file.bytes],
 		);
+	};
 	try {
 		const parent = currentClient();
 		if (parent) {

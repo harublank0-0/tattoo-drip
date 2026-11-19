@@ -58,3 +58,20 @@ export class VideoDeleteError extends ImageDeleteError {
 		this.name = "VideoDeleteError";
 	}
 }
+
+/**
+ * The studio's storage can't take this upload (the storage meter, once
+ * STORAGE_ENFORCEMENT is on): nothing was stored. A kind of
+ * InvalidImageError, so every upload form shows it as that field's error;
+ * the message says how much space it needs and how to make room.
+ */
+export class StorageFullError extends InvalidImageError {
+	constructor(
+		readonly requested: number,
+		readonly remaining: number,
+		message: string,
+	) {
+		super(message);
+		this.name = "StorageFullError";
+	}
+}
