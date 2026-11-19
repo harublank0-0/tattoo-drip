@@ -250,6 +250,10 @@ export const studioCopy = {
 		outOfFive: " out of 5",
 		tattooBy: "Tattoo by {artist}",
 		reply: "Reply from {studio}",
+		/** The review's Fresh ink strip: what its button opens. */
+		photos: "See {name}'s Fresh ink",
+		/** On the strip's last thumbnail, when the post has more than three. */
+		more: "+{count}",
 		showMore: "Show more",
 		newest: "Back to the newest",
 		/** The list's name, for a screen reader. */
@@ -271,6 +275,10 @@ export const studioCopy = {
 		altNoArtist: "Fresh ink from {name}",
 		tattooBy: "Tattoo by {artist}",
 		placement: "Placement",
+		/** Over the client's review in a post's viewer. */
+		review: "Review from {name}",
+		/** Shows the whole review in the viewer. */
+		readReview: "Read the review",
 		showMore: "Show more",
 		newest: "Back to the newest",
 	},

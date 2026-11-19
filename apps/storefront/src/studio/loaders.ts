@@ -443,7 +443,7 @@ export function studioPageData(
 		recentWork: galleryView(recentWork, imageOrigin),
 		flash: flashListView(flash, imageOrigin),
 		freshInk: freshInkView(clients.freshInk ?? null, imageOrigin),
-		reviews: reviewsView(clients.reviews ?? null),
+		reviews: reviewsView(clients.reviews ?? null, imageOrigin),
 		goodToKnow: goodToKnowView(studio),
 		// No clock here (pure, deterministic): loadStudioPage sets the server's.
 		openNow: openNowView(studio, null),
@@ -1204,7 +1204,7 @@ export function reviewsPageData(
 	imageOrigin: string | null = null,
 ): ReviewsPageData | null {
 	const theme = parseThemeConfig(storefrontInput(studio), imageOrigin);
-	const view = reviewsView(page);
+	const view = reviewsView(page, imageOrigin);
 	if (!theme.sections.includes("reviews") || view.reviews.length === 0) {
 		return null;
 	}

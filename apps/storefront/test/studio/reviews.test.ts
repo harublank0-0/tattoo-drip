@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { clientPageCacheHeaders } from "../../src/studio/cache.ts";
+import { excerptOf } from "../../src/studio/client-words.ts";
 import { freshInkView } from "../../src/studio/fresh-ink.ts";
 import {
 	freshInkPageData,
@@ -677,4 +678,140 @@ describe("the review fixes (slice 3 review)", () => {
 			);
 		});
 	}
+});
+
+/**
+ * A client's review and their Fresh ink, linked on the studio's page
+ * (docs/superpowers/specs/2026-11-19-review-fresh-ink-link-design.md): the
+ * view models keep a review's Fresh ink (with its own dialog ids) and a
+ * post's review, and drop either when it doesn't read cleanly, never the
+ * item that carries it.
+ */
+describe("a review and its Fresh ink, linked", () => {
+	const long = `${"The lines healed crisp and even, and the shading is soft. ".repeat(4)}Would come back.`;
+
+	test("reviewsView keeps a review's linked Fresh ink with its own dialog ids", () => {
+		const view = reviewsView(
+			{
+				data: [
+					apiReview(1, { freshInk: { ...apiPost(1), review: null } }),
+					apiReview(2, { freshInk: null }),
+				],
+				nextCursor: null,
+				rating: null,
+			},
+			IMAGE_ORIGIN,
+		);
+		const [linked, alone] = view.reviews;
+		assert.ok(linked.freshInk);
+		assert.ok(linked.freshInk.dialogId.startsWith("review-ink"));
+		assert.ok(linked.freshInk.src.startsWith(IMAGE_ORIGIN));
+		assert.equal(linked.freshInk.name, "Ram K.");
+		assert.equal(alone.freshInk, null);
+	});
+
+	test("a garbled or off-origin linked post is dropped and the review kept", () => {
+		const view = reviewsView(
+			{
+				data: [
+					apiReview(1, {
+						freshInk: apiPost(1, { url: "https://evil.example/x.jpg" }),
+					}),
+					apiReview(2, { freshInk: "nope" }),
+				],
+				nextCursor: null,
+				rating: null,
+			},
+			IMAGE_ORIGIN,
+		);
+		assert.equal(view.reviews.length, 2);
+		assert.deepEqual(
+			view.reviews.map((review) => review.freshInk),
+			[null, null],
+		);
+	});
+
+	test("freshInkView keeps a post's linked review: stars in words, the date, the excerpt", () => {
+		const view = freshInkView(
+			{
+				data: [
+					apiPost(1, {
+						review: {
+							id: id(1),
+							rating: 4,
+							body: long,
+							date: "2026-10-01",
+						},
+					}),
+				],
+				nextCursor: null,
+			},
+			IMAGE_ORIGIN,
+		);
+		const review = view.posts[0].review;
+		assert.ok(review);
+		assert.equal(review.id, id(1));
+		assert.equal(review.rating, 4);
+		assert.equal(review.ratingText, "4 out of 5");
+		assert.equal(review.body, long);
+		assert.deepEqual(review.date, {
+			text: "October 2026",
+			dateTime: "2026-10-01",
+		});
+		assert.ok(review.excerpt?.endsWith("…"));
+	});
+
+	test("the linked review keeps its text as text and cuts its excerpt at a word", () => {
+		assert.equal(excerptOf("x".repeat(200)), null);
+		const excerpt = excerptOf(long);
+		assert.ok(excerpt);
+		assert.ok(Array.from(excerpt).length <= 201);
+		assert.ok(excerpt.endsWith("…"));
+		// Cut at a word: what precedes "…" ends a word of the text.
+		const kept = excerpt.slice(0, -1);
+		assert.ok(long.startsWith(kept));
+		assert.match(long.slice(kept.length, kept.length + 1), /\s/);
+
+		const view = freshInkView(
+			{
+				data: [
+					apiPost(1, {
+						review: {
+							id: id(1),
+							rating: 5,
+							body: "First line.\nSecond line, right to left: سلام عليكم.",
+							date: "2026-10-01",
+						},
+					}),
+				],
+				nextCursor: null,
+			},
+			IMAGE_ORIGIN,
+		);
+		assert.equal(
+			view.posts[0].review?.body,
+			"First line.\nSecond line, right to left: سلام عليكم.",
+		);
+		assert.equal(view.posts[0].review?.excerpt, null);
+	});
+
+	test("an invalid linked review (rating 0, no id) is null and the post kept", () => {
+		const view = freshInkView(
+			{
+				data: [
+					apiPost(1, {
+						review: { id: id(1), rating: 0, body: long, date: "2026-10-01" },
+					}),
+					apiPost(2, { review: { rating: 5, body: long, date: "2026-10-01" } }),
+				],
+				nextCursor: null,
+			},
+			IMAGE_ORIGIN,
+		);
+		assert.equal(view.posts.length, 2);
+		assert.deepEqual(
+			view.posts.map((post) => post.review),
+			[null, null],
+		);
+	});
 });
