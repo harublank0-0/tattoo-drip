@@ -2323,6 +2323,38 @@ export interface components {
                  */
                 date: string;
             } | null;
+            /**
+             * @description The client's Fresh ink post of the same project, exactly as
+             *     `listFreshInk` shows it (its own `review` is null: it sits in this
+             *     review), while that post is on the studio's page (approved,
+             *     published, allowed there, not taken down) and the page shows its
+             *     Fresh ink section; null otherwise. Show its photos with the review
+             *     and open them in the Fresh ink viewer. Never a project's or a
+             *     client's id.
+             */
+            freshInk: components["schemas"]["FreshInkPost"] | null;
+        };
+        /**
+         * @description The client's review of the project a Fresh ink post shows
+         *     (`FreshInkPost.review`): the same id, stars, words and day as its
+         *     `StudioReview`, without the reply (it stays with the review) or the
+         *     name and artist (the post shows them). Plain text, line breaks kept.
+         */
+        LinkedReview: {
+            /**
+             * Format: uuid
+             * @description The review's own id, as in `listReviews`.
+             */
+            id: string;
+            /** @description Whole stars. Say it in words too. */
+            rating: number;
+            /** @description The client's own words. */
+            body: string;
+            /**
+             * Format: date
+             * @description The day the client wrote it, in the studio's timezone.
+             */
+            date: string;
         };
         /**
          * @description The average rating and how many reviews it comes from: a studio's
@@ -2389,6 +2421,15 @@ export interface components {
             styles: components["schemas"]["TattooStyle"][];
             /** @description Where it is on the body, in the client's words, or null. */
             placement: string | null;
+            /**
+             * @description The client's review of the same project, while it shows in
+             *     `listReviews` (allowed on the studio's page, not taken down, not
+             *     deleted) and the page shows its Reviews section; null otherwise,
+             *     and null in a post embedded in its own review
+             *     (`StudioReview.freshInk`). Show the stars and the words in the
+             *     post's viewer. Never a project's or a client's id.
+             */
+            review: components["schemas"]["LinkedReview"] | null;
             /**
              * @description The artist who made the tattoo, while the studio shows that
              *     artist on its page; null otherwise.

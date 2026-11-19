@@ -14,57 +14,74 @@ import type { ShownFreshInkPost } from "#modules/reviews/services/public_review_
  */
 export default class PublicFreshInkPostTransformer extends BaseTransformer<ShownFreshInkPost> {
 	toObject() {
-		const post = this.resource;
-		return {
-			id: post.id,
-			url: post.url,
-			width: post.width,
-			height: post.height,
-			alt: post.alt,
-			variants: post.variants.map(({ url, width }) => ({ url, width })),
-			angles: post.angles.map((angle) =>
-				angle.kind === "video"
-					? {
-							kind: "video" as const,
-							poster: {
-								url: angle.poster.url,
-								width: angle.poster.width,
-								height: angle.poster.height,
-								alt: angle.poster.alt,
-								variants: angle.poster.variants.map(({ url, width }) => ({
-									url,
-									width,
-								})),
-							},
-							sources: angle.sources.map(({ url, type, width, height }) => ({
-								url,
-								type,
-								width,
-								height,
-							})),
-							durationMs: angle.durationMs,
-							alt: angle.alt,
-						}
-					: {
-							kind: "photo" as const,
-							url: angle.url,
-							width: angle.width,
-							height: angle.height,
-							alt: angle.alt,
-							variants: angle.variants.map(({ url, width }) => ({
+		return freshInkPostObject(this.resource);
+	}
+}
+
+/**
+ * A post's public fields, written out one by one: `listFreshInk`'s entries
+ * and a review's linked Fresh ink (`StudioReview.freshInk`, whose `review`
+ * is null) are the same object. The linked review is its id, stars, words
+ * and day only (openapi.yaml, LinkedReview).
+ */
+export function freshInkPostObject(post: ShownFreshInkPost) {
+	return {
+		id: post.id,
+		url: post.url,
+		width: post.width,
+		height: post.height,
+		alt: post.alt,
+		variants: post.variants.map(({ url, width }) => ({ url, width })),
+		angles: post.angles.map((angle) =>
+			angle.kind === "video"
+				? {
+						kind: "video" as const,
+						poster: {
+							url: angle.poster.url,
+							width: angle.poster.width,
+							height: angle.poster.height,
+							alt: angle.poster.alt,
+							variants: angle.poster.variants.map(({ url, width }) => ({
 								url,
 								width,
 							})),
 						},
-			),
-			shownName: post.shownName,
-			caption: post.caption,
-			styles: post.styles.map(({ slug, name }) => ({ slug, name })),
-			placement: post.placement,
-			artist: post.artist
-				? { slug: post.artist.slug, name: post.artist.name }
-				: null,
-			date: post.date,
-		};
-	}
+						sources: angle.sources.map(({ url, type, width, height }) => ({
+							url,
+							type,
+							width,
+							height,
+						})),
+						durationMs: angle.durationMs,
+						alt: angle.alt,
+					}
+				: {
+						kind: "photo" as const,
+						url: angle.url,
+						width: angle.width,
+						height: angle.height,
+						alt: angle.alt,
+						variants: angle.variants.map(({ url, width }) => ({
+							url,
+							width,
+						})),
+					},
+		),
+		shownName: post.shownName,
+		caption: post.caption,
+		styles: post.styles.map(({ slug, name }) => ({ slug, name })),
+		placement: post.placement,
+		artist: post.artist
+			? { slug: post.artist.slug, name: post.artist.name }
+			: null,
+		date: post.date,
+		review: post.review
+			? {
+					id: post.review.id,
+					rating: post.review.rating,
+					body: post.review.body,
+					date: post.review.date,
+				}
+			: null,
+	};
 }

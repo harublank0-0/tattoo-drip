@@ -48,6 +48,7 @@ const REVIEW_FIELDS = [
 	"artist",
 	"body",
 	"date",
+	"freshInk",
 	"id",
 	"rating",
 	"reply",
@@ -63,12 +64,15 @@ const POST_FIELDS = [
 	"height",
 	"id",
 	"placement",
+	"review",
 	"shownName",
 	"styles",
 	"url",
 	"variants",
 	"width",
 ];
+/** A post's linked review (openapi.yaml, LinkedReview): never the reply, the name or the artist. */
+const LINKED_REVIEW_FIELDS = ["body", "date", "id", "rating"];
 
 const T0 = DateTime.fromISO("2026-10-01T10:00:00.000Z", { zone: "utc" });
 /** A fixed time `minutes` after T0: a higher number is newer. */
@@ -87,6 +91,7 @@ type ReviewItem = {
 	date: string;
 	artist: { slug: string; name: string } | null;
 	reply: { body: string; date: string } | null;
+	freshInk: (PostItem & { review: null }) | null;
 };
 type PostItem = {
 	id: string;
@@ -99,6 +104,7 @@ type PostItem = {
 	placement: string | null;
 	artist: { slug: string; name: string } | null;
 	date: string;
+	review: { id: string; rating: number; body: string; date: string } | null;
 };
 
 const ids = (rows: { id: string }[]) => rows.map((row) => row.id);
@@ -179,6 +185,7 @@ test.group("GET /api/v1/tenants/:tenant/reviews (listReviews)", (group) => {
 					.setZone(s.tenant.timezone)
 					.toISODate() as string,
 			},
+			freshInk: null,
 		});
 		assert.equal(body.data[0].shownName, "S. R.");
 		assert.isNull(body.data[0].reply);
@@ -692,3 +699,208 @@ async function addPhoto(client: ApiClient, slug: string, token: string) {
 	});
 	response.assertStatus(201);
 }
+
+/**
+ * A client's review and their Fresh ink post of the same project, linked on
+ * the studio's page (docs/superpowers/specs/2026-11-19-review-fresh-ink-link-design.md):
+ * each carries the other only while both are shown there and the studio's
+ * page shows the other's section; never across projects or studios.
+ */
+test.group(
+	"GET /reviews and /fresh-ink: a review and its Fresh ink linked",
+	(group) => {
+		group.each.setup(() => testUtils.db().wrapInGlobalTransaction());
+
+		const reviewsOf = async (client: ApiClient, slug: string, query = "") =>
+			(await client.get(reviewsUrl(slug, query))).body() as {
+				data: ReviewItem[];
+				nextCursor: string | null;
+			};
+		const postsOf = async (client: ApiClient, slug: string) =>
+			(await client.get(freshInkUrl(slug))).body() as { data: PostItem[] };
+		const sections = (tenant: Tenant, list: string) =>
+			inTenant(tenant, () =>
+				TenantModel.query()
+					.where("id", tenant.id)
+					.update({ storefront_sections: list }),
+			);
+
+		test("a shown review and post of one project link both ways", async ({
+			client,
+			assert,
+		}) => {
+			const s = await studio("link-both");
+			const { review, post } = await inTenant(s.tenant, async () => ({
+				review: await seedReview(s.tenant, s.project, { rating: 4 }),
+				post: (
+					await seedShownPost(s.tenant, s.project, {
+						media: ["photo", "photo", "video-ready"],
+					})
+				).post,
+			}));
+
+			const [shownReview] = (await reviewsOf(client, s.tenant.slug)).data;
+			assert.sameMembers(Object.keys(shownReview), REVIEW_FIELDS);
+			assert.equal(shownReview.freshInk?.id, post.id);
+			assert.isNull(shownReview.freshInk?.review);
+			assert.sameMembers(Object.keys(shownReview.freshInk ?? {}), POST_FIELDS);
+			assert.lengthOf(shownReview.freshInk?.angles ?? [], 2);
+
+			const [shownPost] = (await postsOf(client, s.tenant.slug)).data;
+			assert.sameMembers(Object.keys(shownPost), POST_FIELDS);
+			assert.sameMembers(
+				Object.keys(shownPost.review ?? {}),
+				LINKED_REVIEW_FIELDS,
+			);
+			assert.deepEqual(shownPost.review, {
+				id: review.id,
+				rating: 4,
+				body: shownReview.body,
+				date: shownReview.date,
+			});
+		});
+
+		test("no link when the post is waiting, declined, unpublished, without consent, taken down or deleted", async ({
+			client,
+			assert,
+		}) => {
+			const s = await studio("link-hidden-post");
+			const projects = [s.project];
+			for (let n = 0; n < 5; n++) projects.push(await anotherProject(s));
+			await inTenant(s.tenant, async () => {
+				for (const project of projects) await seedReview(s.tenant, project);
+				await seedShownPost(s.tenant, projects[0], {
+					status: "waiting",
+					published: false,
+				});
+				await seedShownPost(s.tenant, projects[1], {
+					status: "declined",
+					published: false,
+				});
+				await seedShownPost(s.tenant, projects[2], { published: false });
+				await seedShownPost(s.tenant, projects[3], {
+					consentStudioPage: false,
+					consentDiscover: true,
+				});
+				await seedShownPost(s.tenant, projects[4], {
+					published: false,
+					takenDown: true,
+				});
+				// The database keeps a deleted post unpublished.
+				const deleted = await seedShownPost(s.tenant, projects[5], {
+					published: false,
+				});
+				await ClientPost.query()
+					.where("id", deleted.post.id)
+					.update({ deleted_at: new Date() });
+			});
+
+			const reviews = (await reviewsOf(client, s.tenant.slug)).data;
+			assert.lengthOf(reviews, 6);
+			assert.deepEqual(
+				reviews.map((review) => review.freshInk),
+				[null, null, null, null, null, null],
+			);
+		});
+
+		test("no link when the review is without consent, taken down or deleted", async ({
+			client,
+			assert,
+		}) => {
+			const s = await studio("link-hidden-review");
+			const projects = [
+				s.project,
+				await anotherProject(s),
+				await anotherProject(s),
+			];
+			await inTenant(s.tenant, async () => {
+				await seedReview(s.tenant, projects[0], {
+					consentStudioPage: false,
+					consentDiscover: true,
+				});
+				const takenDown = await seedReview(s.tenant, projects[1]);
+				const deleted = await seedReview(s.tenant, projects[2]);
+				await takenDown
+					.merge({ takenDownAt: DateTime.now(), takedownReason: "other" })
+					.save();
+				await deleted.merge({ deletedAt: DateTime.now() }).save();
+				for (const project of projects) await seedShownPost(s.tenant, project);
+			});
+
+			const posts = (await postsOf(client, s.tenant.slug)).data;
+			assert.lengthOf(posts, 3);
+			assert.deepEqual(
+				posts.map((post) => post.review),
+				[null, null, null],
+			);
+		});
+
+		test("no link when the other section is off the page", async ({
+			client,
+			assert,
+		}) => {
+			const s = await studio("link-sections");
+			await inTenant(s.tenant, async () => {
+				await seedReview(s.tenant, s.project);
+				await seedShownPost(s.tenant, s.project);
+			});
+
+			await sections(s.tenant, "work,artists,reviews,info,inquiry");
+			assert.isNull((await reviewsOf(client, s.tenant.slug)).data[0].freshInk);
+			await sections(s.tenant, "work,artists,fresh_ink,info,inquiry");
+			assert.isNull((await postsOf(client, s.tenant.slug)).data[0].review);
+			await sections(s.tenant, "work,fresh_ink,reviews,inquiry");
+			assert.isNotNull(
+				(await reviewsOf(client, s.tenant.slug)).data[0].freshInk,
+			);
+			assert.isNotNull((await postsOf(client, s.tenant.slug)).data[0].review);
+		});
+
+		test("a post whose lead has no public photo links to nothing", async ({
+			client,
+			assert,
+		}) => {
+			const s = await studio("link-no-lead");
+			await inTenant(s.tenant, async () => {
+				await seedReview(s.tenant, s.project);
+				await seedShownPost(s.tenant, s.project, { media: [] });
+			});
+
+			const [review] = (await reviewsOf(client, s.tenant.slug)).data;
+			assert.isNull(review.freshInk);
+		});
+
+		test("links survive paging", async ({ client, assert }) => {
+			const s = await studio("link-paging");
+			const second = await anotherProject(s);
+			const { older } = await inTenant(s.tenant, async () => {
+				const older = await seedReview(s.tenant, s.project, {
+					createdAt: at(1),
+				});
+				await seedReview(s.tenant, second, { createdAt: at(2) });
+				await seedShownPost(s.tenant, s.project);
+				return { older };
+			});
+
+			const first = await reviewsOf(client, s.tenant.slug, "?limit=1");
+			assert.isNull(first.data[0].freshInk);
+			const next = await reviewsOf(
+				client,
+				s.tenant.slug,
+				`?limit=1&cursor=${first.nextCursor}`,
+			);
+			assert.equal(next.data[0].id, older.id);
+			assert.isNotNull(next.data[0].freshInk);
+		});
+
+		test("another studio's project never links", async ({ client, assert }) => {
+			const a = await studio("link-iso-a");
+			const b = await studio("link-iso-b");
+			await inTenant(a.tenant, () => seedReview(a.tenant, a.project));
+			await inTenant(b.tenant, () => seedShownPost(b.tenant, b.project));
+
+			assert.isNull((await reviewsOf(client, a.tenant.slug)).data[0].freshInk);
+			assert.isNull((await postsOf(client, b.tenant.slug)).data[0].review);
+		});
+	},
+);

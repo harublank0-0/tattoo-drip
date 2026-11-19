@@ -51,6 +51,7 @@ export type ReviewVideoUpload = Schemas["ReviewVideoUpload"];
 export type StudioReview = Schemas["StudioReview"];
 export type ReviewRating = Schemas["ReviewRating"];
 export type FreshInkPost = Schemas["FreshInkPost"];
+export type LinkedReview = Schemas["LinkedReview"];
 
 export type ListServicesQuery = NonNullable<
 	operations["listServices"]["parameters"]["query"]
