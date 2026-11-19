@@ -185,6 +185,10 @@ test.group("Storage: reservations", (group) => {
 			).inertiaProps as { storage: unknown };
 		assert.exists((await props("/portfolio")).storage);
 		assert.isNull((await props("/projects")).storage);
+
+		// Once enforced, every page has it, for the dashboard's warning.
+		enforceStorage(true);
+		assert.include((await props("/projects")).storage, { enforced: true });
 	});
 });
 

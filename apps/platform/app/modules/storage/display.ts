@@ -9,6 +9,8 @@ export type StorageLine = {
 	limitText: string | null;
 	/** Whole percent of the allowance used; null when not metered. */
 	percent: number | null;
+	/** Nothing is left (the rounded percent can say 100 before that). */
+	full: boolean;
 	/** STORAGE_ENFORCEMENT is on: a full studio's uploads are refused. */
 	enforced: boolean;
 };
@@ -22,6 +24,7 @@ export function storageLine(usage: StorageUsage): StorageLine {
 			limitBytes === null || limitBytes === 0
 				? null
 				: Math.round((usedBytes / limitBytes) * 100),
+		full: limitBytes !== null && usedBytes >= limitBytes,
 		enforced: storageEnforcement() === "enforce",
 	};
 }
