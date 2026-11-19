@@ -408,12 +408,12 @@ const CATEGORY_WORDS = {
 	clients: {
 		label: "Clients and projects",
 		route: "tenant.projects.index",
-		note: "Inquiry photos and deposit screenshots are kept with their records.",
+		note: "Inquiry photos and deposit screenshots are kept with their records. An owner can delete one from its inquiry or project; a screenshot only once its payment is decided.",
 	},
 	design_lab: {
 		label: "Design Lab",
 		route: "tenant.design_lab.index",
-		note: null,
+		note: "Deleting a design project deletes its concepts.",
 	},
 } as const;
 

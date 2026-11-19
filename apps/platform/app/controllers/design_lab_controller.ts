@@ -53,7 +53,7 @@ import {
 	updateDesignAssetValidator,
 	updateDesignProjectValidator,
 } from "#modules/design_lab/validators/design_lab";
-import { StorageFullError } from "#modules/media/errors";
+import { ImageDeleteError, StorageFullError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import ImageService, {
 	THUMBNAIL_WIDTH,
@@ -272,6 +272,44 @@ export default class DesignLabController {
 			tenant: tenant.slug,
 			id: project.id,
 		});
+	}
+
+	/**
+	 * Deletes the design project with its concepts (the storage meter:
+	 * freeing space) and goes to the Design Lab's list; refused, with why, on
+	 * the project's page while a concept is being made or when some files
+	 * couldn't be deleted.
+	 */
+	async destroy(ctx: HttpContext) {
+		if (!designLabEnabled()) return ctx.response.notFound();
+		const { tenant, membership } = tenantContext(ctx);
+		const project = await this.lab.findProject(
+			tenant,
+			membership,
+			ctx.params.id,
+		);
+		try {
+			await this.lab.deleteProject(tenant, membership, project.id);
+		} catch (error) {
+			if (error instanceof DesignLabRuleError) {
+				ctx.session.flash("error", error.message);
+			} else if (error instanceof ImageDeleteError) {
+				ctx.session.flash(
+					"error",
+					"Some of its concepts couldn't be deleted. Try again in a moment.",
+				);
+			} else {
+				throw error;
+			}
+			return ctx.response.redirect().toRoute("tenant.design_lab.show", {
+				tenant: tenant.slug,
+				id: project.id,
+			});
+		}
+		ctx.session.flash("success", "Design project deleted.");
+		return ctx.response
+			.redirect()
+			.toRoute("tenant.design_lab.index", { tenant: tenant.slug });
 	}
 
 	async generate(ctx: HttpContext) {

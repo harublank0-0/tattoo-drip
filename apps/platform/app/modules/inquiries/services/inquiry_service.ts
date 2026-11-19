@@ -1,4 +1,5 @@
 import { inject } from "@adonisjs/core";
+import { errors as lucidErrors } from "@adonisjs/lucid";
 import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -6,6 +7,7 @@ import ArtistService from "#modules/artists/services/artist_service";
 import { InquiryRuleError } from "#modules/inquiries/errors";
 import Inquiry from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
+import ImageService from "#modules/media/services/image_service";
 import type { ContactVia } from "#modules/notifications/messages";
 import type TattooProject from "#modules/projects/models/tattoo_project";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
@@ -40,7 +42,33 @@ export default class InquiryService {
 	constructor(
 		private artists: ArtistService,
 		private projects: ProjectService,
+		private files: ImageService = new ImageService(),
 	) {}
+
+	/**
+	 * Deletes a client's reference photo, owners only (the storage meter: it
+	 * frees its space; anyone else gets the 404 of another studio's). The
+	 * file and its copies go first (ImageDeleteError when some can't, and the
+	 * photo stays), then the row is soft deleted.
+	 */
+	async deleteReference(
+		tenant: TenantRef,
+		member: { role: string },
+		id: string,
+	): Promise<void> {
+		if (member.role !== "owner") {
+			throw new lucidErrors.E_ROW_NOT_FOUND(ReferenceImage);
+		}
+		await withTransaction(async () => {
+			const image = await ReferenceImage.query()
+				.where("tenant_id", tenant.id)
+				.where("id", id)
+				.forUpdate()
+				.firstOrFail();
+			await this.files.deleteOrThrow("reference_image", image.imageKey);
+			await image.softDelete();
+		});
+	}
 
 	/** Live `new` inquiries, oldest first: whoever has waited longest. */
 	async listNew(tenant: TenantRef, page: number): Promise<InquiryPage> {

@@ -478,6 +478,15 @@ router
 			.prefix("/artists");
 
 		/**
+		 * A client's reference photo, deleted to free storage: owners only
+		 * (TENANT_ROUTE_ROLES), from the inquiry, project or client page.
+		 */
+		router
+			.delete("/references/:id", [controllers.References, "destroy"])
+			.where("id", router.matchers.uuid())
+			.as("tenant.references.destroy");
+
+		/**
 		 * The inquiry inbox: owners only (TENANT_ROUTE_ROLES); reference
 		 * images are private to owners until a project is assigned. Every
 		 * inbox route goes in this group (a test checks).
@@ -691,6 +700,11 @@ router
 					.post(":id/reverse", [controllers.Payments, "reverse"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.payments.reverse");
+				// Frees the storage of a decided payment's screenshot.
+				router
+					.delete(":id/proof", [controllers.Payments, "destroyProof"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.payments.proof.destroy");
 			})
 			.prefix("/payments");
 
@@ -765,6 +779,10 @@ router
 					.put(":id", [controllers.DesignLab, "update"])
 					.where("id", router.matchers.uuid())
 					.as("tenant.design_lab.update");
+				router
+					.delete(":id", [controllers.DesignLab, "destroy"])
+					.where("id", router.matchers.uuid())
+					.as("tenant.design_lab.destroy");
 				router
 					.post(":id/generations", [controllers.DesignLab, "generate"])
 					.where("id", router.matchers.uuid())

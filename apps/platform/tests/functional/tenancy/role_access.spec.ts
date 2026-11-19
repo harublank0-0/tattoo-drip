@@ -45,6 +45,7 @@ const ARTIST_ROUTES = [
 	"tenant.design_lab.assets.download",
 	"tenant.design_lab.assets.select",
 	"tenant.design_lab.assets.update",
+	"tenant.design_lab.destroy",
 	"tenant.design_lab.generate",
 	"tenant.design_lab.index",
 	"tenant.design_lab.retry",

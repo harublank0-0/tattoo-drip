@@ -175,6 +175,9 @@ export interface ApiDefinition {
         destroy: typeof routes['tenant.artists.flash.destroy']
       }
     }
+    references: {
+      destroy: typeof routes['tenant.references.destroy']
+    }
     inbox: {
       index: typeof routes['tenant.inbox.index']
       show: typeof routes['tenant.inbox.show']
@@ -259,6 +262,9 @@ export interface ApiDefinition {
       verify: typeof routes['tenant.payments.verify']
       reject: typeof routes['tenant.payments.reject']
       reverse: typeof routes['tenant.payments.reverse']
+      proof: {
+        destroy: typeof routes['tenant.payments.proof.destroy']
+      }
     }
     sessions: {
       outcome: typeof routes['tenant.sessions.outcome']
@@ -276,6 +282,7 @@ export interface ApiDefinition {
       store: typeof routes['tenant.design_lab.store']
       show: typeof routes['tenant.design_lab.show']
       update: typeof routes['tenant.design_lab.update']
+      destroy: typeof routes['tenant.design_lab.destroy']
       generate: typeof routes['tenant.design_lab.generate']
       status: typeof routes['tenant.design_lab.status']
       retry: typeof routes['tenant.design_lab.retry']

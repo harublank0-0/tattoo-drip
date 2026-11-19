@@ -363,11 +363,12 @@ export default class DesignLabService {
 				.where("id", generationId)
 				.select("design_project_id")
 				.firstOrFail();
-			const project = await this.findProject(
-				tenant,
-				member,
-				seen.designProjectId,
-			);
+			// Locked, as a submit and a delete lock it: a retry and a delete of
+			// the project never overlap.
+			const project = await this.scoped(tenant, member)
+				.where("id", seen.designProjectId)
+				.forUpdate()
+				.firstOrFail();
 			const generation = await DesignGeneration.query()
 				.where("tenant_id", tenant.id)
 				.where("id", generationId)
@@ -431,6 +432,46 @@ export default class DesignLabService {
 				trx,
 			);
 			return true;
+		});
+	}
+
+	/**
+	 * Deletes a design project with its concepts (the storage meter: it frees
+	 * their space). Refused while a concept is being made, under the
+	 * project's lock, which a submit and a retry take too. Each concept's
+	 * files go first (ImageDeleteError when some can't, and nothing else
+	 * changes; a retry finishes), then their rows, then the project is soft
+	 * deleted. Its generations stay, for the studio's usage history.
+	 */
+	async deleteProject(
+		tenant: TenantRef,
+		member: Member,
+		id: string,
+	): Promise<void> {
+		await withTransaction(async () => {
+			const project = await this.scoped(tenant, member)
+				.where("id", id)
+				.forUpdate()
+				.firstOrFail();
+			const making = await DesignGeneration.query()
+				.where("tenant_id", tenant.id)
+				.where("design_project_id", project.id)
+				.whereIn("status", ["queued", "processing"])
+				.first();
+			if (making) {
+				throw new DesignLabRuleError(
+					"project",
+					"Wait for the concepts being made to finish, then delete the project.",
+				);
+			}
+			const assets = DesignAsset.query()
+				.where("tenant_id", tenant.id)
+				.where("design_project_id", project.id);
+			for (const asset of await assets.clone()) {
+				await this.images.deleteOrThrow("design_concept", asset.imageKey);
+			}
+			await assets.delete();
+			await project.softDelete();
 		});
 	}
 

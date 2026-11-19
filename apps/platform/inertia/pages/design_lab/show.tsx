@@ -23,6 +23,7 @@ import {
 	usageText,
 	variationChoices,
 } from "~/components/design_lab";
+import InlineConfirm from "~/components/inline_confirm";
 import Page from "~/components/page";
 import Section from "~/components/section";
 import StorageLine from "~/components/storage_line";
@@ -141,6 +142,11 @@ export default function DesignLabShow({
 	const { slug } = useTenant();
 	const params = { tenant: slug, id: project.id };
 	const archived = project.reviewState === "archived";
+	const heading = useRef<HTMLHeadingElement>(null);
+	const making = generations.some(
+		(generation) =>
+			generation.status === "queued" || generation.status === "processing",
+	);
 	const [compared, setCompared] = useState<string[]>([]);
 	usePollStatuses(params, generations);
 	useFreshImageUrls(generations);
@@ -159,6 +165,7 @@ export default function DesignLabShow({
 	return (
 		<Page
 			title={project.title}
+			titleRef={heading}
 			description={
 				<>
 					AI concepts for you to review and redraw, not finished stencils.{" "}
@@ -378,6 +385,30 @@ export default function DesignLabShow({
 						</>
 					)}
 				</Form>
+				{/* Frees the studio's storage (the storage meter). The server
+				    refuses it while a concept is being made, and says so. */}
+				<div className="mt-4">
+					{making ? (
+						<p className="text-sm text-muted-foreground">
+							You can delete this project once its concepts are made.
+						</p>
+					) : (
+						<InlineConfirm
+							label="Delete project"
+							variant="ghost"
+							question={`Delete "${project.title}"${ready.length > 0 ? ` and its ${ready.length === 1 ? "concept" : `${ready.length} concepts`}` : ""}? This frees their storage and can't be undone.`}
+							confirmLabel="Delete project"
+							keepLabel="Keep the project"
+							busyLabel="Deleting…"
+							fallback={heading}
+							onConfirm={(finished) =>
+								router.delete(urlFor("tenant.design_lab.destroy", params), {
+									onFinish: finished,
+								})
+							}
+						/>
+					)}
+				</div>
 			</Section>
 		</Page>
 	);

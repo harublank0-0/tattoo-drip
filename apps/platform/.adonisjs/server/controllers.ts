@@ -53,6 +53,7 @@ export const controllers = {
   PublicStyles: () => import('#controllers/public_styles_controller'),
   PublicWork: () => import('#controllers/public_work_controller'),
   Quotes: () => import('#controllers/quotes_controller'),
+  References: () => import('#controllers/references_controller'),
   ReviewLinks: () => import('#controllers/review_links_controller'),
   Reviews: () => import('#controllers/reviews_controller'),
   Session: () => import('#controllers/session_controller'),

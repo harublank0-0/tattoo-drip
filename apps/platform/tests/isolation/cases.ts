@@ -89,6 +89,7 @@ export type IsolationCase = {
 		| "finishProject"
 		| "healingProject"
 		| "newInquiry"
+		| "referenceImage"
 		| "client"
 		| "alert"
 		| "closedDay"
@@ -595,6 +596,14 @@ export const isolationCases: IsolationCase[] = [
 		resource: "designProject",
 		actor: "owner",
 		body: () => ({ title: "Renamed design", notes: "Bolder lines" }),
+		ownStatus: 302,
+		snapshot: designLabState,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/design-lab/:id",
+		resource: "designProject",
+		actor: "owner",
 		ownStatus: 302,
 		snapshot: designLabState,
 	},
@@ -1262,6 +1271,14 @@ export const isolationCases: IsolationCase[] = [
 		snapshot: paymentRows,
 	},
 	{
+		method: "DELETE",
+		pattern: "/t/:tenant/payments/:id/proof",
+		resource: "verifiedPayment",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: paymentRows,
+	},
+	{
 		method: "GET",
 		pattern: "/t/:tenant/projects",
 		actor: "owner",
@@ -1445,6 +1462,14 @@ export const isolationCases: IsolationCase[] = [
 		method: "POST",
 		pattern: "/t/:tenant/inbox/:id/decline",
 		resource: "newInquiry",
+		actor: "owner",
+		ownStatus: 302,
+		snapshot: inboxRows,
+	},
+	{
+		method: "DELETE",
+		pattern: "/t/:tenant/references/:id",
+		resource: "referenceImage",
 		actor: "owner",
 		ownStatus: 302,
 		snapshot: inboxRows,
