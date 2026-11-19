@@ -815,3 +815,137 @@ describe("a review and its Fresh ink, linked", () => {
 		);
 	});
 });
+
+/** A photo angle of a post, as the API sends it. */
+const photoAngle = (name: string) => ({ kind: "photo", ...photo(name) });
+
+/** A review linked to a post of `angles.length + 1` items. */
+function linkedReview(n: number, angles: unknown[]) {
+	return apiReview(n, {
+		freshInk: { ...apiPost(n, { angles, shownName: "Sita R." }), review: null },
+	});
+}
+
+describe("a review's Fresh ink and a post's review on the page", () => {
+	const fourItems = [photoAngle("a2"), VIDEO, photoAngle("a4")];
+
+	for (const theme of THEME_KEYS) {
+		test(`${theme}: a linked review draws its strip and its post's viewer`, () => {
+			const reviews = {
+				data: [linkedReview(1, fourItems)],
+				nextCursor: null,
+				rating: null,
+			};
+			const html = home(theme, reviews, freshInkPage(0));
+			assertSafePage(html, { brandImages: true });
+			const strip = html.match(
+				/<button[^>]*class="client-review-photos"[^>]*>.*?<\/button>/s,
+			)?.[0];
+			assert.ok(strip, "the strip is a button");
+			assert.match(strip, /aria-label="See Sita R\.&#x27;s Fresh ink"/);
+			assert.match(strip, /aria-haspopup="dialog"/);
+			assert.equal((strip.match(/<img /g) ?? []).length, 3);
+			assert.match(strip, />\+1</);
+			assert.match(html, /<dialog id="review-ink-photo-1"/);
+			assert.match(strip, /aria-controls="review-ink-photo-1"/);
+		});
+
+		test(`${theme}: a post's viewer shows its linked review`, () => {
+			const long = `${"The lines healed crisp and even, and the shading is soft. ".repeat(4)}Would come back.`;
+			const posts = {
+				data: [
+					apiPost(1, {
+						review: { id: id(1), rating: 4, body: long, date: "2026-10-01" },
+					}),
+				],
+				nextCursor: null,
+			};
+			const html = home(theme, reviewsPage(0), posts);
+			assertSafePage(html, { brandImages: true });
+			const review = html.match(
+				/<div class="fresh-ink-review">.*?<\/div>/s,
+			)?.[0];
+			assert.ok(review, "the viewer holds the review");
+			assert.match(review, /Review from Ram K\./);
+			assert.match(review, /<span class="sr-only">4 out of 5<\/span>/);
+			assert.match(
+				review,
+				/<p class="fresh-ink-review-excerpt user-text" dir="auto">The lines healed[^<]*…<\/p>/,
+			);
+			assert.match(
+				review,
+				/<details[^>]*><summary[^>]*>Read the review<\/summary>/,
+			);
+			assert.ok(
+				review.includes("Would come back."),
+				"the whole text is in the disclosure",
+			);
+		});
+	}
+
+	test("the strip draws one to three thumbnails, a video's poster, and +N past three", () => {
+		const one = home(
+			"stencil-and-ink",
+			{ data: [linkedReview(1, [])], nextCursor: null, rating: null },
+			freshInkPage(0),
+		);
+		const oneStrip =
+			one.match(
+				/<button[^>]*class="client-review-photos"[^>]*>.*?<\/button>/s,
+			)?.[0] ?? "";
+		assert.equal((oneStrip.match(/<img /g) ?? []).length, 1);
+		assert.doesNotMatch(oneStrip, />\+\d/);
+
+		const withVideo = home(
+			"stencil-and-ink",
+			{ data: [linkedReview(1, [VIDEO])], nextCursor: null, rating: null },
+			freshInkPage(0),
+		);
+		const videoStrip =
+			withVideo.match(
+				/<button[^>]*class="client-review-photos"[^>]*>.*?<\/button>/s,
+			)?.[0] ?? "";
+		assert.equal((videoStrip.match(/<img /g) ?? []).length, 2);
+		assert.match(videoStrip, /clip-poster/);
+	});
+
+	test("a post in the grid and in a review has two viewers with distinct ids", () => {
+		const post = apiPost(1);
+		const html = home(
+			"stencil-and-ink",
+			{
+				data: [apiReview(1, { freshInk: { ...post, review: null } })],
+				nextCursor: null,
+				rating: null,
+			},
+			{ data: [post], nextCursor: null },
+		);
+		const dialogs = Array.from(
+			html.matchAll(/<dialog id="([^"]+)"/g),
+			(m) => m[1],
+		);
+		assert.ok(dialogs.includes("fresh-ink-photo-1"));
+		assert.ok(dialogs.includes("review-ink-photo-1"));
+		assert.equal(
+			new Set(dialogs).size,
+			dialogs.length,
+			"every viewer id is unique",
+		);
+		assert.match(html, /aria-controls="fresh-ink-photo-1"/);
+		assert.match(html, /aria-controls="review-ink-photo-1"/);
+	});
+
+	test("the reviews' order is the API's, linked or not", () => {
+		const html = home(
+			"stencil-and-ink",
+			{
+				data: [apiReview(1), linkedReview(2, []), apiReview(3)],
+				nextCursor: null,
+				rating: null,
+			},
+			freshInkPage(0),
+		);
+		const order = Array.from(html.matchAll(/Review number (\d)/g), (m) => m[1]);
+		assert.deepEqual(order, ["1", "2", "3"]);
+	});
+});

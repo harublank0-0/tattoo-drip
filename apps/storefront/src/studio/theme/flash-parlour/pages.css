@@ -1415,3 +1415,16 @@
 	justify-items: center;
 	text-align: center;
 }
+
+/* A review's Fresh ink strip (2026-11-19): sheet outlines, the red "+N". */
+.fp-reviews .client-review-thumb,
+.fp-client-body .client-review-thumb {
+	border: var(--fp-outline);
+	border-radius: var(--radius);
+}
+.fp-reviews .client-review-more,
+.fp-client-body .client-review-more {
+	background: color-mix(in srgb, var(--fp-red) 82%, transparent);
+	font-family: var(--display-face);
+	font-weight: 700;
+}

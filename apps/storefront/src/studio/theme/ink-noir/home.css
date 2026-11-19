@@ -1264,3 +1264,15 @@
 .ink-client-body .client-review-summary {
 	margin-block-end: 2rem;
 }
+
+/* A review's Fresh ink strip (2026-11-19): unframed, square, the accent on hover. */
+.ink-reviews .client-review-thumb,
+.ink-client-body .client-review-thumb {
+	border: 0;
+	border-radius: 0;
+	outline: 1px solid transparent;
+}
+.ink-reviews .client-review-photos:hover .client-review-thumb,
+.ink-client-body .client-review-photos:hover .client-review-thumb {
+	outline-color: var(--stencil);
+}

@@ -900,3 +900,10 @@
 .irz-client-body .client-review-summary {
 	margin-block-start: 0;
 }
+
+/* A review's Fresh ink strip (2026-11-19): hairline frames, square corners. */
+.irz-reviews .client-review-thumb,
+.irz-client-body .client-review-thumb {
+	border-width: 1px;
+	border-radius: 0;
+}

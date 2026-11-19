@@ -1,6 +1,9 @@
-import { ArrowRight, Star } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Fill } from "../../intake/components/fill.tsx";
+import { fill } from "../../intake/template.ts";
 import { studioCopy } from "../copy.ts";
+import type { FreshInkPostView } from "../fresh-ink.ts";
+import { showPhoto } from "../lightbox.ts";
 import { isAllowedHref, reviewsHref } from "../links.ts";
 import {
 	HOME_REVIEWS_COUNT,
@@ -8,6 +11,7 @@ import {
 	type ReviewsView,
 	type ReviewView,
 } from "../reviews.ts";
+import type { BrandImage } from "../theme/config.ts";
 
 /**
  * Client reviews on the studio's own page (Reviews and Fresh ink, slice 3):
@@ -22,42 +26,14 @@ import {
  * section), so the markup stays one.
  */
 
+import { FreshInkDialog } from "./fresh-ink.tsx";
+import { ReviewStars } from "./review-stars.tsx";
+
+// The stars live in review-stars.tsx (the Fresh ink viewer draws them too).
+export { ReviewStars } from "./review-stars.tsx";
+
 /** "Tattoo by " before the artist's link: the name itself is the link. */
 const TATTOO_BY = studioCopy.reviews.tattooBy.replace("{artist}", "");
-
-/**
- * Five stars, `rating` of them filled. With a `label` ("4 out of 5") a
- * screen reader hears it once, as text; without one the stars are
- * decoration beside words that already say it (the average's line).
- */
-export function ReviewStars({
-	rating,
-	label,
-}: {
-	rating: number;
-	label: string | null;
-}) {
-	const stars = (
-		<span className="client-review-stars-row" aria-hidden="true">
-			{[1, 2, 3, 4, 5].map((n) => (
-				<Star
-					key={n}
-					data-on={n <= rating ? "" : undefined}
-					fill={n <= rating ? "currentColor" : "none"}
-					strokeWidth={1.75}
-				/>
-			))}
-		</span>
-	);
-	if (label === null)
-		return <span className="client-review-stars">{stars}</span>;
-	return (
-		<span className="client-review-stars">
-			<span className="sr-only">{label}</span>
-			{stars}
-		</span>
-	);
-}
 
 /**
  * The studio's average from 3 reviews: "4.7 from 12 reviews", which a screen
@@ -111,6 +87,12 @@ export function ReviewItem({
 					</>
 				) : null}
 			</p>
+			{review.freshInk ? (
+				<>
+					<ReviewPhotos post={review.freshInk} name={review.name} />
+					<FreshInkDialog post={review.freshInk} />
+				</>
+			) : null}
 			{artist ? (
 				<p className="client-review-artist">
 					{TATTOO_BY}
@@ -133,6 +115,64 @@ export function ReviewItem({
 				</div>
 			) : null}
 		</article>
+	);
+}
+
+/** The most thumbnails a review's Fresh ink strip shows; past that, "+N". */
+const STRIP_THUMBS = 3;
+/** A thumbnail's drawn width (styles.css, `.client-review-thumb`): the smallest copy suits it. */
+const THUMB_SIZES = "88px";
+
+/**
+ * A review's Fresh ink (the link design, 2026-11-19): one button that opens
+ * the post's viewer, holding its main photo and up to two more (a video's
+ * poster for a video), with "+N" on the last when the post has more. The
+ * thumbnails are decoration: the button's name says what it opens.
+ */
+export function ReviewPhotos({
+	post,
+	name,
+}: {
+	post: FreshInkPostView;
+	name: string;
+}) {
+	const thumbs: BrandImage[] = [
+		post,
+		...post.angles.map((angle) =>
+			angle.kind === "video" ? angle.poster : angle,
+		),
+	];
+	const more = thumbs.length - STRIP_THUMBS;
+	return (
+		<button
+			type="button"
+			className="client-review-photos"
+			aria-haspopup="dialog"
+			aria-controls={post.dialogId}
+			aria-label={fill(studioCopy.reviews.photos, { name })}
+			onClick={() => showPhoto(post.dialogId)}
+		>
+			{thumbs.slice(0, STRIP_THUMBS).map((image, index) => (
+				<span key={image.src} className="client-review-thumb">
+					<img
+						className="client-review-thumb-img"
+						src={image.src}
+						srcSet={image.srcSet}
+						sizes={image.srcSet ? THUMB_SIZES : undefined}
+						width={image.width}
+						height={image.height}
+						alt=""
+						loading="lazy"
+						decoding="async"
+					/>
+					{more > 0 && index === STRIP_THUMBS - 1 ? (
+						<span className="client-review-more" aria-hidden="true">
+							{fill(studioCopy.reviews.more, { count: more })}
+						</span>
+					) : null}
+				</span>
+			))}
+		</button>
 	);
 }
 

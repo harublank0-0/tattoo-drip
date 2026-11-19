@@ -1,15 +1,18 @@
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { fill } from "../../intake/template.ts";
 import { TattooDialog } from "../angles.tsx";
 import { studioCopy } from "../copy.ts";
 import {
 	type FreshInkPostView,
 	type FreshInkView,
 	HOME_FRESH_INK_COUNT,
+	type LinkedReviewView,
 } from "../fresh-ink.ts";
 import { showPhoto } from "../lightbox.ts";
 import { freshInkHref, isAllowedHref } from "../links.ts";
 import { workGridSizes } from "../srcset.ts";
+import { ReviewStars } from "./review-stars.tsx";
 
 /**
  * Fresh ink on the studio's own page (Reviews and Fresh ink, slice 3): the
@@ -63,6 +66,56 @@ export function FreshInkFacts({ post }: { post: FreshInkPostView }) {
 					{post.placement}
 				</p>
 			) : null}
+			{post.review ? (
+				<FreshInkReview review={post.review} name={post.name} />
+			) : null}
+		</div>
+	);
+}
+
+/**
+ * The client's review of the post's project, in its viewer (the link
+ * design, 2026-11-19): who wrote it, the stars (said in words), the month,
+ * and the text. A long one shows its start and "Read the review", which
+ * shows the whole text in place: the review may be pages back on /reviews.
+ */
+export function FreshInkReview({
+	review,
+	name,
+}: {
+	review: LinkedReviewView;
+	name: string;
+}) {
+	return (
+		<div className="fresh-ink-review">
+			<p className="fresh-ink-review-by">
+				<bdi>{fill(studioCopy.freshInk.review, { name })}</bdi>
+				{review.date ? (
+					<>
+						<span aria-hidden="true"> · </span>
+						<time dateTime={review.date.dateTime}>{review.date.text}</time>
+					</>
+				) : null}
+			</p>
+			<ReviewStars rating={review.rating} label={review.ratingText} />
+			{review.excerpt ? (
+				<>
+					{/* Hidden by styles.css once the whole text is open. */}
+					<p className="fresh-ink-review-excerpt user-text" dir="auto">
+						{review.excerpt}
+					</p>
+					<details className="fresh-ink-review-more">
+						<summary>{studioCopy.freshInk.readReview}</summary>
+						<p className="fresh-ink-review-body user-text" dir="auto">
+							{review.body}
+						</p>
+					</details>
+				</>
+			) : (
+				<p className="fresh-ink-review-body user-text" dir="auto">
+					{review.body}
+				</p>
+			)}
 		</div>
 	);
 }
