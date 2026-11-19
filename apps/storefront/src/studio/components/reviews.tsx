@@ -12,6 +12,11 @@ import {
 	type ReviewView,
 } from "../reviews.ts";
 import type { BrandImage } from "../theme/config.ts";
+import { FreshInkDialog } from "./fresh-ink.tsx";
+import { ReviewStars } from "./review-stars.tsx";
+
+// The stars live in review-stars.tsx (the Fresh ink viewer draws them too).
+export { ReviewStars } from "./review-stars.tsx";
 
 /**
  * Client reviews on the studio's own page (Reviews and Fresh ink, slice 3):
@@ -25,12 +30,6 @@ import type { BrandImage } from "../theme/config.ts";
  * classes around them (each theme's stylesheet scopes `.client-review*` under its
  * section), so the markup stays one.
  */
-
-import { FreshInkDialog } from "./fresh-ink.tsx";
-import { ReviewStars } from "./review-stars.tsx";
-
-// The stars live in review-stars.tsx (the Fresh ink viewer draws them too).
-export { ReviewStars } from "./review-stars.tsx";
 
 /** "Tattoo by " before the artist's link: the name itself is the link. */
 const TATTOO_BY = studioCopy.reviews.tattooBy.replace("{artist}", "");
@@ -149,7 +148,14 @@ export function ReviewPhotos({
 			className="client-review-photos"
 			aria-haspopup="dialog"
 			aria-controls={post.dialogId}
-			aria-label={fill(studioCopy.reviews.photos, { name })}
+			aria-label={
+				post.photosLabel
+					? fill(studioCopy.reviews.photosCount, {
+							name,
+							count: post.photosLabel,
+						})
+					: fill(studioCopy.reviews.photos, { name })
+			}
 			onClick={() => showPhoto(post.dialogId)}
 		>
 			{thumbs.slice(0, STRIP_THUMBS).map((image, index) => (

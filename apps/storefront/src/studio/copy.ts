@@ -252,6 +252,8 @@ export const studioCopy = {
 		reply: "Reply from {studio}",
 		/** The review's Fresh ink strip: what its button opens. */
 		photos: "See {name}'s Fresh ink",
+		/** The strip's name when the post holds more than one photo or video ("4 photos and videos"). */
+		photosCount: "See {name}'s Fresh ink, {count}",
 		/** On the strip's last thumbnail, when the post has more than three. */
 		more: "+{count}",
 		showMore: "Show more",

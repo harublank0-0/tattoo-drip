@@ -130,8 +130,9 @@ export default class PublicReviewService {
 	/**
 	 * A page of the shown reviews, newest first (`created_at desc, id desc`,
 	 * never "best first"), and the studio's average and count from all of
-	 * them, only from MIN_RATED_REVIEWS (ruling 10). Three queries: the
-	 * visible artists, the page and the rating.
+	 * them, only from MIN_RATED_REVIEWS (ruling 10). Three queries (the
+	 * visible artists, the page and the rating), and two more while the
+	 * page shows Fresh ink: each review's linked post and its media.
 	 */
 	async reviews(
 		tenant: Tenant,
@@ -205,7 +206,8 @@ export default class PublicReviewService {
 	 * A page of the shown Fresh ink posts, newest published first
 	 * (`published_at desc, id desc`), each with its public copies in order
 	 * (the lead, always a photo, then its other photos and ready videos).
-	 * Three queries: the visible artists, the page and its media. A post
+	 * Three queries (the visible artists, the page and its media), and one
+	 * more while the page shows Reviews: each post's linked review. A post
 	 * whose lead has no public photo is left out (never shown half made); the
 	 * cursor still moves past it.
 	 */
@@ -259,7 +261,6 @@ export default class PublicReviewService {
 		};
 	}
 
-	/** The visible artists' tags by id: the artists the gallery shows (a closed one too). */
 	/**
 	 * The shown posts of these projects, built as `freshInk()` builds them
 	 * (their `review` null), by project: a review's linked Fresh ink. Two
@@ -317,6 +318,7 @@ export default class PublicReviewService {
 		return built;
 	}
 
+	/** The visible artists' tags by id: the artists the gallery shows (a closed one too). */
 	private async artistTags(
 		tenant: Tenant,
 	): Promise<Map<string, ShownArtistTag>> {

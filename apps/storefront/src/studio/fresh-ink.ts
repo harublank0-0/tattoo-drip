@@ -5,12 +5,12 @@ import {
 	dayView,
 	excerptOf,
 	readArtistTag,
-	readText as readPlainText,
 	readShownName,
+	readText,
 } from "./client-words.ts";
 import { studioCopy } from "./copy.ts";
 import { type GalleryPhotoView, tattooEntry } from "./gallery.ts";
-import { cleanLine, cleanText } from "./text.ts";
+import { cleanLine } from "./text.ts";
 
 /**
  * Fresh ink on the studio's own page (Reviews and Fresh ink, slice 3):
@@ -189,7 +189,7 @@ export function readFreshInkPost(
 function readLinkedReview(value: unknown): LinkedReviewView | null {
 	const id = own(value, "id");
 	const rating = own(value, "rating");
-	const body = readPlainText(own(value, "body"), MAX_REVIEW_BODY);
+	const body = readText(own(value, "body"), MAX_REVIEW_BODY);
 	if (
 		typeof id !== "string" ||
 		!UUID.test(id) ||
@@ -209,11 +209,6 @@ function readLinkedReview(value: unknown): LinkedReviewView | null {
 		excerpt: excerptOf(body),
 		date: dayView(own(value, "date")),
 	};
-}
-
-function readText(value: unknown, max: number): string | null {
-	const text = typeof value === "string" ? cleanText(value) : null;
-	return text && Array.from(text).length <= max ? text : null;
 }
 
 function readLine(value: unknown, max: number): string | null {

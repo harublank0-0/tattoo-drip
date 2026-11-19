@@ -5,6 +5,7 @@ import {
 	dayView,
 	readArtistTag,
 	readShownName,
+	readText,
 } from "./client-words.ts";
 import { studioCopy } from "./copy.ts";
 import {
@@ -12,7 +13,6 @@ import {
 	REVIEW_INK_PREFIX,
 	readFreshInkPost,
 } from "./fresh-ink.ts";
-import { cleanText } from "./text.ts";
 
 // The readers both lists share live in client-words.ts; re-exported for their importers.
 export {
@@ -111,10 +111,18 @@ function own(value: unknown, key: string): unknown {
 		: undefined;
 }
 
-/** Plain text up to `max` characters, its line breaks kept, else null. */
-function readText(value: unknown, max: number): string | null {
-	const text = typeof value === "string" ? cleanText(value) : null;
-	return text && Array.from(text).length <= max ? text : null;
+/**
+ * A review's linked Fresh ink: its viewer's ids from the review's position
+ * (unique on the page), but its bar's words its own: "Photo 1", not the
+ * review's number.
+ */
+function linkedPost(
+	value: unknown,
+	imageOrigin: string | null,
+	n: number,
+): FreshInkPostView | null {
+	const post = readFreshInkPost(value, imageOrigin, n, REVIEW_INK_PREFIX);
+	return post && { ...post, label: fill(studioCopy.work.photoN, { n: 1 }) };
 }
 
 function readReview(
@@ -152,12 +160,7 @@ function readReview(
 			replyBody === null
 				? null
 				: { body: replyBody, date: dayView(own(reply, "date")) },
-		freshInk: readFreshInkPost(
-			own(item, "freshInk"),
-			imageOrigin,
-			n,
-			REVIEW_INK_PREFIX,
-		),
+		freshInk: linkedPost(own(item, "freshInk"), imageOrigin, n),
 	};
 }
 

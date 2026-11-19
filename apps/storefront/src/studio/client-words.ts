@@ -1,4 +1,4 @@
-import { cleanLine, cleanText } from "./text.ts";
+import { cleanLine, cleanText, graphemes } from "./text.ts";
 import { ARTIST_SLUG } from "./view-model.ts";
 
 /*
@@ -82,19 +82,23 @@ export function readText(value: unknown, max: number): string | null {
 
 /**
  * A review's start, for the Fresh ink viewer: null when the whole text is
- * 200 characters or fewer; else cut at the last whitespace before the 200th
- * character (or at 200 when there is none), trimmed, with "…".
+ * 200 user-perceived characters or fewer (graphemes: an emoji, a flag or a
+ * Devanagari cluster is one, never split); else its first 200, cut back to
+ * the last whitespace when one falls in the second half (so "Wow " before a
+ * long unspaced run, as Thai or Japanese text is, isn't the whole excerpt),
+ * trimmed, with "…". As `trimDescription` cuts a meta description.
  */
 export function excerptOf(body: string): string | null {
-	const chars = Array.from(body);
-	if (chars.length <= EXCERPT) return null;
-	const head = chars.slice(0, EXCERPT + 1);
-	let cut = EXCERPT;
-	for (let index = EXCERPT; index > 0; index--) {
-		if (/\s/.test(head[index])) {
-			cut = index;
+	const parts = graphemes(body);
+	if (parts.length <= EXCERPT) return null;
+	const kept = parts.slice(0, EXCERPT);
+	let space = -1;
+	for (let index = kept.length - 1; index >= 0; index--) {
+		if (/^\s+$/u.test(kept[index])) {
+			space = index;
 			break;
 		}
 	}
-	return `${chars.slice(0, cut).join("").trimEnd()}…`;
+	const cut = space >= Math.floor(EXCERPT / 2) ? kept.slice(0, space) : kept;
+	return `${cut.join("").trimEnd()}…`;
 }

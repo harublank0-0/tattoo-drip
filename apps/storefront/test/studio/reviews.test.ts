@@ -842,7 +842,10 @@ describe("a review's Fresh ink and a post's review on the page", () => {
 				/<button[^>]*class="client-review-photos"[^>]*>.*?<\/button>/s,
 			)?.[0];
 			assert.ok(strip, "the strip is a button");
-			assert.match(strip, /aria-label="See Sita R\.&#x27;s Fresh ink"/);
+			assert.match(
+				strip,
+				/aria-label="See Sita R\.&#x27;s Fresh ink, 4 photos and videos"/,
+			);
 			assert.match(strip, /aria-haspopup="dialog"/);
 			assert.equal((strip.match(/<img /g) ?? []).length, 3);
 			assert.match(strip, />\+1</);
@@ -947,5 +950,64 @@ describe("a review's Fresh ink and a post's review on the page", () => {
 		);
 		const order = Array.from(html.matchAll(/Review number (\d)/g), (m) => m[1]);
 		assert.deepEqual(order, ["1", "2", "3"]);
+	});
+});
+
+/** The final review's findings on the link (2026-11-19), each pinned. */
+describe("the link's review fixes", () => {
+	test("the excerpt never splits an emoji or a cluster, and a lone early space isn't the cut", () => {
+		const family = "👩‍👩‍👧";
+		const emoji = excerptOf(`${"a".repeat(198)}${family}${"b".repeat(50)}`);
+		assert.ok(emoji);
+		assert.ok(!emoji.includes("‍…"), "no dangling joiner");
+		assert.ok(emoji.includes(family), "the emoji stays whole");
+		assert.ok(emoji.endsWith("b…"), "the 200th character is the first b");
+		const flag = excerptOf(`${"a".repeat(199)}🇳🇵${"b".repeat(50)}`);
+		assert.ok(flag);
+		assert.ok(
+			!/(^|[^\u{1F1E6}-\u{1F1FF}])[\u{1F1E6}-\u{1F1FF}]…$/u.test(flag),
+			"no lone regional indicator",
+		);
+		const early = excerptOf(`Wow ${"x".repeat(260)}`);
+		assert.ok(early && early.length > 100, `not cut at "Wow": ${early}`);
+	});
+
+	test("the strip's name says how many photos and videos it opens", () => {
+		const four = home(
+			"stencil-and-ink",
+			{
+				data: [linkedReview(1, [photoAngle("a2"), VIDEO, photoAngle("a4")])],
+				nextCursor: null,
+				rating: null,
+			},
+			freshInkPage(0),
+		);
+		assert.match(
+			four,
+			/aria-label="See Sita R\.&#x27;s Fresh ink, 4 photos and videos"/,
+		);
+		const one = home(
+			"stencil-and-ink",
+			{ data: [linkedReview(1, [])], nextCursor: null, rating: null },
+			freshInkPage(0),
+		);
+		assert.match(one, /aria-label="See Sita R\.&#x27;s Fresh ink"/);
+	});
+
+	test("a one-photo post opened from the fifth review says Photo 1, not Photo 5", () => {
+		const view = reviewsView(
+			{
+				data: [1, 2, 3, 4]
+					.map((n) => apiReview(n))
+					.concat([linkedReview(5, [])]),
+				nextCursor: null,
+				rating: null,
+			},
+			IMAGE_ORIGIN,
+		);
+		const post = view.reviews[4].freshInk;
+		assert.ok(post);
+		assert.equal(post.label, "Photo 1");
+		assert.equal(post.dialogId, "review-ink-photo-5", "its ids stay its own");
 	});
 });
