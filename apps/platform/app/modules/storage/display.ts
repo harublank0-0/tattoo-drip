@@ -25,3 +25,22 @@ export function storageLine(usage: StorageUsage): StorageLine {
 		enforced: storageEnforcement() === "enforce",
 	};
 }
+
+const perRequest = new WeakMap<object, Promise<StorageUsage>>();
+
+/**
+ * The studio's usage, read once per request (`request` is the request's
+ * HttpContext): the shared `storage` prop and a page that shows more of it
+ * (Billing) share one read.
+ */
+export function usageForRequest(
+	request: object,
+	read: () => Promise<StorageUsage>,
+): Promise<StorageUsage> {
+	let usage = perRequest.get(request);
+	if (!usage) {
+		usage = read();
+		perRequest.set(request, usage);
+	}
+	return usage;
+}

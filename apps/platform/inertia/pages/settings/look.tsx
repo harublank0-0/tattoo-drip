@@ -45,7 +45,6 @@ import {
 	toggleRow,
 } from "~/components/page_look";
 import Section from "~/components/section";
-import StorageLine from "~/components/storage_line";
 import { useStoredChoice, useStoredRows } from "~/components/stored_choice";
 import type { StudioPageProps } from "~/components/studio_link";
 import { ThemeSample } from "~/components/theme_sample";
@@ -337,7 +336,6 @@ export default function PageLook({
 
 			<div className="mt-8 border-t pt-6">
 				<Section title="Cover photo" description={COVER_INTRO_LINE}>
-					<StorageLine />
 					<div className="flex flex-col gap-1">
 						<p className="text-sm">{coverLine(hasCover)}</p>
 						<Link

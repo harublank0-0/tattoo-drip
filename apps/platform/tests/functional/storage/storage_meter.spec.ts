@@ -5,9 +5,13 @@ import drive from "@adonisjs/drive/services/main";
 import { test } from "@japa/runner";
 import { DateTime } from "luxon";
 import Artist from "#modules/artists/models/artist";
+import DesignProject from "#modules/design_lab/models/design_project";
+import ReferenceImage from "#modules/inquiries/models/reference_image";
 import ImageService from "#modules/media/services/image_service";
 import AllowanceBundle from "#modules/packages/models/allowance_bundle";
 import PilotGrant from "#modules/packages/models/pilot_grant";
+import PaymentMethod from "#modules/payments/models/payment_method";
+import ClientPost from "#modules/reviews/models/client_post";
 import { formatBytes } from "#modules/storage/categories";
 import {
 	COUNTED_KEY_COLUMNS,
@@ -19,7 +23,12 @@ import type Tenant from "#modules/tenancy/models/tenant";
 import { addArtist } from "#tests/helpers/artists";
 import { seedDesignLab } from "#tests/helpers/design_lab";
 import { testImages } from "#tests/helpers/images";
-import { artistIn, inTenant, studioWithOwner } from "#tests/helpers/tenants";
+import {
+	artistIn,
+	inTenant,
+	seededStudio,
+	studioWithOwner,
+} from "#tests/helpers/tenants";
 import { makeClip, videoService } from "#tests/helpers/videos";
 
 const MB = 1048576;
@@ -123,6 +132,99 @@ test.group("Storage meter: measuring", (group) => {
 		);
 		assert.equal((await usageOf(s.tenant)).usedBytes, 0);
 		assert.lengthOf(await rowsOf(s.tenant), 2, "the rows stay");
+	});
+
+	test("each record stops counting once it or its parent is deleted", async ({
+		assert,
+	}) => {
+		const studio = await seededStudio("meter-live", "Meter Live");
+		const { tenant } = studio;
+		const lab = await seedDesignLab(tenant, studio.artist);
+		const reference = await inTenant(tenant, () =>
+			ReferenceImage.query()
+				.where("inquiry_id", studio.newInquiry.id)
+				.firstOrFail(),
+		);
+		const qrKey = `tenants/${tenant.id}/payment_qr/${crypto.randomUUID()}.png`;
+		await inTenant(tenant, () =>
+			PaymentMethod.query()
+				.where("id", studio.depositMethod.id)
+				.update({ qr_image_key: qrKey }),
+		);
+		const counted = async (key: string) => {
+			await inTenant(tenant, () =>
+				StoredFile.updateOrCreate(
+					{ key },
+					{
+						tenantId: tenant.id,
+						key,
+						purpose: key.split("/")[2],
+						bytes: 1000,
+						status: "stored",
+						storedAt: DateTime.utc(),
+					},
+				),
+			);
+		};
+		const cases: {
+			name: string;
+			keys: string[];
+			remove: () => Promise<unknown>;
+		}[] = [
+			{
+				name: "an artist's work photos and flash, with the artist",
+				keys: [
+					studio.workPhoto.imageKey as string,
+					studio.flashDesign.imageKey,
+				],
+				remove: () =>
+					Artist.query()
+						.where("id", studio.workPhoto.artistId)
+						.update({ deleted_at: new Date() }),
+			},
+			{
+				name: "a payment method's QR",
+				keys: [qrKey],
+				remove: () =>
+					PaymentMethod.query()
+						.where("id", studio.depositMethod.id)
+						.update({ deleted_at: new Date() }),
+			},
+			{
+				name: "an inquiry's reference photo",
+				keys: [reference.imageKey],
+				remove: () =>
+					ReferenceImage.query()
+						.where("id", reference.id)
+						.update({ deleted_at: new Date() }),
+			},
+			{
+				name: "a client post's photo, with the post",
+				keys: [studio.clientPostPhoto.imageKey as string],
+				remove: () =>
+					ClientPost.query()
+						.where("id", studio.clientPost.id)
+						.update({ deleted_at: new Date() }),
+			},
+			{
+				name: "a Design Lab concept, with its project",
+				keys: [lab.designAsset.imageKey],
+				remove: () =>
+					DesignProject.query()
+						.where("id", lab.designProject.id)
+						.update({ deleted_at: new Date() }),
+			},
+		];
+		for (const { name, keys, remove } of cases) {
+			for (const key of keys) await counted(key);
+			const live = (await usageOf(tenant)).usedBytes;
+			await inTenant(tenant, remove);
+			assert.equal(
+				live - (await usageOf(tenant)).usedBytes,
+				1000 * keys.length,
+				`${name}: counted while live, not once deleted`,
+			);
+		}
 	});
 
 	test("usage is broken down by category", async ({ assert }) => {

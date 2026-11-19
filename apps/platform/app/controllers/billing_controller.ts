@@ -12,7 +12,7 @@ import EntitlementService from "#modules/packages/services/entitlement_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import PackageGate from "#modules/packages/services/package_gate";
 import { formatBytes, STORAGE_CATEGORIES } from "#modules/storage/categories";
-import { storageLine } from "#modules/storage/display";
+import { storageLine, usageForRequest } from "#modules/storage/display";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import StorageMeterService from "#modules/storage/services/storage_meter_service";
 
@@ -41,7 +41,7 @@ export default class BillingController {
 		const plans = ids.length
 			? await BillingPlan.query().whereIn("id", ids)
 			: [];
-		const usage = await this.storage.usage(tenant);
+		const usage = await usageForRequest(ctx, () => this.storage.usage(tenant));
 		return ctx.inertia.render("settings/billing", {
 			...billingPage(
 				overview,

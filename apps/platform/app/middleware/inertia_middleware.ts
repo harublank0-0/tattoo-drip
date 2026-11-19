@@ -10,7 +10,7 @@ import { bellKinds } from "#modules/notifications/alerts";
 import AlertService from "#modules/notifications/services/alert_service";
 import WaitingService from "#modules/projects/services/waiting_service";
 import StudioReviewService from "#modules/reviews/services/studio_review_service";
-import { storageLine } from "#modules/storage/display";
+import { storageLine, usageForRequest } from "#modules/storage/display";
 import StorageMeterService from "#modules/storage/services/storage_meter_service";
 import {
 	INVITATION_LINK_FLASH,
@@ -120,9 +120,11 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 						{ userId: auth.user.id, tenantId: tenant.id },
 						async () =>
 							storageLine(
-								await (
-									await ctx.containerResolver.make(StorageMeterService)
-								).usage(tenant),
+								await usageForRequest(ctx, async () =>
+									(await ctx.containerResolver.make(StorageMeterService)).usage(
+										tenant,
+									),
+								),
 							),
 					)
 				: null;

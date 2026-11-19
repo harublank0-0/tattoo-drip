@@ -7,9 +7,10 @@
  * (storage_meter.spec.ts) fails for a key column in neither list.
  *
  * Each `sql` selects `key` for the studio `t.id` (the `t` CTE that
- * `liveKeysCte` opens), from rows that are live: soft-deleted artists,
- * payment methods, reference images and design projects' assets, and a
- * deleted post's media, don't count.
+ * `liveKeysCte` opens), from rows that are live: a soft-deleted artist's
+ * photo, work photos, videos and flash (the dashboard hides them with the
+ * artist), a soft-deleted payment method's QR, reference image or design
+ * project's assets, and a deleted post's media, don't count.
  */
 const COUNTED: { column: string; sql: string }[] = [
 	{
@@ -18,11 +19,11 @@ const COUNTED: { column: string; sql: string }[] = [
 	},
 	{
 		column: "ArtistWorkPhoto.imageKey",
-		sql: "select image_key as key from artist_work_photos, t where artist_work_photos.tenant_id = t.id and image_key is not null",
+		sql: "select w.image_key as key from artist_work_photos w join artists a on a.tenant_id = w.tenant_id and a.id = w.artist_id, t where w.tenant_id = t.id and a.deleted_at is null and w.image_key is not null",
 	},
 	{
 		column: "ArtistWorkPhoto.videoKeys",
-		sql: "select unnest(video_keys) as key from artist_work_photos, t where artist_work_photos.tenant_id = t.id and video_keys is not null",
+		sql: "select unnest(w.video_keys) as key from artist_work_photos w join artists a on a.tenant_id = w.tenant_id and a.id = w.artist_id, t where w.tenant_id = t.id and a.deleted_at is null and w.video_keys is not null",
 	},
 	{
 		column: "ClientPostMedia.imageKey",
@@ -38,7 +39,7 @@ const COUNTED: { column: string; sql: string }[] = [
 	},
 	{
 		column: "FlashDesign.imageKey",
-		sql: "select image_key as key from flash_designs, t where flash_designs.tenant_id = t.id",
+		sql: "select f.image_key as key from flash_designs f join artists a on a.tenant_id = f.tenant_id and a.id = f.artist_id, t where f.tenant_id = t.id and a.deleted_at is null",
 	},
 	{
 		column: "PaymentMethod.qrImageKey",

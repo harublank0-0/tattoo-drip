@@ -3,6 +3,7 @@ import { SocialIcon } from "@tattoo-drip/react/social-icon";
 import CoverPhotoForm from "~/components/cover_photo_form";
 import type { CoverProps } from "~/components/photos";
 import Section from "~/components/section";
+import StorageLine from "~/components/storage_line";
 import type { AddressHost, StudioPageProps } from "~/components/studio_link";
 import StudioLinkCard from "~/components/studio_link_card";
 import { Button } from "~/components/ui/button";
@@ -243,6 +244,7 @@ export default function StudioProfile({
 					</>
 				)}
 			</Form>
+			<StorageLine />
 			<CoverPhotoForm cover={cover} />
 			<WebAddress addressHost={addressHost} />
 		</>

@@ -63,14 +63,21 @@ export default class StorageMeterService {
 		tenant: TenantRef,
 		now: DateTime = DateTime.utc(),
 	): Promise<StorageUsage> {
+		// A join on the distinct live keys (a semi-join under an OR would be a
+		// per-row subplan), plus the reservations still running.
 		const { rows } = (await dbClient().rawQuery(
 			`${liveKeysCte}
-			 select f.purpose, sum(f.bytes)::text as bytes
-			 from stored_files f, t
-			 where f.tenant_id = t.id
-			   and ((f.status = 'stored' and f.key in (select key from live))
-			     or (f.status = 'reserved' and f.expires_at > ?))
-			 group by f.purpose`,
+			 select purpose, sum(bytes)::text as bytes from (
+			   select f.purpose, f.bytes
+			   from stored_files f
+			   join (select distinct key from live) l on l.key = f.key, t
+			   where f.tenant_id = t.id and f.status = 'stored'
+			   union all
+			   select f.purpose, f.bytes
+			   from stored_files f, t
+			   where f.tenant_id = t.id and f.status = 'reserved' and f.expires_at > ?
+			 ) counted
+			 group by purpose`,
 			[tenant.id, now.toJSDate()],
 		)) as { rows: { purpose: ImagePurpose; bytes: string }[] };
 		const byCategory = Object.fromEntries(
