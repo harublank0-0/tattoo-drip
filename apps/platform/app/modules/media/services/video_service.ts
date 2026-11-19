@@ -38,6 +38,7 @@ import {
 	type VideoType,
 } from "#modules/media/video";
 import { recordStoredFile } from "#modules/storage/record_stored_file";
+import { releaseStorage, reserveStorage } from "#modules/storage/reservations";
 import type Tenant from "#modules/tenancy/models/tenant";
 import { currentClient } from "#services/db_context";
 
@@ -100,6 +101,12 @@ export type ShownVideoSource = {
  * public disk under `work_video`; the poster through ImageService, so it has
  * a photo's copies. The staged object is deleted once processed or refused.
  */
+/** A video's reservation outlasts the signed PUT and the processing that follows. */
+const VIDEO_RESERVATION_MINUTES = 75;
+
+/** The storage reservation of a staged upload, named after it. */
+const stagedReservationKey = (stagingKey: string) => `reserve:${stagingKey}`;
+
 @inject()
 export default class VideoService {
 	constructor(private images: ImageService) {}
@@ -128,21 +135,39 @@ export default class VideoService {
 	 * A presigned PUT for one upload to R2, for exactly `size` bytes of
 	 * `type`, valid for 15 minutes to start; null on the local disk, where the
 	 * dashboard's own route takes the upload (the caller builds its URL).
+	 * First the studio's storage is reserved for `size` bytes under
+	 * `purpose` (StorageFullError when it doesn't fit, with
+	 * STORAGE_ENFORCEMENT on; a client's Fresh ink video is always taken),
+	 * until `deleteStaged` releases it once the upload is processed, refused
+	 * or given up, or it expires.
 	 */
 	async signUpload(
 		tenant: TenantRef,
 		key: string,
 		{ type, size }: { type: VideoType; size: number },
+		purpose: VideoPurpose = VIDEO_PURPOSE,
 	): Promise<SignedUpload | null> {
 		this.assertStagingKeyOf(tenant, key);
 		assertSize(size);
-		if (this.stagesLocally()) return null;
-		const url = await drive.use("private").getSignedUploadUrl(key, {
-			contentType: type,
-			expiresIn: SIGNED_UPLOAD_SECONDS,
-			ContentLength: size,
+		const reservation = await reserveStorage({
+			tenantId: tenant.id,
+			purpose,
+			bytes: size,
+			minutes: VIDEO_RESERVATION_MINUTES,
+			key: stagedReservationKey(key),
 		});
-		return { url, headers: { "Content-Type": type } };
+		if (this.stagesLocally()) return null;
+		try {
+			const url = await drive.use("private").getSignedUploadUrl(key, {
+				contentType: type,
+				expiresIn: SIGNED_UPLOAD_SECONDS,
+				ContentLength: size,
+			});
+			return { url, headers: { "Content-Type": type } };
+		} catch (error) {
+			if (reservation) await releaseStorage(tenant.id, reservation);
+			throw error;
+		}
 	}
 
 	/**
@@ -206,9 +231,14 @@ export default class VideoService {
 		return (await disk.getMetaData(key)).contentLength;
 	}
 
-	/** Deletes a staged upload, best effort: a failure is logged for the orphan sweep (TAT-140). */
+	/**
+	 * Deletes a staged upload, best effort: a failure is logged for the
+	 * orphan sweep (TAT-140). Its storage reservation goes too: the upload is
+	 * processed (its renditions are counted), refused or given up.
+	 */
 	async deleteStaged(tenant: TenantRef, key: string): Promise<void> {
 		this.assertStagingKeyOf(tenant, key);
+		await releaseStorage(tenant.id, stagedReservationKey(key));
 		try {
 			await drive.use("private").delete(key);
 		} catch (error) {

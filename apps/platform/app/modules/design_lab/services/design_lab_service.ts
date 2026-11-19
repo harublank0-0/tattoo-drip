@@ -19,14 +19,16 @@ import DesignProviders from "#modules/design_lab/services/design_providers";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import DesignUsageService from "#modules/design_lab/services/design_usage_service";
 import { designLabSettings } from "#modules/design_lab/settings";
+import { reserveDesignStorage } from "#modules/design_lab/storage_reservation";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import ImageService from "#modules/media/services/image_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import ProjectService, {
 	type Member,
 } from "#modules/projects/services/project_service";
+import { releaseStorage } from "#modules/storage/reservations";
 import type Tenant from "#modules/tenancy/models/tenant";
-import { withTransaction } from "#services/db_context";
+import { afterRollback, withTransaction } from "#services/db_context";
 import { dispatchInTransaction } from "#services/queue";
 
 type TenantRef = Pick<Tenant, "id">;
@@ -320,6 +322,13 @@ export default class DesignLabService {
 					model: generation.model,
 				})),
 			);
+			await this.holdStorage(
+				tenant,
+				generations.map((generation) => ({
+					generationId: generation.id,
+					attempt: 1,
+				})),
+			);
 			for (const generation of generations) {
 				await dispatchInTransaction(
 					RunDesignGenerationJob.dispatch({
@@ -409,6 +418,9 @@ export default class DesignLabService {
 					model: generation.model,
 				},
 			]);
+			await this.holdStorage(tenant, [
+				{ generationId: generation.id, attempt: generation.attempt },
+			]);
 			await dispatchInTransaction(
 				RunDesignGenerationJob.dispatch({
 					tenantId: tenant.id,
@@ -420,6 +432,19 @@ export default class DesignLabService {
 			);
 			return true;
 		});
+	}
+
+	/**
+	 * Reserves the studio's storage for these attempts' concepts (the storage
+	 * meter; StorageFullError when they don't fit), released again if the
+	 * submit or retry rolls back.
+	 */
+	private async holdStorage(
+		tenant: TenantRef,
+		attempts: { generationId: string; attempt: number }[],
+	): Promise<void> {
+		const keys = await reserveDesignStorage(tenant.id, attempts);
+		if (keys.length > 0) afterRollback(() => releaseStorage(tenant.id, keys));
 	}
 
 	/** The member's asset with this id and its project, else a 404. */

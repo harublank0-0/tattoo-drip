@@ -284,7 +284,13 @@ export default class ClientPostService {
 			);
 			return live;
 		});
-		const upload = await this.videos.signUpload(tenant, key, { type, size });
+		// A client's video: always taken, still counted (the storage meter).
+		const upload = await this.videos.signUpload(
+			tenant,
+			key,
+			{ type, size },
+			"client_post_video",
+		);
 		return { post, key, upload };
 	}
 

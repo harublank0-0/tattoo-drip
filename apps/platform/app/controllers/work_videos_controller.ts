@@ -27,6 +27,7 @@ import {
 	readVideoUploadToken,
 	videoUploadToken,
 } from "#modules/artists/video_uploads";
+import { StorageFullError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import VideoService from "#modules/media/services/video_service";
 
@@ -75,7 +76,9 @@ export default class WorkVideosController {
 			type,
 			size,
 		});
-		const signed = await this.videos.signUpload(tenant, key, { type, size });
+		const signed = await asFieldErrors(() =>
+			this.videos.signUpload(tenant, key, { type, size }),
+		);
 		return ctx.response.header("Cache-Control", "no-store").json({
 			upload: signed
 				? { method: "PUT", ...signed }
@@ -214,6 +217,7 @@ async function asFieldErrors<T>(work: () => Promise<T>): Promise<T> {
 			);
 		}
 		if (error instanceof VideoUploadError) throw fieldError(error.message);
+		if (error instanceof StorageFullError) throw fieldError(error.message);
 		throw error;
 	}
 }

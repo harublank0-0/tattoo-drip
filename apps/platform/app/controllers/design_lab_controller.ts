@@ -53,6 +53,7 @@ import {
 	updateDesignAssetValidator,
 	updateDesignProjectValidator,
 } from "#modules/design_lab/validators/design_lab";
+import { StorageFullError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import ImageService, {
 	THUMBNAIL_WIDTH,
@@ -82,6 +83,11 @@ async function asFieldErrors<T>(
 		if (error instanceof AllowanceError) {
 			throw new errors.E_VALIDATION_ERROR([
 				{ field: usageField, message: error.message, rule: "allowance" },
+			]);
+		}
+		if (error instanceof StorageFullError) {
+			throw new errors.E_VALIDATION_ERROR([
+				{ field: usageField, message: error.message, rule: "storage" },
 			]);
 		}
 		throw error;
