@@ -2410,6 +2410,7 @@ export class TenantSchema extends BaseModel {
 		"policiesUpdatedAt",
 		"selectedPackage",
 		"slug",
+		"storageAlertedAt",
 		"storefrontClaimedFlash",
 		"storefrontSections",
 		"storefrontTheme",
@@ -2493,6 +2494,8 @@ export class TenantSchema extends BaseModel {
 	declare selectedPackage: string | null;
 	@column()
 	declare slug: string;
+	@column.dateTime()
+	declare storageAlertedAt: DateTime | null;
 	@column()
 	declare storefrontClaimedFlash: string;
 	@column()

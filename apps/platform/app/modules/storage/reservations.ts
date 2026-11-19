@@ -9,9 +9,11 @@ import {
 	formatBytes,
 	STORAGE_CATEGORY,
 } from "#modules/storage/categories";
+import StorageAlertJob from "#modules/storage/jobs/storage_alert_job";
 import StorageMeterService from "#modules/storage/services/storage_meter_service";
 import { storageEnforcement } from "#modules/storage/settings";
 import { withSeparateContext } from "#services/db_context";
+import { dispatchInTransaction } from "#services/queue";
 
 /**
  * The words of a refusal (spec, What people see): how much space the upload
@@ -129,11 +131,11 @@ async function decide(
 	const tenant = { id: tenantId };
 	// A studio this context can't see (removed meanwhile) has no allowance
 	// to hold: nothing is reserved, and its upload fails on its own.
-	const studio = await trx
+	const studio = (await trx
 		.from("tenants")
 		.where("id", tenantId)
-		.select("id")
-		.first();
+		.select("id", "storage_alerted_at")
+		.first()) as { id: string; storage_alerted_at: Date | null } | null;
 	if (!studio) {
 		logger.warn(
 			{ tenantId, purpose },
@@ -145,7 +147,19 @@ async function decide(
 	const bytes = items.reduce((sum, item) => sum + item.bytes, 0);
 	const usage = await meter.usage(tenant);
 	const limit = usage.limitBytes;
-	if (limit !== null && usage.usedBytes + bytes > limit) {
+	const fits = limit === null || usage.usedBytes + bytes <= limit;
+	if (limit !== null) {
+		await noticeCrossing(trx, {
+			tenantId,
+			limit,
+			before: usage.usedBytes,
+			// A refused upload adds nothing (with enforcement on).
+			after: usage.usedBytes + (fits || !enforced ? bytes : 0),
+			alerted: studio.storage_alerted_at !== null,
+			enforced,
+		});
+	}
+	if (limit !== null && !fits) {
 		const remaining = Math.max(0, limit - usage.usedBytes);
 		if (enforced) {
 			const studioBytes = await meter.studioOfferBytes(tenant, limit);
@@ -185,6 +199,66 @@ async function decide(
 		);
 	}
 	return { kind: "reserved", keys: items.map((item) => item.key) };
+}
+
+/** The share of the allowance at which the owners are emailed (the storage meter). */
+const ALERT_AT = 0.95;
+/** Under this share the alert rearms: a later crossing emails again. */
+const REARM_BELOW = 0.9;
+
+/**
+ * The 95% email, noticed (step 3 of the storage meter), in the
+ * reservation's transaction, under the studio's lock: usage under 90%
+ * before this upload clears the studio's marker; usage at or over 95% with
+ * it (or without it, when refused) queues StorageAlertJob while the marker
+ * is unset, which sends once per crossing (it claims the marker). With
+ * enforcement off nothing is queued or marked, and a reservation that itself
+ * crosses 95% is logged.
+ */
+async function noticeCrossing(
+	trx: TransactionClientContract,
+	{
+		tenantId,
+		limit,
+		before,
+		after,
+		alerted,
+		enforced,
+	}: {
+		tenantId: string;
+		limit: number;
+		before: number;
+		after: number;
+		alerted: boolean;
+		enforced: boolean;
+	},
+): Promise<void> {
+	let marked = alerted;
+	if (marked && before < limit * REARM_BELOW) {
+		await trx
+			.from("tenants")
+			.where("id", tenantId)
+			.update({ storage_alerted_at: null });
+		marked = false;
+	}
+	if (after < limit * ALERT_AT) return;
+	if (!enforced) {
+		if (before < limit * ALERT_AT) {
+			logger.info(
+				{
+					tenantId,
+					rule: "storage_alert",
+					usedBytes: after,
+					limitBytes: limit,
+				},
+				"Package rule would email",
+			);
+		}
+		return;
+	}
+	if (!marked) {
+		await dispatchInTransaction(StorageAlertJob.dispatch({ tenantId }), trx);
+	}
 }
 
 /**
