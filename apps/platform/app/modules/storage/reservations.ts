@@ -87,6 +87,20 @@ export async function reserveStorageFor(input: {
 			`storage:${tenantId}`,
 		]);
 		const tenant = { id: tenantId };
+		// A studio this context can't see (removed meanwhile) has no allowance
+		// to hold: nothing is reserved, and its upload fails on its own.
+		const studio = await trx
+			.from("tenants")
+			.where("id", tenantId)
+			.select("id")
+			.first();
+		if (!studio) {
+			logger.warn(
+				{ tenantId, purpose },
+				"storage was not reserved: the studio isn't visible",
+			);
+			return [];
+		}
 		const usage = await meter.usage(tenant);
 		const limit = usage.limitBytes;
 		if (limit !== null && usage.usedBytes + bytes > limit) {

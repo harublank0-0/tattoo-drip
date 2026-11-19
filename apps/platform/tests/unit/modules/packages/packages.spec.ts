@@ -18,8 +18,8 @@ test.group(
 				"One artist, with help running the business.",
 			);
 			assert.equal(PACKAGES.studio.line, "Multiple artists working together.");
-			assert.equal(PACKAGES.solo.defaultBundleKey, "solo-v1");
-			assert.equal(PACKAGES.studio.defaultBundleKey, "studio-v1");
+			assert.equal(PACKAGES.solo.defaultBundleKey, "solo-v2");
+			assert.equal(PACKAGES.studio.defaultBundleKey, "studio-v2");
 		});
 
 		test("Studio ranks above Solo", ({ assert }) => {
