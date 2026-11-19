@@ -225,10 +225,15 @@ test.group("Storage: concurrent reservations", (group) => {
 			}),
 		]);
 
-		assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), [
-			"fulfilled",
-			"rejected",
-		]);
+		assert.deepEqual(
+			outcomes.map((outcome) => outcome.status).sort(),
+			["fulfilled", "rejected"],
+			outcomes
+				.map((outcome) =>
+					outcome.status === "rejected" ? String(outcome.reason) : "fulfilled",
+				)
+				.join("; "),
+		);
 		const refused = outcomes.find((outcome) => outcome.status === "rejected");
 		assert.instanceOf(
 			(refused as PromiseRejectedResult).reason,

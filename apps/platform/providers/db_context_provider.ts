@@ -5,7 +5,7 @@ import type {
 	LucidModel,
 	ModelAdapterOptions,
 } from "@adonisjs/lucid/types/model";
-import { currentClient } from "#services/db_context";
+import { currentClient, SEPARATE_CONNECTION } from "#services/db_context";
 import { assertRestrictedDbRole } from "#services/db_role_guard";
 
 /**
@@ -13,7 +13,10 @@ import { assertRestrictedDbRole } from "#services/db_role_guard";
  * model query uses that transaction. Instances loaded before it (such as
  * `auth.user`) keep the plain pool client in `$options.client`, so a plain
  * client is replaced; an explicit transaction client still wins, and
- * models on another connection are left alone.
+ * models on another connection are left alone. The separate context's
+ * connection (withSeparateContext) is the primary's twin, the same
+ * database and role on a pool of its own, so primary models join its
+ * transaction too.
  */
 export class ContextAdapter extends Adapter {
 	constructor(private database: Database) {
@@ -30,7 +33,11 @@ export class ContextAdapter extends Adapter {
 				options?.connection ??
 				modelConstructor.connection ??
 				this.database.primaryConnectionName;
-			if (connection === ambient.connectionName) return ambient;
+			const ambientConnection =
+				ambient.connectionName === SEPARATE_CONNECTION
+					? this.database.primaryConnectionName
+					: ambient.connectionName;
+			if (connection === ambientConnection) return ambient;
 		}
 		return super.modelConstructorClient(modelConstructor, options);
 	}

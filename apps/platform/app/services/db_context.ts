@@ -322,6 +322,9 @@ export function afterCommit(fn: Callback): void {
 	activeOrThrow("afterCommit").level.commit.push(fn);
 }
 
+/** The connection withSeparateContext opens its transactions on (config/database.ts). */
+export const SEPARATE_CONNECTION = "storage";
+
 /**
  * `fn` in a root transaction of its own, outside any transaction the caller
  * has open: a short write that must commit at once whatever the caller's
@@ -343,7 +346,7 @@ export function withSeparateContext<T>(
 	const open = active();
 	if (open?.root.nested) return withDbContext(values, fn);
 	if (!open && db.connection().isTransaction) return openRoot(values, fn);
-	return storage.exit(() => openRoot(values, fn, "storage"));
+	return storage.exit(() => openRoot(values, fn, SEPARATE_CONNECTION));
 }
 
 /**
