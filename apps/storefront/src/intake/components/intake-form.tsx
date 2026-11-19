@@ -185,6 +185,8 @@ export function IntakeForm({
 		() => new Map(),
 	);
 	const [phase, setPhase] = useState<FormPhase>("idle");
+	/** The send under way leaves the photos out: the status line counts none. */
+	const [photosLeftOut, setPhotosLeftOut] = useState(false);
 	const [slow, setSlow] = useState(false);
 	const [notice, setNotice] = useState<NoticeProblem | null>(null);
 	const [showSummary, setShowSummary] = useState(false);
@@ -210,6 +212,8 @@ export function IntakeForm({
 	const previewUrls = useRef<ReadonlyMap<string, string>>(new Map());
 	const photoWaiters = useRef<Array<() => void>>([]);
 	const inFlight = useRef(false);
+	/** The next send leaves the photos out ("Send without photos"). */
+	const dropPhotos = useRef(false);
 	const nextPhotoId = useRef(0);
 	const sendRef = useRef<
 		(input: CreateInquiryInput) => Promise<InquiryReceipt>
@@ -276,8 +280,18 @@ export function IntakeForm({
 		onSubmit: ({ value }) => send(value),
 		// Something on an earlier step is wrong (the review step's Send checks
 		// them all): go to the first such step and say what.
-		onSubmitInvalid: ({ value }) => showErrorsOn(firstStepWithErrors(value)),
+		onSubmitInvalid: ({ value }) => {
+			dropPhotos.current = false;
+			showErrorsOn(firstStepWithErrors(value));
+		},
 	});
+
+	/** The notice's "Send without photos": the same answers again, no photos, a new check. */
+	function sendWithoutPhotos() {
+		if (busy || blocked) return;
+		dropPhotos.current = true;
+		void form.handleSubmit();
+	}
 
 	/** The first step, in order, with a field that is wrong; the current one when none is. */
 	function firstStepWithErrors(values: BookingValues): BookingStep {
@@ -353,6 +367,8 @@ export function IntakeForm({
 	}
 
 	async function send(values: BookingValues): Promise<void> {
+		const leaveOutPhotos = dropPhotos.current;
+		dropPhotos.current = false;
 		if (inFlight.current) return;
 		if (blockedUntil !== null && Date.now() < blockedUntil) return;
 		inFlight.current = true;
@@ -360,14 +376,15 @@ export function IntakeForm({
 			setNotice(null);
 			setShowSummary(false);
 			setPhotosStopped(false);
-			if (hasPhotoErrors(latest.current)) {
+			setPhotosLeftOut(leaveOutPhotos);
+			if (!leaveOutPhotos && hasPhotoErrors(latest.current)) {
 				setStep("tattoo");
 				setSummaryFields(STEP_FIELDS.tattoo);
 				setShowSummary(true);
 				setFocus("summary");
 				return;
 			}
-			if (isPreparing(latest.current)) {
+			if (!leaveOutPhotos && isPreparing(latest.current)) {
 				const asked = latest.current;
 				setPhase("preparing");
 				await new Promise<void>((done) => photoWaiters.current.push(done));
@@ -383,7 +400,8 @@ export function IntakeForm({
 					return;
 				}
 			}
-			const photos = readyItems(latest.current);
+			// "Send without photos" sends none; the tray keeps them.
+			const photos = leaveOutPhotos ? [] : readyItems(latest.current);
 			const intake = intakeValuesOf(values, today, rules);
 			const result = await submit(
 				toInquiryInput(
@@ -462,6 +480,7 @@ export function IntakeForm({
 			setFocus("notice");
 		} finally {
 			setPhase("idle");
+			setPhotosLeftOut(false);
 			inFlight.current = false;
 		}
 	}
@@ -646,6 +665,7 @@ export function IntakeForm({
 							problem={notice}
 							studioName={studioName}
 							channels={channels}
+							onSendWithoutPhotos={sendWithoutPhotos}
 						/>
 					) : null}
 
@@ -1006,8 +1026,8 @@ export function IntakeForm({
 						<SubmitStatus
 							phase={phase}
 							slow={slow}
-							photoCount={readyItems(references).length}
-							bytes={totalBytes(references)}
+							photoCount={photosLeftOut ? 0 : readyItems(references).length}
+							bytes={photosLeftOut ? 0 : totalBytes(references)}
 						/>
 					) : null}
 					{hasChannels(channels) ? (

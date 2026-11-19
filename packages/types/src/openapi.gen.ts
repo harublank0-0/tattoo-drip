@@ -958,6 +958,12 @@ export interface paths {
          *     `validation_failed` on that field; an image that isn't a JPEG, PNG or WebP is
          *     `validation_failed` on `referenceImages.<index>`.
          *
+         *     A request with reference images is a 409 `attachments_unavailable`
+         *     when the studio's storage is full: nothing is created. Offer to send
+         *     the same request again without its images (the person shares them
+         *     when the studio replies); a request without images is never refused
+         *     for storage.
+         *
          *     Abuse protection (TAT-55): send the bot-challenge token in
          *     `X-Challenge-Token` and leave the honeypot field `website` out. A
          *     missing, invalid, expired or reused token, or a filled `website`, is
@@ -1446,7 +1452,7 @@ export interface components {
                  *     and `service_busy` (503, with `Retry-After`: too many uploads
                  *     in progress, or no database connection free). Endpoint codes: `artist_not_accepting`,
                  *     `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`,
-                 *     `flash_claimed` (409),
+                 *     `flash_claimed`, `attachments_unavailable` (409),
                  *     `challenge_failed` (403) and `challenge_unavailable` (503),
                  *     all `createInquiry`; `deposit_not_due`, `deposit_changed`
                  *     (409, `submitDepositProof`); `review_locked`, `post_full`,
@@ -4212,7 +4218,7 @@ export interface operations {
             };
             404: components["responses"]["NotFound"];
             408: components["responses"]["Error"];
-            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`, `flash_claimed`) */
+            /** @description The studio takes no such inquiry now (`artist_not_accepting`, `studio_not_accepting`, `too_many_open_inquiries`, `flash_unavailable`, `flash_claimed`), or no reference images (`attachments_unavailable`) */
             409: {
                 headers: {
                     [name: string]: unknown;

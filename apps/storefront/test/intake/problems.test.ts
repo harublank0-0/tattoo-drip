@@ -26,6 +26,7 @@ function notice(
 		retry?: boolean;
 		contact?: boolean;
 		reload?: boolean;
+		withoutPhotos?: boolean;
 		waitSeconds?: number;
 	} = {},
 ): SubmitProblem {
@@ -35,6 +36,7 @@ function notice(
 		retry: flags.retry ?? false,
 		contact: flags.contact ?? false,
 		reload: flags.reload ?? false,
+		withoutPhotos: flags.withoutPhotos ?? false,
 		waitSeconds: flags.waitSeconds ?? null,
 	};
 }
@@ -62,6 +64,10 @@ describe("describeSubmitError", () => {
 			[
 				apiError(409, "studio_not_accepting"),
 				notice("studio-closed", { contact: true }),
+			],
+			[
+				apiError(409, "attachments_unavailable"),
+				notice("photos-unavailable", { withoutPhotos: true, contact: true }),
 			],
 			[
 				apiError(403, "challenge_failed"),
