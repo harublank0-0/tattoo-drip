@@ -1,4 +1,5 @@
 import { Form } from "@adonisjs/inertia/react";
+import { router } from "@inertiajs/react";
 import { cn } from "cn";
 import { TriangleAlert } from "lucide-react";
 import {
@@ -19,6 +20,7 @@ import {
 	FormSheetTrigger,
 	type PageSheets,
 } from "~/components/form_sheet";
+import InlineConfirm from "~/components/inline_confirm";
 import {
 	DESK_KIND_TEXT,
 	type DeskKindName,
@@ -485,10 +487,16 @@ function PaymentItem({
 	const tenant = useTenant();
 	const [reversing, setReversing] = useState(false);
 	const trigger = useRef<HTMLButtonElement>(null);
+	// Where focus goes once a deleted screenshot's buttons are gone.
+	const item = useRef<HTMLLIElement>(null);
 	const unsigned = row.amountText.replace(/^−/, "");
 
 	return (
-		<li className="flex flex-col gap-1 py-3">
+		<li
+			ref={item}
+			tabIndex={-1}
+			className="flex flex-col gap-1 py-3 outline-none"
+		>
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<span className="font-medium">
 					{KIND_LABELS[row.kind]} {row.amountText}
@@ -502,6 +510,9 @@ function PaymentItem({
 			</span>
 			<span className="text-muted-foreground">{row.decisionText}</span>
 			{row.reversalText && <span>{row.reversalText}</span>}
+			{row.proofRemovedText && (
+				<span className="text-muted-foreground">{row.proofRemovedText}</span>
+			)}
 			{row.note && <span className="whitespace-pre-line">{row.note}</span>}
 			{(row.proofUrl || row.canReverse) && (
 				<div className="flex flex-wrap gap-2 pt-1">
@@ -517,6 +528,27 @@ function PaymentItem({
 						>
 							View screenshot
 						</a>
+					)}
+					{row.proofUrl && (
+						// Frees the studio's storage (the storage meter); the payment stays.
+						<InlineConfirm
+							label="Delete screenshot"
+							variant="ghost"
+							question="Delete this screenshot? The payment stays as it is, but the client's file can't be brought back."
+							confirmLabel="Delete screenshot"
+							keepLabel="Keep it"
+							busyLabel="Deleting…"
+							fallback={item}
+							onConfirm={(finished) =>
+								router.delete(
+									urlFor("tenant.payments.proof.destroy", {
+										tenant: tenant.slug,
+										id: row.id,
+									}),
+									{ preserveScroll: true, onFinish: finished },
+								)
+							}
+						/>
 					)}
 					{row.canReverse && (
 						<Button

@@ -35,6 +35,7 @@ function payment(over: Partial<Payment> = {}): Payment {
 		proofImageKey: null,
 		proofImageWidth: null,
 		proofImageHeight: null,
+		proofRemovedAt: null,
 		...over,
 	} as unknown as Payment;
 }
@@ -166,6 +167,25 @@ test.group("paymentsCard", () => {
 		// NPR 1,000 was received, which the screen's sentence must not blame
 		// on a quote change.
 		assert.equal(props.pending[0].dueNowText, "NPR 2,000");
+	});
+
+	test("a screenshot the studio removed still reads as verified, and says it was removed", ({
+		assert,
+	}) => {
+		const removed = payment({ proofRemovedAt: AT.plus({ days: 2 }) });
+		const desk = payment();
+		const props = card(money([removed, desk]), "booked", true, new Map());
+		const row = (id: string) => props.rows.find((r) => r.id === id);
+
+		assert.deepInclude(row(removed.id), {
+			decisionText: "Verified by Asha Rai, 18 Oct 2026",
+			proofRemovedText: "Screenshot removed by the studio",
+			proofUrl: null,
+		});
+		assert.deepInclude(row(desk.id), {
+			decisionText: "Recorded by Asha Rai, 18 Oct 2026",
+			proofRemovedText: null,
+		});
 	});
 
 	test("rows say who decided and how; reversals point both ways", ({

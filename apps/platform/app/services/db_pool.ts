@@ -22,3 +22,15 @@ export const LIMITER_POOL = {
 	max: 4,
 	acquireTimeoutMillis: 5_000,
 } as const;
+
+/**
+ * Storage reservations' own small pool (the storage meter): an upload
+ * reserves while its request holds a `pg` connection, so reserving on that
+ * same pool could leave concurrent uploads each waiting for a second
+ * connection the others hold, as the limiter could (withSeparateContext).
+ */
+export const STORAGE_POOL = {
+	min: 0,
+	max: 4,
+	acquireTimeoutMillis: 10_000,
+} as const;

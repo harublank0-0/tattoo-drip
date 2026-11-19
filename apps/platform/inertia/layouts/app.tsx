@@ -5,6 +5,7 @@ import FlashToasts from "~/components/flash_toasts";
 import { navItems, showTabBar } from "~/components/shell/nav_items";
 import OfflineBar from "~/components/shell/offline_bar";
 import SideNav from "~/components/shell/side_nav";
+import StorageBar from "~/components/shell/storage_bar";
 import TabBar from "~/components/shell/tab_bar";
 import TopBar from "~/components/shell/top_bar";
 import VerifyEmailBar from "~/components/shell/verify_email_bar";
@@ -46,6 +47,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 					<TopBar items={items} />
 					<OfflineBar />
 					<VerifyEmailBar />
+					<StorageBar />
 					<main
 						className={cn(
 							"flex flex-1 pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]",

@@ -2,6 +2,7 @@ import { inject } from "@adonisjs/core";
 import type { HttpContext } from "@adonisjs/core/http";
 import { errors } from "@vinejs/vine";
 import { tenantContext } from "#middleware/tenant_middleware";
+import { ImageDeleteError } from "#modules/media/errors";
 import {
 	PaymentRuleError,
 	type PaymentRuleReason,
@@ -36,6 +37,8 @@ const PAYMENT_RULE_MESSAGES: Record<
 	deposit_not_pending:
 		"A deposit can be recorded only while the project waits for it. Mark the quote accepted first.",
 	project_declined: "This project was declined: it takes no payments.",
+	proof_waiting:
+		"Verify or reject this payment before deleting its screenshot.",
 	outcome_first: "Record what happened to the deposit first.",
 	no_outcome_needed: "There's no deposit outcome to record for this project.",
 };
@@ -178,6 +181,28 @@ export default class PaymentsController {
 	}
 
 	/** The payment (owners only, the tenant's) and its live project, else a 404. */
+	/**
+	 * Deletes a decided payment's deposit screenshot (the storage meter:
+	 * freeing space); the payment stays as it is.
+	 */
+	async destroyProof(ctx: HttpContext) {
+		const { tenant, membership } = tenantContext(ctx);
+		const { payment, project } = await this.paymentAndProject(ctx);
+		try {
+			await refusalsAsFlash(ctx, async () => {
+				await this.payments.removeProof(tenant, membership, payment);
+				ctx.session.flash("success", "Screenshot deleted.");
+			});
+		} catch (error) {
+			if (!(error instanceof ImageDeleteError)) throw error;
+			ctx.session.flash(
+				"error",
+				"The screenshot couldn't be deleted. Try again in a moment.",
+			);
+		}
+		return backTo(ctx, tenant, project);
+	}
+
 	private async paymentAndProject(ctx: HttpContext) {
 		const { tenant, membership } = tenantContext(ctx);
 		const payment = await this.payments.findFor(

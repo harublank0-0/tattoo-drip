@@ -41,6 +41,7 @@ import {
 	tileMeta,
 } from "~/components/portfolio";
 import PortfolioBulkBar from "~/components/portfolio_bulk_bar";
+import StorageLine from "~/components/storage_line";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { QUIET_VISIT_HEADER } from "~/components/visits";
@@ -239,6 +240,7 @@ export default function PortfolioIndex({
 				) : undefined
 			}
 		>
+			<StorageLine />
 			{artists.length === 0 ? (
 				<NoArtists isOwner={isOwner} tenantSlug={tenant.slug} />
 			) : (

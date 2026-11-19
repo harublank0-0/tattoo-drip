@@ -6,6 +6,7 @@ import {
 	type CreateInquiryInput,
 	createTattooClient,
 	type InquiryReceipt,
+	TattooApiError,
 } from "@tattoo-drip/sdk";
 import { createStorefrontQueryClient } from "../../src/api/query-client.ts";
 import type { ChallengeResult } from "../../src/intake/challenge.ts";
@@ -60,6 +61,62 @@ function setup(
 	});
 	return { submit, sent, phases, events };
 }
+
+describe("Send without photos", () => {
+	test("after attachments_unavailable, the same answers go again with a new token and no photos", async () => {
+		const tokens = ["tok-first", "tok-second"];
+		const sent: CreateInquiryInput[] = [];
+		const submit = createSubmitter({
+			challenge: {
+				token: async () => ({ ok: true, token: tokens.shift() ?? "none" }),
+				reset: () => {},
+			},
+			send: async (input) => {
+				sent.push(input);
+				if ((input.referenceImages ?? []).length > 0) {
+					throw new TattooApiError(409, {
+						code: "attachments_unavailable",
+						message: "This studio can't take photos right now.",
+					});
+				}
+				return RECEIPT;
+			},
+			onPhase: () => {},
+		});
+		const photo = new File([new Uint8Array([1, 2, 3])], "ref.png", {
+			type: "image/png",
+		});
+		const withPhoto: CreateInquiryInput = {
+			...INPUT,
+			referenceImages: [photo],
+		};
+
+		const first = await submit(withPhoto);
+		assert.equal(first.kind, "failed");
+		const problem = describeSubmitError((first as { error: unknown }).error, {
+			sentArtistId: null,
+			artistName: () => null,
+		});
+		assert.equal(problem.kind === "notice" && problem.withoutPhotos, true);
+
+		// The form's "Send without photos": the same answers, no photos.
+		assert.deepEqual(await submit({ ...withPhoto, referenceImages: [] }), {
+			kind: "sent",
+			receipt: RECEIPT,
+		});
+		assert.deepEqual(
+			sent.map((input) => [
+				input.challengeToken,
+				input.referenceImages?.length,
+			]),
+			[
+				["tok-first", 1],
+				["tok-second", 0],
+			],
+		);
+		assert.equal(sent[1].idea, INPUT.idea);
+	});
+});
 
 describe("createSubmitter", () => {
 	test("checks, sends with the token, then resets the widget", async () => {

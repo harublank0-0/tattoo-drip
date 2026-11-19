@@ -120,11 +120,14 @@ export function ProblemNotice({
 	problem,
 	studioName,
 	channels,
+	onSendWithoutPhotos,
 	ref,
 }: {
 	problem: NoticeProblem;
 	studioName: string;
 	channels: InquiryChannels;
+	/** Sends the same answers without the photos (`withoutPhotos`). */
+	onSendWithoutPhotos?: () => void;
 	ref?: Ref<HTMLElement>;
 }) {
 	const values = noticeValues(problem, studioName);
@@ -146,6 +149,15 @@ export function ProblemNotice({
 			{problem.retry ? (
 				<button type="submit" className="action action-secondary">
 					{copy.sendAgain}
+				</button>
+			) : null}
+			{problem.withoutPhotos && onSendWithoutPhotos ? (
+				<button
+					type="button"
+					className="action action-primary"
+					onClick={onSendWithoutPhotos}
+				>
+					{copy.sendWithoutPhotos}
 				</button>
 			) : null}
 			{problem.reload ? (

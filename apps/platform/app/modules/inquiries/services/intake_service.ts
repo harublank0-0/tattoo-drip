@@ -22,7 +22,7 @@ import Inquiry, {
 	type SourceChannel,
 } from "#modules/inquiries/models/inquiry";
 import ReferenceImage from "#modules/inquiries/models/reference_image";
-import { InvalidImageError } from "#modules/media/errors";
+import { InvalidImageError, StorageFullError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ImageService, {
 	type StoredImage,
@@ -275,6 +275,11 @@ export default class IntakeService {
 			try {
 				image = await this.images.store(upload, { tenant, purpose: PURPOSE });
 			} catch (error) {
+				// The studio's storage is full (the storage meter): the client
+				// may send the inquiry without its photos. Nothing is kept.
+				if (error instanceof StorageFullError) {
+					throw new InquiryRuleError("attachments_unavailable");
+				}
 				if (error instanceof InvalidImageError) {
 					throw new InvalidReferenceImageError(index, error.message, {
 						cause: error,

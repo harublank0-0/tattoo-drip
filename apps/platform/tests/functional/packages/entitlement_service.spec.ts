@@ -75,7 +75,8 @@ test.group("Packages: EntitlementService", (group) => {
 			timezone: "Asia/Kathmandu",
 		});
 		await inTenant(tenant, () => tenant.refresh());
-		const solo = await AllowanceBundle.findByOrFail("key", "solo-v1");
+		// A trial takes its package's default bundle: v2 since the storage meter.
+		const solo = await AllowanceBundle.findByOrFail("key", "solo-v2");
 
 		const entitlement = await entitlementOf(tenant);
 		assert.equal(entitlement.state, "trial");

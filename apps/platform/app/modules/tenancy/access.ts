@@ -43,6 +43,7 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.design_lab.store": MEMBERS,
 	"tenant.design_lab.show": MEMBERS,
 	"tenant.design_lab.update": MEMBERS,
+	"tenant.design_lab.destroy": MEMBERS,
 	"tenant.design_lab.generate": MEMBERS,
 	"tenant.design_lab.status": MEMBERS,
 	"tenant.design_lab.retry": MEMBERS,
@@ -162,6 +163,7 @@ export const TENANT_ROUTE_ROLES = {
 
 	// The inquiry inbox: reference images stay private to owners until a
 	// project is assigned.
+	"tenant.references.destroy": OWNERS,
 	"tenant.inbox.index": OWNERS,
 	"tenant.inbox.show": OWNERS,
 	"tenant.inbox.accept": OWNERS,
@@ -225,6 +227,7 @@ export const TENANT_ROUTE_ROLES = {
 	"tenant.payments.verify": OWNERS,
 	"tenant.payments.reject": OWNERS,
 	"tenant.payments.reverse": OWNERS,
+	"tenant.payments.proof.destroy": OWNERS,
 
 	// One session: an artist only their own session on a project assigned to
 	// their profile (mayChangeSession in #modules/scheduling/outcomes,

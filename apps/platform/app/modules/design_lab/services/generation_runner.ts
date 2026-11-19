@@ -22,11 +22,15 @@ import {
 import DesignProviders from "#modules/design_lab/services/design_providers";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import DesignUsageService from "#modules/design_lab/services/design_usage_service";
+import {
+	designReservationKey,
+	releaseDesignStorage,
+} from "#modules/design_lab/storage_reservation";
 import { InvalidImageError } from "#modules/media/errors";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime.
 import ImageService from "#modules/media/services/image_service";
 import type Tenant from "#modules/tenancy/models/tenant";
-import { withDbContext } from "#services/db_context";
+import { afterCommit, withDbContext } from "#services/db_context";
 import { dispatchInTransaction } from "#services/queue";
 import env from "#start/env";
 
@@ -297,9 +301,11 @@ export default class GenerationRunner {
 		try {
 			const bytes = await provider.download(result.sampleUrl, signal);
 			// As delivered: the provider's provenance data stays in the file.
+			// The stored concept takes its storage reservation's place.
 			const image = await this.images.storeOriginal(bytes, {
 				tenant,
 				purpose: "design_concept",
+				reservationKey: designReservationKey(generation.id, generation.attempt),
 			});
 			return {
 				kind: "completed",
@@ -452,6 +458,9 @@ export default class GenerationRunner {
 			// A moderated or failed request may still have been charged.
 			typeof cost === "number" ? cost : null,
 		);
+		// No concept will take its storage reservation's place.
+		const { id, attempt } = row;
+		afterCommit(() => releaseDesignStorage(tenant.id, id, attempt));
 		const fields = {
 			tenantId: tenant.id,
 			generationId: row.id,

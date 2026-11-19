@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, stat } from "node:fs/promises";
 import type { MultipartFile } from "@adonisjs/core/bodyparser";
 import logger from "@adonisjs/core/services/logger";
 import drive from "@adonisjs/drive/services/main";
@@ -26,7 +26,9 @@ import {
 	variantKey,
 	variantsOfKey,
 } from "#modules/media/variants";
+import { recordStoredFile } from "#modules/storage/record_stored_file";
 import type Tenant from "#modules/tenancy/models/tenant";
+import { afterRollback, currentClient } from "#services/db_context";
 
 /**
  * What each kind of image is for. The purpose picks the disk, so a private
@@ -184,10 +186,57 @@ export default class ImageService {
 	 * save fails, call delete() so no file is left behind.
 	 */
 	async store(
-		file: Pick<MultipartFile, "tmpPath">,
+		file: Pick<MultipartFile, "tmpPath"> & { size?: number },
 		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
 	): Promise<StoredImage> {
-		return this.storeBytes(await takeUpload(file), { tenant, purpose });
+		return this.reserving(tenant, purpose, file, async (reservationKey) =>
+			this.storeBytes(await takeUpload(file), {
+				tenant,
+				purpose,
+				reservationKey,
+			}),
+		);
+	}
+
+	/**
+	 * Runs a store of `file` holding the studio's storage for it (the storage
+	 * meter): its size is reserved first (StorageFullError when it doesn't
+	 * fit, with STORAGE_ENFORCEMENT on), the stored row replaces the
+	 * reservation, and a failure releases it (and the upload's temp file),
+	 * as does a rollback of the caller's transaction.
+	 */
+	private async reserving<T>(
+		tenant: Pick<Tenant, "id">,
+		purpose: ImagePurpose,
+		file: Pick<MultipartFile, "tmpPath"> & { size?: number },
+		work: (reservationKey: string | null) => Promise<T>,
+	): Promise<T> {
+		// Imported when needed: the meter reads entitlements, whose services
+		// import this one.
+		const { reserveStorage, releaseStorage } = await import(
+			"#modules/storage/reservations"
+		);
+		let reservation: string | null = null;
+		try {
+			const bytes =
+				file.size ?? (file.tmpPath ? (await stat(file.tmpPath)).size : 0);
+			reservation = await reserveStorage({
+				tenantId: tenant.id,
+				purpose,
+				bytes,
+				minutes: 15,
+			});
+			const result = await work(reservation);
+			const kept = reservation;
+			if (kept && currentClient()) {
+				afterRollback(() => releaseStorage(tenant.id, kept));
+			}
+			return result;
+		} catch (error) {
+			if (reservation) await releaseStorage(tenant.id, reservation);
+			if (file.tmpPath) await rm(file.tmpPath, { force: true });
+			throw error;
+		}
 	}
 
 	/**
@@ -198,13 +247,31 @@ export default class ImageService {
 	 * the caller registers the cleanup of the logo and of the icon it returns.
 	 */
 	async storeLogo(
-		file: Pick<MultipartFile, "tmpPath">,
+		file: Pick<MultipartFile, "tmpPath"> & { size?: number },
 		{ tenant, tiles }: { tenant: Pick<Tenant, "id">; tiles: TileColours },
+	): Promise<StoredLogo> {
+		return this.reserving(tenant, "studio_logo", file, (reservationKey) =>
+			this.storeLogoNow(file, { tenant, tiles, reservationKey }),
+		);
+	}
+
+	private async storeLogoNow(
+		file: Pick<MultipartFile, "tmpPath">,
+		{
+			tenant,
+			tiles,
+			reservationKey,
+		}: {
+			tenant: Pick<Tenant, "id">;
+			tiles: TileColours;
+			reservationKey: string | null;
+		},
 	): Promise<StoredLogo> {
 		const image = await processImage(await takeUpload(file));
 		const logo = await this.storeProcessed(image, {
 			tenant,
 			purpose: "studio_logo",
+			reservationKey,
 		});
 		let tile: "light" | "dark" = "light";
 		try {
@@ -237,9 +304,22 @@ export default class ImageService {
 	 */
 	async storeBytes(
 		bytes: Buffer,
-		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
+		{
+			tenant,
+			purpose,
+			reservationKey,
+		}: {
+			tenant: Pick<Tenant, "id">;
+			purpose: ImagePurpose;
+			/** The storage reservation this file replaces (`store`). */
+			reservationKey?: string | null;
+		},
 	): Promise<StoredImage> {
-		return this.storeProcessed(await processImage(bytes), { tenant, purpose });
+		return this.storeProcessed(await processImage(bytes), {
+			tenant,
+			purpose,
+			reservationKey,
+		});
 	}
 
 	/**
@@ -253,12 +333,25 @@ export default class ImageService {
 	 */
 	async storeOriginal(
 		bytes: Buffer,
-		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
+		{
+			tenant,
+			purpose,
+			reservationKey,
+		}: {
+			tenant: Pick<Tenant, "id">;
+			purpose: ImagePurpose;
+			/** The storage reservation this file replaces (Design Lab's). */
+			reservationKey?: string | null;
+		},
 	): Promise<StoredImage> {
 		const format = sniff(bytes);
 		const processed = await processImage(bytes);
 		if (format !== "png" && format !== "jpeg") {
-			return this.storeProcessed(processed, { tenant, purpose });
+			return this.storeProcessed(processed, {
+				tenant,
+				purpose,
+				reservationKey,
+			});
 		}
 		const size = await imageSize(bytes);
 		const extension: ImageExtension = format === "png" ? "png" : "jpg";
@@ -283,13 +376,29 @@ export default class ImageService {
 			]);
 			throw error;
 		}
+		// The storage meter counts the main file, never its copies.
+		await recordStoredFile({
+			tenantId: tenant.id,
+			key,
+			purpose,
+			bytes: bytes.length,
+			reservationKey,
+		});
 		return { key, ...size };
 	}
 
 	/** Writes an image processImage has accepted, with the purpose's copies. */
 	private async storeProcessed(
 		image: ProcessedImage,
-		{ tenant, purpose }: { tenant: Pick<Tenant, "id">; purpose: ImagePurpose },
+		{
+			tenant,
+			purpose,
+			reservationKey,
+		}: {
+			tenant: Pick<Tenant, "id">;
+			purpose: ImagePurpose;
+			reservationKey?: string | null;
+		},
 	): Promise<StoredImage> {
 		const extension: ImageExtension = image.format === "png" ? "png" : "jpg";
 		const base = `tenants/${tenant.id}/${purpose}/${randomUUID()}`;
@@ -309,6 +418,14 @@ export default class ImageService {
 			]);
 			throw error;
 		}
+		// The storage meter counts the main file, never its copies.
+		await recordStoredFile({
+			tenantId: tenant.id,
+			key,
+			purpose,
+			bytes: image.data.length,
+			reservationKey,
+		});
 		return { key, width: image.width, height: image.height };
 	}
 

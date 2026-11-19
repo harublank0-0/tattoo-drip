@@ -1,0 +1,13 @@
+@email.layout({ title: full ? 'Storage full' : 'Storage nearly full', preheader: full ? 'New uploads are paused until there is room.' : 'Your studio has used most of its storage.' })
+  <p style="margin: 0 0 16px;">Hi {{ recipientName || 'there' }},</p>
+  @if(full)
+    <p style="margin: 0 0 16px;">{{ studioName }} has used {{ percent }}% of its {{ limitText }} storage, so new uploads are paused until there's room. Existing files, bookings and deposits keep working.</p>
+  @else
+    <p style="margin: 0 0 16px;">{{ studioName }} has used {{ percent }}% of its {{ limitText }} storage. When it's full, new uploads pause until there's room; existing files, bookings and deposits keep working.</p>
+  @end
+  <p style="margin: 0 0 16px;">Free up space or see what uses it under Settings, Billing, Storage.</p>
+  @!email.button({ href: url, text: 'See storage' })
+  <p style="margin: 0; font-size: 14px; line-height: 20px; color: #71717a;">
+    You get this email as an owner of {{ studioName }} on Tattoo Drip.
+  </p>
+@end

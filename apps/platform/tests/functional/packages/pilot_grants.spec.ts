@@ -24,7 +24,8 @@ test.group("Packages: pilot grants", (group) => {
 	}) => {
 		const { tenant } = await studioWithOwner("pilot-a", "Pilot A");
 		const now = DateTime.utc().startOf("second");
-		const studioBundle = await AllowanceBundle.findByOrFail("key", "studio-v1");
+		// The package's default bundle: v2 since the storage meter.
+		const studioBundle = await AllowanceBundle.findByOrFail("key", "studio-v2");
 
 		const grant = await pilots.grant(
 			"pilot-a",

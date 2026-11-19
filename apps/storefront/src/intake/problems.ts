@@ -35,6 +35,8 @@ export type SubmitProblem =
 			readonly contact: boolean;
 			/** Offer to reload the page. */
 			readonly reload: boolean;
+			/** Offer to send the same answers without the photos. */
+			readonly withoutPhotos: boolean;
 			/** Block Send this long (rate_limited). */
 			readonly waitSeconds: number | null;
 	  };
@@ -58,6 +60,7 @@ type Flags = {
 	retry?: boolean;
 	contact?: boolean;
 	reload?: boolean;
+	withoutPhotos?: boolean;
 	waitSeconds?: number;
 };
 
@@ -68,6 +71,7 @@ function notice(code: NoticeCode, flags: Flags = {}): SubmitProblem {
 		retry: flags.retry ?? false,
 		contact: flags.contact ?? false,
 		reload: flags.reload ?? false,
+		withoutPhotos: flags.withoutPhotos ?? false,
 		waitSeconds: flags.waitSeconds ?? null,
 	};
 }
@@ -113,6 +117,11 @@ export function describeSubmitError(
 			return notice("already-waiting", { contact: true });
 		case "studio_not_accepting":
 			return notice("studio-closed", { contact: true });
+		case "attachments_unavailable":
+			return notice("photos-unavailable", {
+				withoutPhotos: true,
+				contact: true,
+			});
 		case "challenge_failed":
 			return notice("challenge-failed", { retry: true, contact: true });
 		case "challenge_unavailable":
@@ -154,6 +163,7 @@ export function unexpectedProblem(): Extract<
 		retry: true,
 		contact: true,
 		reload: false,
+		withoutPhotos: false,
 		waitSeconds: null,
 	};
 }

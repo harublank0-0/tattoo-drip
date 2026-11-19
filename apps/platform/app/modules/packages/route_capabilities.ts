@@ -29,6 +29,7 @@ export const ROUTE_CAPABILITIES = {
 	"tenant.design_lab.store": "open",
 	"tenant.design_lab.show": "open",
 	"tenant.design_lab.update": "open",
+	"tenant.design_lab.destroy": "open",
 	// Design Lab generation (spec, Gating): refused when paused; reading and
 	// keeping saved concepts stay open.
 	"tenant.design_lab.generate": "design_lab",
@@ -123,6 +124,7 @@ export const ROUTE_CAPABILITIES = {
 	"tenant.artists.flash.update": "open",
 	"tenant.artists.flash.claim.update": "open",
 	"tenant.artists.flash.destroy": "open",
+	"tenant.references.destroy": "open",
 	"tenant.inbox.index": "open",
 	"tenant.inbox.show": "open",
 	// New client work (spec ruling 8): converting an inquiry into a project,
@@ -165,6 +167,7 @@ export const ROUTE_CAPABILITIES = {
 	"tenant.payments.verify": "open",
 	"tenant.payments.reject": "open",
 	"tenant.payments.reverse": "open",
+	"tenant.payments.proof.destroy": "open",
 	"tenant.sessions.outcome": "open",
 	"tenant.sessions.move": "open",
 	"tenant.calendar.index": "open",

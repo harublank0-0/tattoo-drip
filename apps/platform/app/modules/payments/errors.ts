@@ -85,6 +85,7 @@ export const PAYMENT_RULE_REASONS = [
 	"refund_too_large",
 	"outcome_first",
 	"no_outcome_needed",
+	"proof_waiting",
 ] as const;
 export type PaymentRuleReason = (typeof PAYMENT_RULE_REASONS)[number];
 
@@ -101,6 +102,8 @@ const PAYMENT_MESSAGES: Record<PaymentRuleReason, string> = {
 	outcome_first: "The closed project's deposit outcome must be recorded first",
 	no_outcome_needed:
 		"The project is not closed, holds no deposit money, or already has its outcome",
+	proof_waiting:
+		"The payment is still submitted: its screenshot is needed to decide it",
 };
 
 /**

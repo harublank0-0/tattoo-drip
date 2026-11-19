@@ -95,6 +95,7 @@ function toApiError(error: unknown) {
 		case "too_many_open_inquiries":
 		case "flash_unavailable":
 		case "flash_claimed":
+		case "attachments_unavailable":
 			return ApiException.of(error.reason);
 		default:
 			return error;

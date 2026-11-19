@@ -1668,6 +1668,7 @@ export class PaymentSchema extends BaseModel {
 		"proofImageHeight",
 		"proofImageKey",
 		"proofImageWidth",
+		"proofRemovedAt",
 		"status",
 		"tenantId",
 		"updatedAt",
@@ -1699,6 +1700,8 @@ export class PaymentSchema extends BaseModel {
 	declare proofImageKey: string | null;
 	@column()
 	declare proofImageWidth: number | null;
+	@column.dateTime()
+	declare proofRemovedAt: DateTime | null;
 	@column()
 	declare status: string;
 	@column()
@@ -2089,6 +2092,45 @@ export class StaffAlertSchema extends BaseModel {
 	declare userId: string;
 }
 
+export class StoredFileSchema extends BaseModel {
+	static $columns = [
+		"bytes",
+		"createdAt",
+		"expiresAt",
+		"id",
+		"key",
+		"purpose",
+		"reservedAt",
+		"status",
+		"storedAt",
+		"tenantId",
+		"updatedAt",
+	] as const;
+	$columns = StoredFileSchema.$columns;
+	@column()
+	declare bytes: bigint | number;
+	@column.dateTime({ autoCreate: true })
+	declare createdAt: DateTime;
+	@column.dateTime()
+	declare expiresAt: DateTime | null;
+	@column({ isPrimary: true })
+	declare id: string;
+	@column()
+	declare key: string;
+	@column()
+	declare purpose: string;
+	@column.dateTime()
+	declare reservedAt: DateTime | null;
+	@column()
+	declare status: string;
+	@column.dateTime()
+	declare storedAt: DateTime | null;
+	@column()
+	declare tenantId: string;
+	@column.dateTime({ autoCreate: true, autoUpdate: true })
+	declare updatedAt: DateTime;
+}
+
 export class StudioClosureSchema extends BaseModel {
 	static $columns = [
 		"createdAt",
@@ -2368,6 +2410,7 @@ export class TenantSchema extends BaseModel {
 		"policiesUpdatedAt",
 		"selectedPackage",
 		"slug",
+		"storageAlertedAt",
 		"storefrontClaimedFlash",
 		"storefrontSections",
 		"storefrontTheme",
@@ -2451,6 +2494,8 @@ export class TenantSchema extends BaseModel {
 	declare selectedPackage: string | null;
 	@column()
 	declare slug: string;
+	@column.dateTime()
+	declare storageAlertedAt: DateTime | null;
 	@column()
 	declare storefrontClaimedFlash: string;
 	@column()

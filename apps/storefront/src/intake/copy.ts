@@ -13,6 +13,7 @@ import type { IntakeField } from "./rules.ts";
 export const NOTICE_CODES = [
 	"already-waiting",
 	"studio-closed",
+	"photos-unavailable",
 	"flash-unavailable",
 	"flash-closed",
 	"flash-claimed",
@@ -118,6 +119,10 @@ const notices: Readonly<Record<NoticeCode, Notice>> = {
 		title: "{studio} isn't taking new inquiries right now",
 		body: "They closed their inquiries while you were writing. You can still message them.",
 	},
+	"photos-unavailable": {
+		title: "{studio} can't take photos right now",
+		body: "Your inquiry wasn't sent. Send it without the photos, and share them when {studio} replies on WhatsApp or Viber.",
+	},
 	"flash-unavailable": {
 		title: "This design isn't available any more",
 		body: "{studio} took it off their page while you were writing. You can still message them about it.",
@@ -220,6 +225,7 @@ export const copy = {
 	send: "Send inquiry",
 	sending: "Sending…",
 	sendAgain: "Send again",
+	sendWithoutPhotos: "Send without photos",
 	reload: "Reload the page",
 	chat: "Prefer to chat?",
 	chatLinks: {

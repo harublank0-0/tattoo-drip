@@ -12,6 +12,8 @@ export type PaymentRowProps = {
 	note: string | null;
 	/** "Reverses the NPR 3,000 deposit of 18 Oct 2026", or "Reversed 19 Oct 2026". */
 	reversalText: string | null;
+	/** The studio deleted the deposit screenshot to free storage. */
+	proofRemovedText: string | null;
 	/** Owners only, decided payments with a screenshot: a 5-minute signed URL. */
 	proofUrl: string | null;
 	/** Owners only: verified, not a reversal, not reversed yet. */

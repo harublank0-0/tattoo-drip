@@ -1243,6 +1243,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/flash_designs_controller').default['destroy']>>>
     }
   }
+  'tenant.references.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/references/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/references_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/references_controller').default['destroy']>>>
+    }
+  }
   'tenant.inbox.index': {
     methods: ["GET","HEAD"]
     pattern: '/t/:tenant/inbox'
@@ -1711,6 +1723,18 @@ export interface Registry {
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['reverse']>>> | { status: 422; response: { errors: SimpleError[] } }
     }
   }
+  'tenant.payments.proof.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/payments/:id/proof'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['destroyProof']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/payments_controller').default['destroyProof']>>>
+    }
+  }
   'tenant.sessions.outcome': {
     methods: ["POST"]
     pattern: '/t/:tenant/sessions/:id/outcome'
@@ -1829,6 +1853,18 @@ export interface Registry {
       query: ExtractQuery<InferInput<(typeof import('#modules/design_lab/validators/design_lab').updateDesignProjectValidator)>>
       response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['update']>>>
       errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['update']>>> | { status: 422; response: { errors: SimpleError[] } }
+    }
+  }
+  'tenant.design_lab.destroy': {
+    methods: ["DELETE"]
+    pattern: '/t/:tenant/design-lab/:id'
+    types: {
+      body: {}
+      paramsTuple: [ParamValue, ParamValue]
+      params: { tenant: ParamValue; id: ParamValue }
+      query: {}
+      response: ExtractResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['destroy']>>>
+      errorResponse: ExtractErrorResponse<Awaited<ReturnType<import('#controllers/design_lab_controller').default['destroy']>>>
     }
   }
   'tenant.design_lab.generate': {

@@ -624,6 +624,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"artists","end":""},{"old":"/t/:tenant/artists/flash/:id","type":0,"val":"flash","end":""},{"old":"/t/:tenant/artists/flash/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.artists.flash.destroy']['types'],
   },
+  'tenant.references.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/references/:id',
+    tokens: [{"old":"/t/:tenant/references/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/references/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/references/:id","type":0,"val":"references","end":""},{"old":"/t/:tenant/references/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.references.destroy']['types'],
+  },
   'tenant.inbox.index': {
     methods: ["GET","HEAD"],
     pattern: '/t/:tenant/inbox',
@@ -858,6 +864,12 @@ const routes = {
     tokens: [{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"t","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"payments","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":1,"val":"id","end":""},{"old":"/t/:tenant/payments/:id/reverse","type":0,"val":"reverse","end":""}],
     types: placeholder as Registry['tenant.payments.reverse']['types'],
   },
+  'tenant.payments.proof.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/payments/:id/proof',
+    tokens: [{"old":"/t/:tenant/payments/:id/proof","type":0,"val":"t","end":""},{"old":"/t/:tenant/payments/:id/proof","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/payments/:id/proof","type":0,"val":"payments","end":""},{"old":"/t/:tenant/payments/:id/proof","type":1,"val":"id","end":""},{"old":"/t/:tenant/payments/:id/proof","type":0,"val":"proof","end":""}],
+    types: placeholder as Registry['tenant.payments.proof.destroy']['types'],
+  },
   'tenant.sessions.outcome': {
     methods: ["POST"],
     pattern: '/t/:tenant/sessions/:id/outcome',
@@ -917,6 +929,12 @@ const routes = {
     pattern: '/t/:tenant/design-lab/:id',
     tokens: [{"old":"/t/:tenant/design-lab/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/design-lab/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/design-lab/:id","type":0,"val":"design-lab","end":""},{"old":"/t/:tenant/design-lab/:id","type":1,"val":"id","end":""}],
     types: placeholder as Registry['tenant.design_lab.update']['types'],
+  },
+  'tenant.design_lab.destroy': {
+    methods: ["DELETE"],
+    pattern: '/t/:tenant/design-lab/:id',
+    tokens: [{"old":"/t/:tenant/design-lab/:id","type":0,"val":"t","end":""},{"old":"/t/:tenant/design-lab/:id","type":1,"val":"tenant","end":""},{"old":"/t/:tenant/design-lab/:id","type":0,"val":"design-lab","end":""},{"old":"/t/:tenant/design-lab/:id","type":1,"val":"id","end":""}],
+    types: placeholder as Registry['tenant.design_lab.destroy']['types'],
   },
   'tenant.design_lab.generate': {
     methods: ["POST"],

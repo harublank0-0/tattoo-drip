@@ -303,10 +303,10 @@ export async function seededStudio(slug: string, name: string) {
 		return { project, quote: await makeQuote(tenant, project) };
 	});
 	// A new inquiry with one reference image, for the inbox routes.
-	const newInquiry = await inTenant(tenant, async () => {
+	const { newInquiry, referenceImage } = await inTenant(tenant, async () => {
 		const inquiry = await makeInquiry(tenant, pipeline.client);
-		await makeReferenceImage(tenant, { inquiryId: inquiry.id });
-		return inquiry;
+		const image = await makeReferenceImage(tenant, { inquiryId: inquiry.id });
+		return { newInquiry: inquiry, referenceImage: image };
 	});
 	// An unread alert of the owner about the new inquiry, for the alerts
 	// routes (TAT-52).
@@ -363,10 +363,14 @@ export async function seededStudio(slug: string, name: string) {
 			status: "booked",
 		});
 		await makeQuote(tenant, project);
+		// With its screenshot, which the proof delete clears (the storage meter).
 		const payment = await makePayment(tenant, project, {
 			status: "verified",
 			verifiedAt: DateTime.utc(),
 			verifiedByUserId: owner.id,
+			proofImageKey: `tenants/${tenant.id}/payment_proof/${randomUUID()}.webp`,
+			proofImageWidth: 800,
+			proofImageHeight: 1600,
 		});
 		return { project, payment };
 	});
@@ -556,6 +560,8 @@ export async function seededStudio(slug: string, name: string) {
 		closedPaidProject,
 		// The :id resource of the inbox routes' isolation cases.
 		newInquiry,
+		// Its reference photo: the reference delete's (the storage meter).
+		referenceImage,
 		// The :id resource of the alerts routes' isolation cases (TAT-52).
 		alert,
 		// The studio's own aftercare text (TAT-52): the messages settings

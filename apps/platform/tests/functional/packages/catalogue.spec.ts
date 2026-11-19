@@ -3,6 +3,7 @@ import { test } from "@japa/runner";
 import User from "#models/user";
 import BillingPlan from "#modules/billing/models/billing_plan";
 import AllowanceBundle from "#modules/packages/models/allowance_bundle";
+import { PACKAGES } from "#modules/packages/packages";
 import TenancyService from "#modules/tenancy/services/tenancy_service";
 import { withTransaction } from "#services/db_context";
 import { sandboxPlans } from "#tests/helpers/online_payments";
@@ -31,9 +32,15 @@ test.group("Packages: catalogue", (group) => {
 			]),
 			[
 				["solo-v1", "solo", 40, null, null, null],
+				// The storage meter's launch defaults (5 GB and 25 GB).
+				["solo-v2", "solo", 40, 5120, null, null],
 				["studio-v1", "studio", 40, null, null, null],
+				["studio-v2", "studio", 40, 25600, null, null],
 			],
 		);
+		// New trials and grants take v2; existing plans keep v1, which reads v2's storage.
+		assert.equal(PACKAGES.solo.defaultBundleKey, "solo-v2");
+		assert.equal(PACKAGES.studio.defaultBundleKey, "studio-v2");
 		for (const statement of [
 			"update allowance_bundles set images_per_month = 41",
 			"delete from allowance_bundles",

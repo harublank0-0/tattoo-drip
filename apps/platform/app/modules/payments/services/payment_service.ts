@@ -4,6 +4,7 @@ import type { TransactionClientContract } from "@adonisjs/lucid/types/database";
 import { DateTime } from "luxon";
 import User from "#models/user";
 import { claimFlashFor } from "#modules/flash/services/flash_claim";
+import ImageService from "#modules/media/services/image_service";
 import { PaymentRuleError } from "#modules/payments/errors";
 import {
 	type Balance,
@@ -152,7 +153,44 @@ export default class PaymentService {
 		private projects: ProjectService,
 		private quotes: QuoteService,
 		private sessions: SessionService,
+		private images: ImageService = new ImageService(),
 	) {}
+
+	/**
+	 * Deletes a decided payment's deposit screenshot, owners only (the
+	 * storage meter: it frees its space). The payment stays as it was; only
+	 * its proof is cleared and `proof_removed_at` set, which payments_guard
+	 * allows once. A payment still
+	 * waiting for a decision keeps it (`proof_waiting`). The file goes first
+	 * (ImageDeleteError when it can't, and nothing changes). False when there
+	 * was no screenshot.
+	 */
+	async removeProof(
+		tenant: TenantRef,
+		member: Member,
+		payment: Payment,
+	): Promise<boolean> {
+		assertOwner(member);
+		assertPaymentOf(tenant, payment);
+		return withTransaction(async (trx) => {
+			// The project first, as the decisions lock them.
+			await this.lockProject(trx, tenant, payment.projectId);
+			const live = await lockPayment(trx, tenant, payment.id);
+			if (live.status === "submitted") {
+				throw new PaymentRuleError("proof_waiting");
+			}
+			if (!live.proofImageKey) return false;
+			await this.images.deleteOrThrow("payment_proof", live.proofImageKey);
+			live.merge({
+				proofImageKey: null,
+				proofImageWidth: null,
+				proofImageHeight: null,
+				proofRemovedAt: DateTime.utc(),
+			});
+			await live.save();
+			return true;
+		});
+	}
 
 	/**
 	 * Owners only: anyone else gets E_ROW_NOT_FOUND (a 404). The controllers

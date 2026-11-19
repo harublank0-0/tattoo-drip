@@ -37,6 +37,7 @@ import {
 	type WorkPhotoProps,
 } from "~/components/photos";
 import Section from "~/components/section";
+import StorageLine from "~/components/storage_line";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -116,6 +117,7 @@ export default function ArtistForm({
 
 	return (
 		<Page title={pageTitle} hideTitle={Boolean(artist)}>
+			<StorageLine />
 			{artist && schedule && (
 				<ArtistProfileHeader
 					artist={artist}
