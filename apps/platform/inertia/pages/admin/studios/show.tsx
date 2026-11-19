@@ -54,6 +54,8 @@ type Props = {
 		defaultPackage: string | null;
 		/** Design Lab images this month against the limit in force. */
 		imagesText: string;
+		/** The studio's stored files against its storage allowance. */
+		storageText: string;
 	};
 	discover: {
 		statusLabel: string;
@@ -119,6 +121,7 @@ export default function AdminStudio({
 					<Badge variant="outline">{pilot.stateText}</Badge>
 				</p>
 				<p className="text-sm text-muted-foreground">{pilot.imagesText}</p>
+				<p className="text-sm text-muted-foreground">{pilot.storageText}</p>
 				{pilot.running ? (
 					<div className="flex flex-col gap-2 text-sm">
 						<GrantLine grant={pilot.running} />

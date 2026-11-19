@@ -11,6 +11,10 @@ import { planChoiceValidator } from "#modules/billing/validators/billing";
 import EntitlementService from "#modules/packages/services/entitlement_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import PackageGate from "#modules/packages/services/package_gate";
+import { formatBytes, STORAGE_CATEGORIES } from "#modules/storage/categories";
+import { storageLine } from "#modules/storage/display";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import StorageMeterService from "#modules/storage/services/storage_meter_service";
 
 /**
  * The studio's TattooDrip subscription (Settings, Billing), owners only
@@ -23,6 +27,7 @@ export default class BillingController {
 		private billing: BillingService,
 		private entitlements: EntitlementService,
 		private packages: PackageGate,
+		private storage: StorageMeterService,
 	) {}
 
 	async show(ctx: HttpContext) {
@@ -36,16 +41,24 @@ export default class BillingController {
 		const plans = ids.length
 			? await BillingPlan.query().whereIn("id", ids)
 			: [];
-		return ctx.inertia.render(
-			"settings/billing",
-			billingPage(
+		const usage = await this.storage.usage(tenant);
+		return ctx.inertia.render("settings/billing", {
+			...billingPage(
 				overview,
 				new Map(plans.map((plan) => [plan.id, plan])),
 				tenant.timezone,
 				await this.entitlements.for(tenant),
 				await this.packages.artistUsage(tenant),
 			),
-		);
+			// The storage meter: the line, and what each category holds.
+			storageDetail: {
+				...storageLine(usage),
+				categories: STORAGE_CATEGORIES.map((key) => ({
+					key,
+					sizeText: formatBytes(usage.byCategory[key]),
+				})),
+			},
+		});
 	}
 
 	async subscribe(ctx: HttpContext) {

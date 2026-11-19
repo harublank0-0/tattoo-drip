@@ -10,6 +10,8 @@ import { bellKinds } from "#modules/notifications/alerts";
 import AlertService from "#modules/notifications/services/alert_service";
 import WaitingService from "#modules/projects/services/waiting_service";
 import StudioReviewService from "#modules/reviews/services/studio_review_service";
+import { storageLine } from "#modules/storage/display";
+import StorageMeterService from "#modules/storage/services/storage_meter_service";
 import {
 	INVITATION_LINK_FLASH,
 	INVITATION_LINK_PAGE,
@@ -110,6 +112,21 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 					)
 				: null;
 
+		// The studio's storage (the storage meter): the line its upload pages
+		// show every member. Null off tenant pages.
+		const storage =
+			tenant && membership && auth?.user
+				? await ensureDbContext(
+						{ userId: auth.user.id, tenantId: tenant.id },
+						async () =>
+							storageLine(
+								await (
+									await ctx.containerResolver.make(StorageMeterService)
+								).usage(tenant),
+							),
+					)
+				: null;
+
 		// The bell's count (TAT-52, TAT-107): the member's own unread alerts
 		// here that no tab counts (bellKinds): for an owner only the
 		// online-payment alerts, the Inbox, Today and Reviews counting the rest.
@@ -190,6 +207,7 @@ export default class InertiaMiddleware extends BaseInertiaMiddleware {
 			alertCount: ctx.inertia.always(alertCount),
 			/** Fresh ink waiting for this member (Reviews' badge); null off tenant pages. */
 			reviewsCount: ctx.inertia.always(reviewsCount),
+			storage: ctx.inertia.always(storage),
 		};
 	}
 

@@ -34,6 +34,9 @@ import {
 import type { OperatorItem } from "#modules/reviews/services/review_operator_service";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import ReviewOperatorService from "#modules/reviews/services/review_operator_service";
+import { storageLine } from "#modules/storage/display";
+// biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
+import StorageMeterService from "#modules/storage/services/storage_meter_service";
 import Tenant from "#modules/tenancy/models/tenant";
 // biome-ignore lint/style/useImportType: @inject() reads the class at runtime (decorator metadata); a type-only import breaks injection.
 import TenancyService from "#modules/tenancy/services/tenancy_service";
@@ -165,6 +168,7 @@ export default class AdminStudiosController {
 		private pilots: PilotGrantService,
 		private entitlements: EntitlementService,
 		private designUsage: DesignUsageService,
+		private storage: StorageMeterService,
 	) {}
 
 	async index(ctx: HttpContext) {
@@ -350,8 +354,15 @@ export default class AdminStudiosController {
 				// Studio pilot never quietly makes it Solo), else on none.
 				defaultPackage: running?.package ?? null,
 				imagesText: imagesText(await this.designUsage.allowance(tenant, now)),
+				storageText: await this.storageText(tenant),
 			};
 		});
+	}
+
+	/** "Storage: 1.2 GB of 25 GB": what the studio keeps against its allowance (the storage meter), to check the launch numbers against real use. */
+	private async storageText(tenant: Tenant) {
+		const line = storageLine(await this.storage.usage(tenant));
+		return `Storage: ${line.usedText} of ${line.limitText ?? "unmetered"}`;
 	}
 
 	/** Runs a pilot grant action; the service's refusals become an error flash. */

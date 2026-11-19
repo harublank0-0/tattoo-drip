@@ -1,5 +1,5 @@
 import { Form } from "@adonisjs/inertia/react";
-import { router } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { CreditCard } from "lucide-react";
 import { useState } from "react";
 import { urlFor } from "~/client";
@@ -63,6 +63,19 @@ type Props = {
 		paidText: string | null;
 		payable: boolean;
 	}[];
+	/** The storage meter: the studio's stored files against its allowance. */
+	storageDetail: StorageDetail;
+};
+
+type StorageDetail = {
+	usedText: string;
+	limitText: string | null;
+	percent: number | null;
+	enforced: boolean;
+	categories: {
+		key: "portfolio" | "clients" | "design_lab";
+		sizeText: string;
+	}[];
 };
 
 const selectClass =
@@ -81,6 +94,7 @@ export default function Billing({
 	plans,
 	subscription,
 	invoices,
+	storageDetail,
 }: Props) {
 	const tenant = useTenant();
 	const params = { tenant: tenant.slug };
@@ -91,25 +105,29 @@ export default function Billing({
 		// The package (a pilot, a trial) doesn't depend on billing being set
 		// up, so it shows either way.
 		return (
-			<Section
-				title="Your plan"
-				description="What your studio pays TattooDrip. Separate from your clients' payments."
-			>
-				<div className="mb-4">
-					<PackageSummary studioPackage={studioPackage} />
-				</div>
-				<Empty className="border">
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<CreditCard />
-						</EmptyMedia>
-						<EmptyTitle>Billing isn't set up yet</EmptyTitle>
-						<EmptyDescription>
-							TattooDrip hasn't turned on subscriptions. Nothing to pay for now.
-						</EmptyDescription>
-					</EmptyHeader>
-				</Empty>
-			</Section>
+			<>
+				<Section
+					title="Your plan"
+					description="What your studio pays TattooDrip. Separate from your clients' payments."
+				>
+					<div className="mb-4">
+						<PackageSummary studioPackage={studioPackage} />
+					</div>
+					<Empty className="border">
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<CreditCard />
+							</EmptyMedia>
+							<EmptyTitle>Billing isn't set up yet</EmptyTitle>
+							<EmptyDescription>
+								TattooDrip hasn't turned on subscriptions. Nothing to pay for
+								now.
+							</EmptyDescription>
+						</EmptyHeader>
+					</Empty>
+				</Section>
+				<StorageSection detail={storageDetail} slug={tenant.slug} />
+			</>
 		);
 	}
 
@@ -350,6 +368,7 @@ export default function Billing({
 					</ul>
 				)}
 			</Section>
+			<StorageSection detail={storageDetail} slug={tenant.slug} />
 		</>
 	);
 }
@@ -376,5 +395,96 @@ function PackageSummary({
 			<p className="text-muted-foreground">{studioPackage.line}</p>
 			<p className="text-muted-foreground">{studioPackage.artists.text}</p>
 		</div>
+	);
+}
+
+/** What each category of stored files is called, and where its files are managed. */
+const CATEGORY_WORDS = {
+	portfolio: {
+		label: "Portfolio and studio page",
+		route: "tenant.portfolio",
+		note: null,
+	},
+	clients: {
+		label: "Clients and projects",
+		route: "tenant.projects.index",
+		note: "Inquiry photos and deposit screenshots are kept with their records.",
+	},
+	design_lab: {
+		label: "Design Lab",
+		route: "tenant.design_lab.index",
+		note: null,
+	},
+} as const;
+
+/**
+ * Storage (the storage meter): the studio's stored files against its
+ * package's allowance, and what each category holds, each linking to where
+ * those files are managed.
+ */
+function StorageSection({
+	detail,
+	slug,
+}: {
+	detail: StorageDetail;
+	slug: string;
+}) {
+	return (
+		<Section
+			title="Storage"
+			description="Every file your studio keeps, all members together. It doesn't reset each month."
+		>
+			<p className="text-sm">
+				{detail.limitText
+					? `${detail.usedText} of ${detail.limitText} used`
+					: `${detail.usedText} used`}
+			</p>
+			{detail.percent !== null && (
+				<div
+					role="progressbar"
+					aria-label="Storage used"
+					aria-valuemin={0}
+					aria-valuemax={100}
+					aria-valuenow={Math.min(100, detail.percent)}
+					className="h-2 w-full overflow-hidden rounded-full bg-muted"
+				>
+					<div
+						className="h-full bg-primary"
+						style={{ width: `${Math.min(100, detail.percent)}%` }}
+					/>
+				</div>
+			)}
+			<ul className="divide-y text-sm">
+				{detail.categories.map((category) => {
+					const words = CATEGORY_WORDS[category.key];
+					return (
+						<li
+							key={category.key}
+							className="flex flex-wrap justify-between gap-2 py-3"
+						>
+							<span>
+								<Link
+									href={urlFor(words.route, { tenant: slug })}
+									className="font-medium underline-offset-4 hover:underline"
+								>
+									{words.label}
+								</Link>
+								{words.note && (
+									<span className="block text-muted-foreground">
+										{words.note}
+									</span>
+								)}
+							</span>
+							<span>{category.sizeText}</span>
+						</li>
+					);
+				})}
+			</ul>
+			{!detail.enforced && (
+				<p className="text-sm text-muted-foreground">
+					Storage limits aren't applied yet.
+				</p>
+			)}
+		</Section>
 	);
 }

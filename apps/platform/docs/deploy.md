@@ -99,6 +99,13 @@ Values for nginx; set the equivalent on the host's proxy.
   Expect `200` and `Access-Control-Allow-Origin` naming that origin (or `*`); the same with `Origin: <APP_URL's origin>`. A preflight uploads nothing and needs no credentials.
 - If the studio origin gets no `Access-Control-Allow-Origin`, R2 doesn't honour the wildcard, and clients can't upload videos from the review page (the browser blocks the PUT). Nothing else depends on it: clients' photos go through the API, and video angles come from `APP_URL`'s exact origin. Either list each live studio's origin in place of the wildcard and add every new studio (or changed slug) by hand, or deploy and record client video uploads as a known blocker. Never widen it to `*`.
 
+### Storage meter
+
+Each studio's stored files are measured against its package's storage allowance (Solo 5 GB, Studio 25 GB; [design](../../../docs/superpowers/specs/2026-11-16-storage-meter-design.md)). New files record their size as they're stored; files from before the meter need one backfill:
+
+- After deploying the meter, run `node build/ace.js storage:reconcile` (every live studio, or one by its slug) as the app role. It's safe to run again: it records a size for every file a live record holds, removes rows nothing holds, and reports files that are missing from storage without counting them. Its last column, per studio, is usage against the allowance.
+- `STORAGE_ENFORCEMENT` (in `platform.env`): `observe` (the default, also unset) shows usage and refuses nothing, logging what it would refuse ("Package rule would refuse", `storage_limit`). Set `enforce` only after the reconcile run and a look at real usage; it's separate from `PACKAGE_ENFORCEMENT`.
+
 ### Database
 
 - Connections: a web server's pool holds up to 10 (`pgPoolFor`, `#services/db_pool`) plus the limiter's 4; a worker's up to 6. A public request holds one of the 10 for its whole length, the intake's up-to-3-second Cloudflare check and a slow upload included, because `publicTenant` opens its transaction before them. One web server and one worker need about 20, plus migrations and your own `psql`: keep `max_connections` above that with headroom, and add 14 for each extra web server.

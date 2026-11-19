@@ -25,6 +25,7 @@ import {
 } from "~/components/design_lab";
 import Page from "~/components/page";
 import Section from "~/components/section";
+import StorageLine from "~/components/storage_line";
 import { Badge } from "~/components/ui/badge";
 import { Button, buttonVariants } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -188,6 +189,7 @@ export default function DesignLabShow({
 				</div>
 			}
 		>
+			<StorageLine />
 			{archived ? (
 				<p className="rounded-md border p-4 text-sm">
 					This design project is archived. Restore it under Project details to
