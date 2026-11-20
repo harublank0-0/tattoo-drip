@@ -10,11 +10,13 @@ import sharp from "sharp";
 import DemoStudioSiteSeeder from "#database/seeders/demo_studio_site_seeder";
 import Artist from "#modules/artists/models/artist";
 import ArtistWorkPhoto from "#modules/artists/models/artist_work_photo";
+import ArtistService from "#modules/artists/services/artist_service";
 import { MAX_PHOTO_STYLES, STYLE_SLUGS } from "#modules/artists/styles";
 import { createArtistValidator } from "#modules/artists/validators/artist";
 import { updateWorkPhotoValidator } from "#modules/artists/validators/work_photo";
 import FlashDesign from "#modules/flash/models/flash_design";
 import { updateFlashDesignValidator } from "#modules/flash/validators/flash_design";
+import ImageService from "#modules/media/services/image_service";
 import { variantsOfKey } from "#modules/media/variants";
 import { todayIn } from "#modules/projects/quotes";
 import StudioClosure from "#modules/scheduling/models/studio_closure";
@@ -174,6 +176,8 @@ test.group("DemoStudioSiteSeeder", (group) => {
 		assert,
 	}) => {
 		const { tenant } = await studio("empty");
+		// Before the seed: a run that crosses the studio's midnight sees the next day.
+		const before = DateTime.fromISO(todayIn(tenant.timezone));
 		await seed(tenant);
 
 		const artists = await shown(tenant);
@@ -298,17 +302,20 @@ test.group("DemoStudioSiteSeeder", (group) => {
 			assert.equal(row.opensAt.slice(0, 5), "11:00");
 			assert.equal(row.closesAt.slice(0, 5), "19:00");
 		}
-		// One closed day: from five days ahead for two days, in the studio's timezone.
-		const today = DateTime.fromISO(todayIn(tenant.timezone));
+		// One closure: from five days ahead for two days, in the studio's timezone.
 		const closures = await closuresOf(tenant);
 		assert.lengthOf(closures, 1);
-		assert.equal(
-			closures[0].startsOn.toISODate(),
-			today.plus({ days: 5 }).toISODate(),
+		const startsOn = closures[0].startsOn.toISODate() ?? "";
+		assert.include(
+			[
+				before.plus({ days: 5 }).toISODate(),
+				before.plus({ days: 6 }).toISODate(),
+			],
+			startsOn,
 		);
 		assert.equal(
 			closures[0].endsOn.toISODate(),
-			today.plus({ days: 6 }).toISODate(),
+			DateTime.fromISO(startsOn).plus({ days: 1 }).toISODate(),
 		);
 		assert.equal(closures[0].note, "Closed for a holiday, back soon");
 
@@ -552,6 +559,66 @@ test.group("DemoStudioSiteSeeder", (group) => {
 		);
 	}).timeout(SLOW);
 
+	test("counts an archived artist out of a Solo studio's limit", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studio("solo-archived");
+		await asOwner("update tenants set selected_package = 'solo' where id = ?", [
+			tenant.id,
+		]);
+		const old = await addArtist(tenant, owner, {
+			name: "Old One",
+			slug: "old-one",
+		});
+		await inTenant(tenant, () =>
+			new ArtistService(new ImageService()).archive(tenant, old.id),
+		);
+
+		await seed(tenant);
+
+		assert.deepEqual(
+			(await shown(tenant)).map(({ artist }) => artist.name),
+			["Sita Rai"],
+		);
+	}).timeout(SLOW);
+
+	test("skips a demo artist whose slug or name an artist already has", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studio("taken");
+		// Hidden, so they don't fill the three: only the clash keeps Sita and Maya out.
+		const slugTaken = await addArtist(tenant, owner, {
+			name: "Someone Else",
+			slug: "sita-rai",
+			visible: false,
+		});
+		const nameTaken = await addArtist(tenant, owner, {
+			name: "MAYA GURUNG",
+			slug: "maya-g",
+			visible: false,
+		});
+
+		await seed(tenant);
+
+		assert.deepEqual(
+			(await shown(tenant)).map(({ artist }) => artist.name),
+			["अर्जुन थापा"],
+		);
+		const hidden = await inTenant(tenant, () =>
+			Artist.query()
+				.where("tenant_id", tenant.id)
+				.where("visible", false)
+				.orderBy("slug"),
+		);
+		assert.deepEqual(
+			hidden.map((artist) => [artist.id, artist.name]),
+			[
+				[nameTaken.id, "MAYA GURUNG"],
+				[slugTaken.id, "Someone Else"],
+			],
+		);
+	}).timeout(SLOW);
+
 	test("writes only the studios it is given, whatever other studios hold", async ({
 		assert,
 	}) => {
@@ -570,6 +637,23 @@ test.group("DemoStudioSiteSeeder", (group) => {
 		for (const { photos, flash } of artists) {
 			assert.lengthOf(photos, 8);
 			assert.lengthOf(flash, 6);
+		}
+		// Hours, the closure and the texts too: the other studio's don't count as the target's.
+		assert.deepEqual(
+			(await hoursOf(target)).map((row) => row.weekday),
+			[0, 1, 2, 3, 4, 5],
+		);
+		assert.lengthOf(await closuresOf(target), 1);
+		const targetRow = await tenantRow(target);
+		for (const text of [
+			targetRow.walkInsText,
+			targetRow.ageRuleText,
+			targetRow.beforeSessionText,
+			targetRow.aftercareText,
+			targetRow.depositPolicy,
+			targetRow.contactPhone,
+		]) {
+			assert.isNotEmpty((text ?? "").trim());
 		}
 		assert.deepEqual(await dump(other), otherBefore);
 		// A studio that was not given is untouched: no rows of any kind.

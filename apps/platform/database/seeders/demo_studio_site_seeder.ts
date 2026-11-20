@@ -115,13 +115,14 @@ const STUDIO_FILLS = [
  * limit, so a Solo studio has one; a paused studio is still topped up, as
  * the limit is the package's shape and pausing is a billing state), eight
  * work photos per visible artist and six flash designs for each who has
- * none (generated line-art
- * pictures stored like real uploads, with their 320/640/1280 px copies),
- * opening hours, one upcoming closed day, and the Good to know texts, chat
- * number and deposit policy when they are empty. Existing artists keep their
- * names, flags and visibility; only empty fields are filled. Each step looks
- * at what the studio already has, so a second run adds nothing. Run as the
- * owner role, which row-level security does not apply to: `pnpm seed:dev`.
+ * none (generated line-art pictures stored like real uploads, with their
+ * 320/640/1280 px copies), opening hours, an upcoming two-day closure, and
+ * the Good to know texts, chat number and deposit policy when they are
+ * empty. Existing artists keep their names, flags and visibility; only
+ * empty fields are filled. Each step looks at what the studio already has,
+ * so a second run adds nothing, except a new closure once the last one has
+ * passed. Run as the owner role, which row-level security does not apply
+ * to: `pnpm seed:dev`.
  */
 export default class DemoStudioSiteSeeder extends BaseSeeder {
 	static environment = ["development"];
@@ -137,13 +138,13 @@ export default class DemoStudioSiteSeeder extends BaseSeeder {
 		for (const tenant of await this.studios()) {
 			const added = await seedStudio(tenant, this.client, { images, gate });
 			logger.info(
-				`${studioLinks(tenant.slug).url}: ${count(added.artists, "artist")}, ${count(added.photos, "photo")} and ${count(added.flash, "flash design")} added (/work, /flash, /artists/<slug>)`,
+				`${studioLinks(tenant.slug).url}: ${plural(added.artists, "artist")}, ${plural(added.photos, "photo")} and ${plural(added.flash, "flash design")} added (/work, /flash, /artists/<slug>)`,
 			);
 		}
 	}
 }
 
-const count = (total: number, noun: string) =>
+const plural = (total: number, noun: string) =>
 	`${total} ${noun}${total === 1 ? "" : "s"}`;
 
 async function seedStudio(
@@ -298,7 +299,8 @@ async function addWorkPhotos(
 				// Newest first: each photo is about twelve days older than the last.
 				createdAt: now.minus({
 					days: 6 + n * 12 + (seed % 5),
-					hours: (seed >> 3) % 24,
+					// Unsigned: a seed is up to 2^32, and `>>` would make it negative.
+					hours: (seed >>> 3) % 24,
 				}),
 			},
 			write,
@@ -368,7 +370,7 @@ async function addFlash(
 	return FLASH_PER_ARTIST;
 }
 
-/** Opening hours and one closed day, for a studio with none; the studio's own timezone decides "today". */
+/** Opening hours for a studio with none, and a two-day closure when none is upcoming; the studio's own timezone decides "today". */
 async function seedHours(tenant: Tenant, client: Db, write: Write) {
 	const hasHours = await StudioHour.query({ client })
 		.where("tenant_id", tenant.id)
