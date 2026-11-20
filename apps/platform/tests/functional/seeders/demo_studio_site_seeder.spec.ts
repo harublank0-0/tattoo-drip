@@ -310,7 +310,7 @@ test.group("DemoStudioSiteSeeder", (group) => {
 			closures[0].endsOn.toISODate(),
 			today.plus({ days: 6 }).toISODate(),
 		);
-		assert.equal(closures[0].note, "Closed for Tihar, back soon");
+		assert.equal(closures[0].note, "Closed for a holiday, back soon");
 
 		// Good to know, the chat number and the deposit policy.
 		const row = await tenantRow(tenant);
@@ -506,6 +506,50 @@ test.group("DemoStudioSiteSeeder", (group) => {
 		]) {
 			assert.isAbove((text ?? "").length, 20);
 		}
+	}).timeout(SLOW);
+
+	test("tops a Solo studio up only to its package's one artist", async ({
+		assert,
+	}) => {
+		const { tenant } = await studio("solo");
+		await asOwner("update tenants set selected_package = 'solo' where id = ?", [
+			tenant.id,
+		]);
+
+		await seed(tenant);
+
+		const artists = await shown(tenant);
+		assert.deepEqual(
+			artists.map(({ artist }) => artist.name),
+			["Sita Rai"],
+		);
+		assert.lengthOf(artists[0].photos, 8);
+		assert.lengthOf(artists[0].flash, 6);
+	}).timeout(SLOW);
+
+	test("gives a Solo studio whose one artist is hidden no demo artist", async ({
+		assert,
+	}) => {
+		const { tenant, owner } = await studio("solo-hidden");
+		await asOwner("update tenants set selected_package = 'solo' where id = ?", [
+			tenant.id,
+		]);
+		const hidden = await addArtist(tenant, owner, {
+			name: "Hidden One",
+			slug: "hidden-one",
+			visible: false,
+		});
+
+		await seed(tenant);
+
+		// A hidden artist still counts toward the package's limit, as on the dashboard.
+		const all = await inTenant(tenant, () =>
+			Artist.query().where("tenant_id", tenant.id),
+		);
+		assert.deepEqual(
+			all.map((artist) => artist.id),
+			[hidden.id],
+		);
 	}).timeout(SLOW);
 
 	test("writes only the studios it is given, whatever other studios hold", async ({

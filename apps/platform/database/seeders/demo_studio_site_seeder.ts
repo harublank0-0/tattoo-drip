@@ -1,3 +1,4 @@
+import app from "@adonisjs/core/services/app";
 import logger from "@adonisjs/core/services/logger";
 import { BaseSeeder } from "@adonisjs/lucid/seeders";
 import type { QueryClientContract } from "@adonisjs/lucid/types/database";
@@ -12,13 +13,15 @@ import {
 } from "#modules/artists/styles";
 import FlashDesign from "#modules/flash/models/flash_design";
 import ImageService from "#modules/media/services/image_service";
+import PackageGate from "#modules/packages/services/package_gate";
 import { todayIn } from "#modules/projects/quotes";
 import StudioClosure from "#modules/scheduling/models/studio_closure";
 import StudioHour from "#modules/scheduling/models/studio_hour";
 import Tenant from "#modules/tenancy/models/tenant";
+import { withDbContext } from "#services/db_context";
 import { studioLinks } from "#services/studio_links";
 
-/** A visible-artists target: a studio with fewer gets the demo artists below. */
+/** A visible-artists target: a studio with fewer gets the demo artists below, within its package's artist limit. */
 const WANTED_ARTISTS = 3;
 /** Lead photos a visible artist has after the seed (the dashboard allows 100). */
 const WANTED_PHOTOS = 8;
@@ -108,8 +111,11 @@ const STUDIO_FILLS = [
 
 /**
  * Development only: gives every studio a website worth looking at, whatever
- * else it has: up to three visible artists, eight work photos per visible
- * artist and six flash designs for each who has none (generated line-art
+ * else it has: up to three visible artists (never past its package's artist
+ * limit, so a Solo studio has one; a paused studio is still topped up, as
+ * the limit is the package's shape and pausing is a billing state), eight
+ * work photos per visible artist and six flash designs for each who has
+ * none (generated line-art
  * pictures stored like real uploads, with their 320/640/1280 px copies),
  * opening hours, one upcoming closed day, and the Good to know texts, chat
  * number and deposit policy when they are empty. Existing artists keep their
@@ -127,16 +133,24 @@ export default class DemoStudioSiteSeeder extends BaseSeeder {
 
 	async run() {
 		const images = new ImageService();
+		const gate = await app.container.make(PackageGate);
 		for (const tenant of await this.studios()) {
-			const added = await seedStudio(tenant, this.client, images);
+			const added = await seedStudio(tenant, this.client, { images, gate });
 			logger.info(
-				`${studioLinks(tenant.slug).url}: ${added.artists} artists, ${added.photos} photos and ${added.flash} flash designs added (/work, /flash, /artists/<slug>)`,
+				`${studioLinks(tenant.slug).url}: ${count(added.artists, "artist")}, ${count(added.photos, "photo")} and ${count(added.flash, "flash design")} added (/work, /flash, /artists/<slug>)`,
 			);
 		}
 	}
 }
 
-async function seedStudio(tenant: Tenant, client: Db, images: ImageService) {
+const count = (total: number, noun: string) =>
+	`${total} ${noun}${total === 1 ? "" : "s"}`;
+
+async function seedStudio(
+	tenant: Tenant,
+	client: Db,
+	{ images, gate }: { images: ImageService; gate: PackageGate },
+) {
 	// Writes pass `{ connection }`, not `{ client }`: a model instance keeps
 	// only a transaction client, so a plain `{ client }` would silently
 	// write as the app role and fail row-level security. Queries
@@ -145,11 +159,20 @@ async function seedStudio(tenant: Tenant, client: Db, images: ImageService) {
 	const added = { artists: 0, photos: 0, flash: 0 };
 
 	// Artists: top the studio up to three visible ones, skipping a demo artist
-	// whose slug or name a live artist (hidden ones too) already has.
+	// whose slug or name a live artist (hidden ones too) already has, and
+	// adding none past the package's limit. The limit counts active artists,
+	// hidden ones included, by the dashboard's own rule (PackageGate).
 	const live = await Artist.query({ client }).where("tenant_id", tenant.id);
 	let visible = live.filter((artist) => artist.visible).length;
+	const usage = await withDbContext({ tenantId: tenant.id }, () =>
+		gate.artistUsage(tenant),
+	);
+	let room =
+		usage.limit === null
+			? Number.POSITIVE_INFINITY
+			: usage.limit - usage.active;
 	for (const demo of DEMO_ARTISTS) {
-		if (visible >= WANTED_ARTISTS) break;
+		if (visible >= WANTED_ARTISTS || room <= 0) break;
 		const taken = live.some(
 			(artist) =>
 				artist.slug === demo.slug ||
@@ -173,6 +196,7 @@ async function seedStudio(tenant: Tenant, client: Db, images: ImageService) {
 			write,
 		);
 		visible++;
+		room--;
 		added.artists++;
 	}
 
@@ -371,7 +395,7 @@ async function seedHours(tenant: Tenant, client: Db, write: Write) {
 				tenantId: tenant.id,
 				startsOn: first,
 				endsOn: first.plus({ days: 1 }),
-				note: "Closed for Tihar, back soon",
+				note: "Closed for a holiday, back soon",
 			},
 			write,
 		);
